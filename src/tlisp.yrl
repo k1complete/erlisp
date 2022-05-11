@@ -6,7 +6,7 @@ expressions sexpression elements
 term hterm atom asymbol  lines.
 
 Terminals
-symbol
+symbol module_function
 integer float string variable
 '(' ')' ',' ',@' '\'' '#('.
 
@@ -29,6 +29,7 @@ elements ->
 elements ->
     elements term : lists:append('$1', ['$2']).
 
+
 term ->
     atom : '$1'.
 term ->
@@ -43,6 +44,8 @@ hterm ->
 hterm ->
     sexpression : '$1'.
 
+asymbol ->
+    module_function : setline(mf(element(3, '$1')), '$1').
 asymbol ->
     symbol : 
         setline(erl_syntax:atom(element(3,'$1')), '$1').
@@ -72,6 +75,10 @@ setline(Tree, {_t, Line}) ->
 setline(Tree, {_t, Line, _v}) ->
     Pos = erl_anno:new(Line),
     erl_syntax:set_pos(Tree, Pos).
+
+mf(Text) ->
+    [Module, Function] = string:split(Text, ":"),
+    erl_syntax:module_qualifier(Module, Function).
 
 eval(Tlist) ->
     case erl_syntax:type(Tlist) of

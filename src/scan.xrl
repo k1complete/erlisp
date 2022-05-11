@@ -6,7 +6,7 @@ Definitions.
 Digits = [0-9]+
 Alphabet = [A-Za-z_]
 PostAlphabet = ({Alphabet}|{Digits}|\-)
-Symbols = [a-z]{PostAlphabet}*
+Symbols = [-+/*a-z]{PostAlphabet}*
 Variables = [A-Z_]{PostAlphabet}*
 WhiteSpace = [\s\t]+
 QString = \"([^\"]|\\\")+\"
@@ -21,6 +21,8 @@ Rules.
   {token, {variable, ?LC(TokenLine, TokenLen), list_to_atom(TokenChars)}}.
 {Symbols} : 
   {token, {symbol, ?LC(TokenLine, TokenLen), list_to_atom(TokenChars)}}.
+{Symbols}:{Symbols} : 
+  {token, {module_function, ?LC(TokenLine, TokenLen), list_to_atom(TokenChars)}}.
 \( :
   {token, {'(', ?LC(TokenLine, TokenLen)}}.
 \) :
