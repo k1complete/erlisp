@@ -63,3 +63,9 @@ export_test() ->
                             ["[export, [a, 2], [b, 3]]"])),
     C5 = merl:quote(Line, ["-export([a/2, b/3])."]),
     ?assertEqual(C5, erl_syntax:revert(C4)).
+module_test() ->
+    Line = ?LINE,
+    C4 = transpile:form(?TQ(Line,
+                            ["[module, b]"])),
+    C5 = merl:quote(Line, ["-module(b)."]),
+    ?assertEqual(C5, erl_syntax:revert(C4)).

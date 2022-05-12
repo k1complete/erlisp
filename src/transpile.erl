@@ -40,6 +40,8 @@ form(A) ->
                     infix_op(Args, "*");
                 H == atom, Hn == "export" ->
                     export_(Args);
+                H == atom, Hn == "module" ->
+                    module_(Args);
                 H == atom, Hn == "cons" ->
                     cons_(T);
                 H == atom, Hn == "quote" ->
@@ -59,9 +61,14 @@ form(A) ->
 export_(L) ->
     Aq = lists:map(fun(E) ->
                            [F, A] = erl_syntax:list_elements(E),
-                           erl_syntax:arity_qualifier(term(F), term(A))
+                           erl_syntax:arity_qualifier(F, A)
                    end, L),
     E = erl_syntax:attribute(erl_syntax:atom(export),[erl_syntax:list(Aq)]),
+    erl_syntax:copy_pos(hd(L), E).
+
+module_(L) ->
+    Module =hd(L),
+    E = erl_syntax:attribute(erl_syntax:atom(module), [Module]),
     erl_syntax:copy_pos(hd(L), E).
 
 match_op([Left,Right]) ->

@@ -4,7 +4,7 @@ Definitions.
 
 %macro definitions
 Digits = [0-9]+
-Alphabet = [A-Za-z_]
+Alphabet = [A-Za-z_\x{80}-\x{fff}]
 PostAlphabet = ({Alphabet}|{Digits}|\-)
 Symbols = [-+/*a-z]{PostAlphabet}*
 Variables = [A-Z_]{PostAlphabet}*
@@ -77,4 +77,5 @@ file(F, Loc, TokenList) ->
             {ok, TokenList ++ [{'$end', {End+1,1}}]}
     end.
 
+    
     

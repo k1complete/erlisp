@@ -35,7 +35,7 @@ term ->
 term ->
     asymbol : '$1'.
 term ->
-    string : setline(erl_syntax:string(element(3, '$1')), '$1').
+    string : setline(erl_syntax:string(tokenvalue('$1')), '$1').
 term ->
     sexpression : '$1'.
 
@@ -45,20 +45,21 @@ hterm ->
     sexpression : '$1'.
 
 asymbol ->
-    module_function : setline(mf(element(3, '$1')), '$1').
+    module_function : setline(mf(tokenvalue('$1')), '$1').
 asymbol ->
     symbol : 
-        setline(erl_syntax:atom(element(3,'$1')), '$1').
+        setline(erl_syntax:atom(tokenvalue('$1')), '$1').
 asymbol ->
     variable : 
-        setline(erl_syntax:variable(element(3, '$1')), '$1').
+        setline(erl_syntax:variable(tokenvalue('$1')), '$1').
 
 atom ->
     integer :
-        setline(erl_syntax:integer('$1'), '$1').
+        io:format("integer: ~p~n", ['$1']),
+        setline(erl_syntax:integer(tokenvalue('$1')), '$1').
 atom ->
     float : 
-        setline(erl_syntax:float('$1'), '$1').
+        setline(erl_syntax:float(tokenvalue('$1')), '$1').
     
   
 
@@ -68,6 +69,8 @@ Erlang code.
 -export([test/0]).
 
 -include_lib("scan.hrl").
+tokenvalue(T) ->
+    element(3, T).
 
 setline(Tree, {_t, Line}) ->
     Pos = erl_anno:new(Line),
