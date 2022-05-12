@@ -4,9 +4,11 @@ Definitions.
 
 %macro definitions
 Digits = [0-9]+
-Alphabet = [A-Za-z_\x{80}-\x{fff}]
-PostAlphabet = ({Alphabet}|{Digits}|\-)
+Alphabet = [A-Za-z_]|[\x{80}-\x{10fff}]
+Griph=[-+*/]
+PostAlphabet = ({Alphabet}|{Digits}|{Griph})
 Symbols = [-+/*a-z]{PostAlphabet}*
+Op = (\+\+|\-\-|==|/=|=<|<|>=|>|=:=|=/=|\+|-|\*|/)
 Variables = [A-Z_]{PostAlphabet}*
 WhiteSpace = [\s\t]+
 QString = \"([^\"]|\\\")+\"
@@ -19,6 +21,8 @@ Rules.
   {token, {float, ?LC(TokenLine, TokenLen), list_to_float(TokenChars)}}.
 {Variables} : 
   {token, {variable, ?LC(TokenLine, TokenLen), list_to_atom(TokenChars)}}.
+{Op} : 
+  {token, {symbol, ?LC(TokenLine, TokenLen), list_to_atom(TokenChars)}}.
 {Symbols} : 
   {token, {symbol, ?LC(TokenLine, TokenLen), list_to_atom(TokenChars)}}.
 {Symbols}:{Symbols} : 

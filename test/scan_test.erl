@@ -10,7 +10,26 @@ process(Expected, Got) ->
     Trees = transpile:form(Tree),
     {erl_prettypr:format(merl:quote(Expected)),
      erl_prettypr:format(Trees)}.
-    
+
+utf8_test() ->    
+    Line=?LINE,
+    Got = "(Aあ)",
+    {ok, Tokens, _Lines} = scan:string(Got, Line),
+    {ok, Tree} = tlisp:parse(Tokens),
+    Trees = transpile:form(Tree),
+    io:format("~ts~n", [erl_syntax:variable_literal(Trees)]),
+    ?assertEqual("Aあ", erl_syntax:variable_literal(Trees)).
+comparison_test() ->
+    {A, B} = process("1==1", "(== 1 1)"),
+    ?assertEqual(A, B),
+    {A2, B2} = process("1/=1", "(/= 1 1)"),
+    ?assertEqual(A2, B2),
+    {A3, B3} = process("1=<1", "(=< 1 1)"),
+    ?assertEqual(A3, B3).
+
+eq_test() ->
+    {A, B} = process("1==1", "(== 1 1)"),
+    ?assertEqual(A, B).
 plus2_test() ->
     {A, B} = process("A=1+1", "(match A (+ 1 1))"),
     ?assertEqual(A, B).

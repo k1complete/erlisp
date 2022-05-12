@@ -20,7 +20,16 @@ term(A) ->
     end.
 
 dispatch_infix_op(A) ->
-    L = #{"+" => fun infix_op/2,
+    L = #{
+          "==" => fun infix_op/2,
+          "/=" => fun infix_op/2,
+          "=<" => fun infix_op/2,
+          "<" => fun infix_op/2,
+          ">=" => fun infix_op/2,
+          ">" => fun infix_op/2,
+          "=:=" => fun infix_op/2,
+          "=/=" => fun infix_op/2,
+          "+" => fun infix_op/2,
           "-" => fun infix_op/2,
           "*" => fun infix_op/2,
           "/" => fun infix_op/2

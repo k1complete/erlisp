@@ -69,3 +69,12 @@ module_test() ->
                             ["[module, b]"])),
     C5 = merl:quote(Line, ["-module(b)."]),
     ?assertEqual(C5, erl_syntax:revert(C4)).
+
+equal_test() ->
+    Line=?LINE,
+%    C4 = transpile:form(?Q(Line, "['==', 1, 2]")),
+    C4 = transpile:form({cons,1,
+                         {atom,1,'=='},
+                         {cons,1,{integer,1,1},{cons,1,{integer,1,2},{nil,1}}}}),
+    C5 = merl:quote( "1 == 2"),
+    ?assertEqual(C5, erl_syntax:revert(C4)).
