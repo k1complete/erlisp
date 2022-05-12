@@ -19,13 +19,24 @@ utf8_test() ->
     Trees = transpile:form(Tree),
     io:format("~ts~n", [erl_syntax:variable_literal(Trees)]),
     ?assertEqual("Aあ", erl_syntax:variable_literal(Trees)).
-comparison_test() ->
-    {A, B} = process("1==1", "(== 1 1)"),
-    ?assertEqual(A, B),
-    {A2, B2} = process("1/=1", "(/= 1 1)"),
-    ?assertEqual(A2, B2),
-    {A3, B3} = process("1=<1", "(=< 1 1)"),
-    ?assertEqual(A3, B3).
+infix_test() ->
+    lists:map(fun({AM, BM}) ->
+                      {A, B} = process(AM, BM),
+                      ?assertEqual(A, B)
+              end,
+              [{"1==1", "(== 1 1)"},
+               {"1/=1", "(/= 1 1)"},
+               {"1=<1", "(=< 1 1)"},
+               {"1<1", "(< 1 1)"},
+               {"1>=1", "(>= 1 1)"},
+               {"1>1", "(> 1 1)"},
+               {"1=:=1", "(=:= 1 1)"},
+               {"1=/=1", "(=/= 1 1)"},
+               {"1+2", "(+ 1 2)"},
+               {"1-2", "(- 1 2)"},
+               {"1*2", "(* 1 2)"},
+               {"1/2", "(/ 1 2)"}
+              ]).
 
 eq_test() ->
     {A, B} = process("1==1", "(== 1 1)"),
