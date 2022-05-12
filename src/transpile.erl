@@ -53,8 +53,9 @@ form(A) ->
                         Spf ->
                             Spf(X, T)
                     end;
-                InF ->
-                    Inf(Hn, Args)
+                Inf ->
+                    Op = erl_syntax:copy_pos(X, erl_syntax:operator(Hn)), 
+                    Inf(Op, Args)
             end;
         _ ->
             X
@@ -79,10 +80,11 @@ match_op(X, L) ->
     erl_syntax:copy_pos(X, Me).
 
 infix_op(Op, [Left|T]) ->
+%    Ops = erl_syntax:copy_pos(Op, erl_syntax:operator(Op)),
     case T of
         [] -> Left;
         [Right|Tail] ->
-            Nexp = erl_syntax:infix_expr(Left, erl_syntax:operator(Op), Right),
+            Nexp = erl_syntax:infix_expr(Left, Op, Right),
             Exp = erl_syntax:copy_pos(Right, Nexp),
             infix_op(Op, [Exp|Tail])
     end.
@@ -186,18 +188,11 @@ getmf(X) ->
              erl_syntax:copy_pos(X, erl_syntax:atom(hd(F)))}
     end.
 
-lists_reverse_(X, T) ->
-    call_function(X, T).
-    
-quote_(X, L) ->
+quote_(_X, L) ->
     erl_syntax:list_head(L).
 
-quote_(L) ->    
-    Head = erl_syntax:list_head(L),
-    Head.
 
 lst() ->
-    A=?Q("_@Ee+1") = ?Q("B+1"),
     ?Q("B+1+1"),
     C=form(?Q("[add, 1, 2, 3]")),
     C2=form(?Q("[mul, 1, 2, 3]")),
