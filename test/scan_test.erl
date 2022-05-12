@@ -3,6 +3,21 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("syntax_tools/include/merl.hrl").
 
+process(Expected, Got) ->
+    Line=?LINE,
+    {ok, Tokens, _Lines} = scan:string(Got, Line),
+    {ok, Tree} = tlisp:parse(Tokens),
+    Trees = transpile:form(Tree),
+    {erl_prettypr:format(merl:quote(Expected)),
+     erl_prettypr:format(Trees)}.
+    
+plus2_test() ->
+    {A, B} = process("A=1+1", "(match A (+ 1 1))"),
+    ?assertEqual(A, B).
+minus_test() ->
+    {A, B} = process("A= 1-1", "(match A (- 1 1))"),
+    ?assertEqual(A, B).
+ 
 plus_test() ->
     Line=?LINE,
     S="(+ 1 1)",
@@ -16,4 +31,5 @@ plus_test() ->
     A=erl_prettypr:format(SE),
     B=erl_prettypr:format(TP),
     ?assertEqual(A, B).
+
 

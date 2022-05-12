@@ -3,7 +3,7 @@
 -compile([{debug_info, true}]).
 -export([lst/0]).
 
--export([form/1, term/1, infix_op/2, cons_/1, length_/1]).
+-export([form/1, term/1, infix_op/2]).
 -type tree() :: erl_syntax:syntaxTree().
 
 term(A) ->
@@ -19,6 +19,23 @@ term(A) ->
             A
     end.
 
+dispatch_infix_op(A) ->
+    L = #{"+" => fun infix_op/2,
+          "-" => fun infix_op/2,
+          "*" => fun infix_op/2,
+          "/" => fun infix_op/2
+         },
+    maps:get(A, L, undef).
+dispatch_special(A) ->
+    L = #{"match" => fun match_op/2,
+          "export" => fun export_/2,
+          "module" => fun module_/2,
+          "cons" => fun cons_/2,
+          "quote" => fun quote_/2,
+          "defun" => fun defun_/2
+         },
+    maps:get(A, L, undef).
+
 -spec form(tree()) -> tree().
 form(A) ->
     X = erl_syntax:list_head(A),
@@ -28,75 +45,65 @@ form(A) ->
         atom ->
             Hn = erl_syntax:atom_name(X),
             Args = erl_syntax:list_elements(T),
-            if 
-                H == atom, Hn == "match" ->
-                    match_op(Args);
-                H == atom, Hn == "+" ->
-                    io:format("+", []),
-                    infix_op(Args, "+");
-                H == atom, Hn == "add" ->
-                    infix_op(Args, "+");
-                H == atom, Hn == "mul" ->
-                    infix_op(Args, "*");
-                H == atom, Hn == "export" ->
-                    export_(Args);
-                H == atom, Hn == "module" ->
-                    module_(Args);
-                H == atom, Hn == "cons" ->
-                    cons_(T);
-                H == atom, Hn == "quote" ->
-                    quote_(T);
-                H == atom, Hn == "length" ->
-                    length_(T);
-                H == atom, Hn == "defun" ->
-                    defun_(T);
-                H == atom, Hn == "lists:reverse" ->
-                    lists_reverse_(T);
-                true ->
-                    X
+            case Inf=dispatch_infix_op(Hn) of
+                undef ->
+                    case Spf=dispatch_special(Hn) of
+                        undef ->
+                            call_function(X, T);
+                        Spf ->
+                            Spf(X, T)
+                    end;
+                InF ->
+                    Inf(Hn, Args)
             end;
         _ ->
             X
     end.
-export_(L) ->
+export_(X, L) ->
     Aq = lists:map(fun(E) ->
                            [F, A] = erl_syntax:list_elements(E),
                            erl_syntax:arity_qualifier(F, A)
-                   end, L),
+                   end, erl_syntax:list_elements(L)),
     E = erl_syntax:attribute(erl_syntax:atom(export),[erl_syntax:list(Aq)]),
-    erl_syntax:copy_pos(hd(L), E).
+    erl_syntax:copy_pos(X, E).
 
-module_(L) ->
-    Module =hd(L),
+module_(X, L) ->
+    Module = erl_syntax:list_head(L),
     E = erl_syntax:attribute(erl_syntax:atom(module), [Module]),
-    erl_syntax:copy_pos(hd(L), E).
+    erl_syntax:copy_pos(X, E).
 
-match_op([Left,Right]) ->
+match_op(X, L) ->
+    [Left, Right] = erl_syntax:list_elements(L),
     io:format("Match: ~p ~p~n", [Left, Right]),
-    Me = erl_syntax:match_expr(Left, Right),
-    erl_syntax:copy_pos(Left, Me).
+    Me = erl_syntax:match_expr(term(Left), term(Right)),
+    erl_syntax:copy_pos(X, Me).
 
-infix_op([Left|T], Op) ->
+infix_op(Op, [Left|T]) ->
     case T of
         [] -> Left;
         [Right|Tail] ->
             Nexp = erl_syntax:infix_expr(Left, erl_syntax:operator(Op), Right),
             Exp = erl_syntax:copy_pos(Right, Nexp),
-            infix_op([Exp|Tail], Op)
+            infix_op(Op, [Exp|Tail])
     end.
 
 -define(MQ(L, T, B), merl:qquote(erl_syntax:get_pos(L), T, B)).
 
-cons_(L) ->
+cons_(C, L) ->
+    io:format("cons: ~p~n", [L]),
     Head = erl_syntax:list_head(L),
     Tail = erl_syntax:list_elements(erl_syntax:list_tail(L)),
     case Tail of
         [] -> Head;
         [X] ->
             HHead = term(Head),
+            io:format("HHead: ~p~n", [HHead]),
             TTail = term(X),
-            ?MQ(Head, "[_@HHead|_@TTail]", [{'HHead', HHead}, {'TTail', TTail}])
+            io:format("TTail: ~p~n", [TTail]),
+
+            ?MQ(C, "[_@HHead|_@TTail]", [{'HHead', HHead}, {'TTail', TTail}])
     end.
+
 forms(L) ->    
     case erl_syntax:list_length(L) of
         1 ->
@@ -131,20 +138,21 @@ clause_(L) ->
     ?MQ(Args, "(_@PArgs) when _@__Guard -> _@Body",
         [{'PArgs', PArgs}, {'Guard', Guard}, {'Body', Body} ]).
 
+
 match_defun_(Name, Clauses) ->
     Md = erl_syntax:function(Name, lists:map(fun(E) ->
                                                      clause_(E)
                                              end, Clauses)),
     erl_syntax:copy_pos(Name, Md).
 
-defun_(L) ->
+defun_(X, L) ->
     [Name, Args | Rest] = erl_syntax:list_elements(L),
     case erl_syntax:type(erl_syntax:list_head(Args)) of
         list ->
             match_defun_(Name, [Args|Rest]);
         variable ->
             Body = lists:map(fun(E) -> form(E) end, Rest),
-            ?MQ(Name, "'@Name'(_@@Args) -> _@@Body.", 
+            ?MQ(X, "'@Name'(_@@Args) -> _@@Body.", 
                 [{'Name', Name}, 
                  {'Args', erl_syntax:list_elements(Args)}, 
                  {'Body', Body}]);
@@ -152,16 +160,38 @@ defun_(L) ->
             io:format("Y: ~p~n", [X])
     end.
 
-length_(L) ->
-    Head = erl_syntax:list_head(L),
-    FHead = term(Head),
-    io:format("LLL ~p", [L]),
-    ?MQ(Head, "length(_@FHead)", [{'FHead', FHead}]).
-
-lists_reverse_(T) ->
+call_function(X, T) ->
     FHead = term(erl_syntax:list_head(T)),
-    ?MQ(FHead, "lists:reverse(_@FHead)", [{'FHead', FHead}]).
+    {M, F} = getmf(X),
+    case M of
+        undef ->
+            ?MQ(X, "'@F'(_@FHead)", 
+                [{'F', F},
+                 {'FHead', FHead}]);
+        _ ->
+            ?MQ(X, "'@M':'@F'(_@FHead)", 
+                [{'M', M},
+                 {'F', F},
+                 {'FHead', FHead}])
+    end.
+
+
+getmf(X) ->
+    [M|F] = string:split(erl_syntax:atom_name(X), ":"),
+    case F of
+        [] ->
+            {undef, erl_syntax:copy_pos(X, erl_syntax:atom(M))};
+        _ ->
+            {erl_syntax:copy_pos(X, erl_syntax:atom(M)),
+             erl_syntax:copy_pos(X, erl_syntax:atom(hd(F)))}
+    end.
+
+lists_reverse_(X, T) ->
+    call_function(X, T).
     
+quote_(X, L) ->
+    erl_syntax:list_head(L).
+
 quote_(L) ->    
     Head = erl_syntax:list_head(L),
     Head.
