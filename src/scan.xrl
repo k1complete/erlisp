@@ -39,6 +39,8 @@ Rules.
   {token, {'\'', ?LC(TokenLine, TokenLen)}}.
 \#\( :
   {token, {'#(', ?LC(TokenLine, TokenLen)}}.
+_ : 
+  {token, {underscore, ?LC(TokenLine, TokenLen), "_"}}.
   
 {QString} :
   [_|String] = lists:droplast(TokenChars),

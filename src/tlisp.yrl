@@ -7,22 +7,27 @@ term hterm atom asymbol  lines.
 
 Terminals
 symbol module_function
-integer float string variable
+integer float string variable underscore
 '(' ')' ',' ',@' '\'' '#('.
 
 Rootsymbol lines.
 Endsymbol '$end'.
 
 lines ->
-    expressions : '$1'.
+    expressions : 
+        '$1'.
 expressions ->
-    sexpression : '$1'.
+    sexpression : 
+        '$1'.
 expressions ->
-    expressions sexpression : erl_syntax:list('$1', ['$2']).
+    expressions sexpression : 
+        setline(erl_syntax:list('$1', ['$2']), '$2').
 sexpression ->
     '(' ')' : nil.
 sexpression ->
-    '(' elements ')' : erl_syntax:list('$2').
+    '(' elements ')' : 
+%        erl_syntax:list('$2').
+        setline(erl_syntax:list('$2'), hd('$2')).
 
 elements ->
     hterm : ['$1'].
@@ -42,6 +47,8 @@ term ->
 hterm ->
     asymbol : '$1'.
 hterm ->
+    atom : '$1'.
+hterm ->
     sexpression : '$1'.
 
 asymbol ->
@@ -52,6 +59,9 @@ asymbol ->
 asymbol ->
     variable : 
         setline(erl_syntax:variable(tokenvalue('$1')), '$1').
+asymbol ->
+    underscore : 
+        setline(erl_syntax:underscore(), '$1').
 
 atom ->
     integer :
@@ -74,7 +84,9 @@ setline(Tree, {_t, Line}) ->
     erl_syntax:set_pos(Tree, Pos);
 setline(Tree, {_t, Line, _v}) ->
     Pos = erl_anno:new(Line),
-    erl_syntax:set_pos(Tree, Pos).
+    erl_syntax:set_pos(Tree, Pos);
+setline(Tree, {tree, _t, _a, _v} = L) ->
+    erl_syntax:copy_pos(L, Tree).
 
 mf(Text) ->
     [Module, Function] = string:split(Text, ":"),

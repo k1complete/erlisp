@@ -15,6 +15,10 @@ term(A) ->
             A;
         list ->
             form(A);
+        variable  ->
+            A;
+        underscore ->
+            A;
         _ ->
             A
     end.
@@ -32,7 +36,15 @@ dispatch_infix_op(A) ->
           "+" => fun infix_op/2,
           "-" => fun infix_op/2,
           "*" => fun infix_op/2,
-          "/" => fun infix_op/2
+          "/" => fun infix_op/2,
+          "bnot" => fun infix_op/2,
+          "div" => fun infix_op/2,
+          "rem" => fun infix_op/2,
+          "band" => fun infix_op/2,
+          "bor" => fun infix_op/2,
+          "bxor" => fun infix_op/2,
+          "bsl" => fun infix_op/2,
+          "bsr" => fun infix_op/2
          },
     maps:get(A, L, undef).
 dispatch_special(A) ->
@@ -53,13 +65,16 @@ form(A) ->
     case H of 
         atom ->
             Hn = erl_syntax:atom_name(X),
+            io:format("Form: ~p~n", [T]),
             Args = erl_syntax:list_elements(T),
+            io:format("FormL: ~p~n Hn: ~p~n", [Args, Hn]),
             case Inf=dispatch_infix_op(Hn) of
                 undef ->
                     case Spf=dispatch_special(Hn) of
                         undef ->
                             call_function(X, T);
                         Spf ->
+                            io:format("SPf: ~p~n: ~p~n", [X, T]),
                             Spf(X, T)
                     end;
                 Inf ->
@@ -86,16 +101,31 @@ match_op(X, L) ->
     [Left, Right] = erl_syntax:list_elements(L),
     io:format("Match: ~p ~p~n", [Left, Right]),
     Me = erl_syntax:match_expr(term(Left), term(Right)),
+    io:format("Match2: ~p~n", [Me]),
     erl_syntax:copy_pos(X, Me).
 
+anary_op(Op, Left) ->
+    Nexp = erl_syntax:prefix_expr(Op, Left),
+    erl_syntax:copy_pos(Op, Nexp).
+
 infix_op(Op, [Left|T]) ->
-%    Ops = erl_syntax:copy_pos(Op, erl_syntax:operator(Op)),
+    infix_op_do(Op, [term(Left)|T]).
+
+infix_op_do(Op, [Left|T]) ->
     case T of
-        [] -> Left;
+        [] -> 
+            anary_op(Op, Left);
         [Right|Tail] ->
-            Nexp = erl_syntax:infix_expr(Left, Op, Right),
-            Exp = erl_syntax:copy_pos(Right, Nexp),
-            infix_op(Op, [Exp|Tail])
+            case Tail of
+                [] ->
+                    Nexp = erl_syntax:infix_expr(Left, Op, term(Right)),
+                    Exp = erl_syntax:copy_pos(Right, Nexp),
+                    Exp;
+                _ ->
+                    Nexp = erl_syntax:infix_expr(Left, Op, term(Right)),
+                    Exp = erl_syntax:copy_pos(Right, Nexp),
+                    infix_op_do(Op, [Exp|Tail])
+            end
     end.
 
 -define(MQ(L, T, B), merl:qquote(erl_syntax:get_pos(L), T, B)).
@@ -151,9 +181,10 @@ clause_(L) ->
 
 
 match_defun_(Name, Clauses) ->
-    Md = erl_syntax:function(Name, lists:map(fun(E) ->
-                                                     clause_(E)
-                                             end, Clauses)),
+    Md = erl_syntax:function(Name, 
+                             lists:map(fun(E) ->
+                                               clause_(E)
+                                       end, Clauses)),
     erl_syntax:copy_pos(Name, Md).
 
 defun_(X, L) ->
@@ -198,6 +229,7 @@ getmf(X) ->
     end.
 
 quote_(_X, L) ->
+    io:format("quote ~p~n", [L]),
     erl_syntax:list_head(L).
 
 

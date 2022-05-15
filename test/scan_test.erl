@@ -3,13 +3,29 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("syntax_tools/include/merl.hrl").
 
+loctoline(Tree) ->
+    erl_syntax_lib:map(fun(E) ->
+                               Loc=erl_syntax:get_pos(E),
+                               Line = case Loc of
+                                          {L, _} ->
+                                              L;
+                                          L when is_integer(L) ->
+                                              L
+                                      end,
+                               erl_syntax:set_pos(E, Line)
+                       end,
+                       Tree).
+        
 process(Expected, Got) ->
     Line=?LINE,
     {ok, Tokens, _Lines} = scan:string(Got, Line),
     {ok, Tree} = tlisp:parse(Tokens),
     Trees = transpile:form(Tree),
-    {erl_prettypr:format(merl:quote(Expected)),
-     erl_prettypr:format(Trees)}.
+%    {erl_prettypr:format(merl:quote(Expected)),
+%     erl_prettypr:format(Trees)}.
+    {merl:quote(Line, Expected),
+     erl_syntax:revert(loctoline(Trees))}.
+   
 
 utf8_test() ->    
     Line=?LINE,
@@ -35,8 +51,23 @@ infix_test() ->
                {"1+2", "(+ 1 2)"},
                {"1-2", "(- 1 2)"},
                {"1*2", "(* 1 2)"},
-               {"1/2", "(/ 1 2)"}
+               {"1/2", "(/ 1 2)"},
+               {"bnot 1", "(bnot 1)"},
+               {"1 div 2", "(div 1 2)"},
+               {"3 rem 2", "(rem 3 2)"},
+               {"6 band 4", "(band 6 4)"},
+               {"8 bor 4", "(bor 8 4)"},
+               {"8 bxor 4", "(bxor 8 4)"},
+               {"8 bsl 2", "(bsl 8 2)"},
+               {"8 bsr 2", "(bsr 8 2)"},
+               {"8 bsl (8 bsr 2)", "(bsl 8 (bsr 8 2))"}
               ]).
+match_test() ->
+    {A, B} = process("_ = [1,2,3]", "(match _ (quote (1 2 3)))"),
+    ?assertEqual(A, B).
+match2_test() ->
+    {A, B} = process("[X, Y, 3] = [1,2,3]", "(match (cons X (cons Y (quote (3)))) (quote (1 2 3)))"),
+    ?assertEqual(A, B).
 
 eq_test() ->
     {A, B} = process("1==1", "(== 1 1)"),
@@ -61,5 +92,4 @@ plus_test() ->
     A=erl_prettypr:format(SE),
     B=erl_prettypr:format(TP),
     ?assertEqual(A, B).
-
 
