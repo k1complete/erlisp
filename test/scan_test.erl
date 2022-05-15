@@ -68,6 +68,9 @@ match_test() ->
 match2_test() ->
     {A, B} = process("[X, Y, 3] = [1,2,3]", "(match (cons X (cons Y (quote (3)))) (quote (1 2 3)))"),
     ?assertEqual(A, B).
+match3_test() ->
+    {A, B} = process("'_' = [1,2,3]", "(match (quote _) (quote (1 2 3)))"),
+    ?assertEqual(A, B).
 
 eq_test() ->
     {A, B} = process("1==1", "(== 1 1)"),

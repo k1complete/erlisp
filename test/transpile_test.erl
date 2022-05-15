@@ -26,14 +26,14 @@ lists_reverse2_test() ->
 quote_var_test() ->
     Line = ?LINE,
     C4 = transpile:form(merl:quote(Line, "[quote, A]")), 
-    C5 = merl:quote(Line, "A"),
-    ?assertEqual(C4, C5).
+    C5 = merl:quote(Line, "'A'"),
+    ?assertEqual(C5, erl_syntax:revert(C4)).
 
 quote_list_test() ->
     Line = ?LINE,
     C4 = transpile:form(?TQ(Line, "[quote, [a, A, 1]]")), 
-    C5 = ?TQ(Line, "[a, A, 1]"),
-    ?assertEqual(C4, C5).
+    C5 = ?TQ(Line, "[a, 'A', 1]"),
+    ?assertEqual(erl_syntax:revert(C5), erl_syntax:revert(C4)).
     
 defun_form_test() ->
     Line = ?LINE,

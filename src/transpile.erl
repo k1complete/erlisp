@@ -230,7 +230,16 @@ getmf(X) ->
 
 quote_(_X, L) ->
     io:format("quote ~p~n", [L]),
-    erl_syntax:list_head(L).
+    L2 = erl_syntax_lib:map(fun(E) ->
+                                    case erl_syntax:type(E) of
+                                        variable ->
+                                            V = erl_syntax:atom(erl_syntax:variable_name(E)),
+                                            erl_syntax:copy_pos(E, V);
+                                        _ ->
+                                            E
+                                    end
+                            end, L),
+    erl_syntax:list_head(L2).
 
 
 lst() ->
