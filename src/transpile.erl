@@ -10,7 +10,17 @@ term(A) ->
     X = erl_syntax:type(A),
     case X of
         atom ->
-            A;
+            A,
+            B = case erl_syntax:atom_name(A) of
+                    "_" ->
+                        erl_syntax:underscore();
+                    N ->
+                        %S=binary_to_list(unicode:characters_to_binary(N)),
+                        S = N,
+                        io:format("S ~ts", [S]),
+                        erl_syntax:variable(S)
+                end,
+            erl_syntax:copy_pos(A, B);
         integer ->
             A;
         list ->
@@ -203,6 +213,7 @@ defun_(X, L) ->
     end.
 
 call_function(X, T) ->
+    io:format("call X ~p~nT ~p~n", [X, T]),
     FHead = term(erl_syntax:list_head(T)),
     {M, F} = getmf(X),
     case M of

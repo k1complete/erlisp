@@ -20,7 +20,7 @@ Rules.
 {Digits}\.{Digits}((E|e)(\+|\-)?{Digits})? :
   {token, {float, ?LC(TokenLine, TokenLen), list_to_float(TokenChars)}}.
 {Variables} : 
-  {token, {variable, ?LC(TokenLine, TokenLen), list_to_atom(TokenChars)}}.
+  {token, {symbol, ?LC(TokenLine, TokenLen), list_to_atom(TokenChars)}}.
 {Op} : 
   {token, {symbol, ?LC(TokenLine, TokenLen), list_to_atom(TokenChars)}}.
 {Symbols} : 
@@ -39,8 +39,6 @@ Rules.
   {token, {'\'', ?LC(TokenLine, TokenLen)}}.
 \#\( :
   {token, {'#(', ?LC(TokenLine, TokenLen)}}.
-_ : 
-  {token, {underscore, ?LC(TokenLine, TokenLen), "_"}}.
 {QString} :
   [_|String] = lists:droplast(TokenChars),
   {token, {string, ?LC(TokenLine, TokenLen), String}}.

@@ -7,9 +7,10 @@ term hterm atom asymbol  lines.
 
 Terminals
 symbol module_function
-integer float string variable underscore
+integer float string 
+underscore
 '(' ')' ',' ',@' '\'' '#('.
-
+%% variable 
 Rootsymbol lines.
 Endsymbol '$end'.
 
@@ -56,9 +57,6 @@ asymbol ->
 asymbol ->
     symbol : 
         setline(erl_syntax:atom(tokenvalue('$1')), '$1').
-asymbol ->
-    variable : 
-        setline(erl_syntax:variable(tokenvalue('$1')), '$1').
 asymbol ->
     underscore : 
         setline(erl_syntax:underscore(), '$1').

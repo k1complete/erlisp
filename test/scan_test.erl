@@ -29,7 +29,7 @@ process(Expected, Got) ->
 
 utf8_test() ->    
     Line=?LINE,
-    Got = "(Aあ)",
+    Got = "(quote Aあ)",
     {ok, Tokens, _Lines} = scan:string(Got, Line),
     {ok, Tree} = tlisp:parse(Tokens),
     Trees = transpile:form(Tree),
