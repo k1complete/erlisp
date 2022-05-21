@@ -19,7 +19,7 @@ loctoline(Tree) ->
 process(Expected, Got) ->
     Line=?LINE,
     {ok, Tokens, _Lines} = scan:string(Got, Line),
-    {ok, Tree} = tlisp:parse(Tokens),
+    {ok, Tree} = parser:parse(Tokens),
     Trees = transpile:form(Tree),
 %    {erl_prettypr:format(merl:quote(Expected)),
 %     erl_prettypr:format(Trees)}.
@@ -31,7 +31,7 @@ utf8_test() ->
     Line=?LINE,
     Got = "(quote Aあ)",
     {ok, Tokens, _Lines} = scan:string(Got, Line),
-    {ok, Tree} = tlisp:parse(Tokens),
+    {ok, Tree} = parser:parse(Tokens),
     Trees = transpile:form(Tree),
     io:format("~ts~n", [erl_syntax:variable_literal(Trees)]),
     ?assertEqual("Aあ", erl_syntax:variable_literal(Trees)).
@@ -88,7 +88,7 @@ plus_test() ->
     SR = scan:string(S, Line),
     SRR=element(2, SR),
     io:format("SRR:~p~n", [SRR]),
-    {ok, SP}=tlisp:parse(SRR),
+    {ok, SP}=parser:parse(SRR),
     io:format("SP:~p~n", [SP]),
     TP=transpile:form(SP),
     SE = merl:quote(Line, "1+1"),
