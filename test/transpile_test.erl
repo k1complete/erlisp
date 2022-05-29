@@ -78,3 +78,22 @@ equal_test() ->
                          {cons,1,{integer,1,1},{cons,1,{integer,1,2},{nil,1}}}}),
     C5 = merl:quote( "1 == 2"),
     ?assertEqual(C5, erl_syntax:revert(C4)).
+
+macro_test() ->
+    C4 = macro:expand_form({cons,1,
+                     {atom,1,'=='},
+                     {cons,1,{integer,1,1},{cons,1,{integer,1,2},{nil,1}}}},
+                    #{"==" => fun(L) ->
+                                      H = erl_syntax:list_head(L),
+                                      T = erl_syntax:list_tail(L),
+                                      NH = erl_syntax:atom("!="),
+                                      erl_syntax:cons(erl_syntax:copy_pos(H, NH),
+                                                     T)
+                              end}
+                   ),
+    C5= {cons,1,
+         {atom,1,'!='},
+         {cons,1,{integer,1,1},{cons,1,{integer,1,2},{nil,1}}}},
+    ?assertEqual(C5, erl_syntax:revert(C4)).
+
+
