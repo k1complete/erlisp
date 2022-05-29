@@ -19,3 +19,5 @@ rebar3.crashdump
 *~
 scan.erl
 tlisp.erl
+parser.erl
+attic/
