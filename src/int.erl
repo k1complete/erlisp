@@ -55,7 +55,7 @@ call_func("set", T, 2, A, E) ->
     {ok, A2V, E2V}  =step(A2, A, E),
     case erl_syntax:type(A1) of 
         variable -> 
-            {ok, A2, maps:put(erl_syntax:variable_literal(A1), A2V, E2V)}
+            {ok, A2V, maps:put(erl_syntax:variable_literal(A1), A2V, E2V)}
     end;
 call_func("car", T, 1, A, E) ->
     {ok, B2, E2} = case erl_syntax:type(B=erl_syntax:list_head(T)) of
@@ -108,7 +108,8 @@ call_func(S, T, TL, A, E) ->
                            fun(Elm, Ac) ->
                                    case erl_syntax:type(Elm)  of
                                        variable ->
-                                           var_replace(Elm, A, Ac);
+                                           {ok, R, E2} = var_replace(Elm, A, Ac),
+                                           {R, E2};
                                        list ->
                                            {ok, R, E2} = step(Elm, A, Ac),
                                            {R, E2};
