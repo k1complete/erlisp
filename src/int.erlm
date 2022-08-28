@@ -1,0 +1,55 @@
+-module(int).
+-include_lib("syntax_tools/include/merl.hrl").
+-export([an/3]).
+-export([export_/4, attribute_/5, module_/4]).
+-export([f/0, create/0]).
+-export([toast/1]).
+
+ 
+an(File, Line, Col) ->
+    Anno =  erl_anno:new({Line, Col}),
+    erl_anno:set_file(File, Anno).
+f() ->
+    ?Q(["-module(test).",
+        "-export([testfunc/1]).",
+        "testfunc(A) -> A = 10."
+       ]).
+
+attribute_(Aname, Abody, F, Line, Col) ->
+    A = erl_syntax:attribute(erl_syntax:atom(Aname), Abody),
+    erl_syntax:set_pos(A, an(F, Line, Col)).
+
+export_(Arities, F, Line, Col) ->
+    ArityQualifiers = lists:map(fun({Fun, A}) ->
+                                        Abody = erl_syntax:atom(Fun),
+                                        Aarity = erl_syntax:integer(A),
+                                        erl_syntax:arity_qualifier(Abody, Aarity)
+                                end, Arities),
+    Alist = erl_syntax:list(ArityQualifiers),
+    attribute_(export, [Alist], F, Line, Col).
+module_(Aname, F, Line, Col) ->
+    attribute_(module, [erl_syntax:atom(Aname)], F, Line, Col).
+
+eval(Tree) ->
+    .
+
+car_(Tree) ->
+    erl_syntax:list_head(Tree).
+
+
+create() ->
+    Line=10,
+    Col = 1,
+    F="m.erl",
+    A = erl_syntax:set_pos(erl_syntax:variable("A"), an(F, Line, Col)),
+    A_10 = erl_syntax:set_pos(erl_syntax:match_expr(A, erl_syntax:integer(10)), an(F, Line+1, Col+1)),
+    Clause = erl_syntax:clause([erl_syntax:variable("A")], [],
+                               [A_10]),
+    Function = erl_syntax:function(erl_syntax:atom("is10"),
+                                   [Clause]),
+    
+    Function.
+ 
+toast(A) ->
+    erl_syntax:revert(A).
+ 
