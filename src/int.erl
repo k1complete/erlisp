@@ -9,7 +9,9 @@
 -type binding() :: map().
 -type reason() :: atom() | {atom(), any()}.
 
--spec step(tree(), binding(), env()) -> {ok, tree(), env()} | {error, reason()}.
+-spec step(tree(), binding(), env()) -> 
+          {ok, tree(), env()} | 
+          {error, reason()}.
 step(T, A, E) ->
     case erl_syntax:type(T) of
         list ->
@@ -33,8 +35,9 @@ step(T, A, E) ->
             {error, {not_a_list, T}}
     end.
 
--spec var_replace(tree(), tree(), env()) -> {ok, tree(), env()} | {error, undefined_variable, tree()}.
-
+-spec var_replace(tree(), tree(), env()) -> 
+          {ok, tree(), env()} | 
+          {error, undefined_variable, tree()}.
 var_replace(T, _S, Env) ->
     case maps:get(erl_syntax:variable_literal(T), Env, undefined) of
         undefined ->
@@ -42,6 +45,7 @@ var_replace(T, _S, Env) ->
         V ->
             {ok, V, Env}
     end.
+
 -spec mf(string()) -> {module(), function()}.
 mf(String) ->
     case string:split(String, ":") of
@@ -53,7 +57,9 @@ mf(String) ->
             {list_to_atom(M), list_to_atom(F)}
     end.
     
--spec eval_params(tree(), tree(), env()) -> {ok, tree(), env()} | {error, reason()}.
+-spec eval_params(tree(), tree(), env()) -> 
+          {ok, tree(), env()} | 
+          {error, reason()}.
 eval_params(P, FunArgs, Env) ->
     case erl_syntax:type(P) of
         variable ->
@@ -64,7 +70,9 @@ eval_params(P, FunArgs, Env) ->
             {error, not_a_argment}
     end.
 
--spec special_form(string(), tree(), integer(), binding(), env()) -> {ok, tree(), env()} | {error, reason()}.
+-spec special_form(string(), tree(), integer(), binding(), env()) -> 
+          {ok, tree(), env()} | 
+          {error, reason()}.
 special_form("set", T, 2, A, E) ->
     [A1, A2] = erl_syntax:list_elements(T),
     {ok, A2V, E2V}  =step(A2, A, E),
@@ -98,7 +106,9 @@ special_form("quote", T, 1, _A, E) ->
 special_form(S, T, TL, A, E) ->
     call_func(S, T, TL, A, E).
 
--spec call_func(atom(), tree(), tree(), tree(), env()) -> {ok, tree(), env()} | {error, reason()}.
+-spec call_func(atom(), tree(), tree(), tree(), env()) -> 
+          {ok, tree(), env()} | 
+          {error, reason()}.
 call_func(Symbol, Tree, Treetail, Arguments, Env) ->
     {M, F} = case Symbol of
                  {X, Y} -> 
@@ -124,9 +134,9 @@ call_func(Symbol, Tree, Treetail, Arguments, Env) ->
             io:format("apply ~p:~p~p~n", [M, F, Args2]),
             {ok, erl_syntax:abstract(apply(M, F, Args2 )), E2};
         {F, An} ->
-            {error, {bad_arity, F, An, Treetail}};
+            {error, {bad_arity, {F, An, Treetail}}};
         false ->
-            {error, {undefine, X, Treetail}}
+            {error, {undefine, {X, Treetail}}}
     end.
 
 test() ->
