@@ -55,5 +55,12 @@ varreplace_test() ->
     io:format("~p~n", [E2]),
     ?assertEqual(1,
        erl_syntax:concrete(T2)).
-
+varreplace2_test() ->
+    E = #{"T" => merl:quote(1, "[ 1, car, [quote, [3, 4]]]")},
+    T = merl:quote(1, "T"),
+    A = #{},
+    {ok, T2, E2} = int:step(T, A, E),
+    io:format("~p~n", [E2]),
+    ?assertEqual([1, car, [quote, [3, 4]]],
+       erl_syntax:concrete(T2)).
 

@@ -27,6 +27,8 @@ step(T, A, E) ->
             end;
         integer ->
             {ok, T, E};
+        variable ->
+            var_replace(T, A, E);
         _ ->
             {error, {not_a_list, T}}
     end.
@@ -48,6 +50,15 @@ mf(String) ->
     end.
     
 
+eval_params(P, FunArgs, Env) ->
+    case erl_syntax:type(P) of
+        variable ->
+            step(P, FunArgs, Env);
+        list ->
+            step(P, FunArgs, Env);
+        _ ->
+            {error, not_a_argment}
+    end.
 
 -spec call_func(string(), tree(), integer(), binding(), env()) -> {ok, tree(), env()} | {error, reason()}.
 call_func("set", T, 2, A, E) ->
@@ -58,15 +69,7 @@ call_func("set", T, 2, A, E) ->
             {ok, A2V, maps:put(erl_syntax:variable_literal(A1), A2V, E2V)}
     end;
 call_func("car", T, 1, A, E) ->
-    {ok, B2, E2} = case erl_syntax:type(B=erl_syntax:list_head(T)) of
-                       variable ->
-                           io:format("car var~p~n", [B]),
-                           var_replace(B, A, E);
-                       list ->
-                           step(B, A, E);
-                       _ ->
-                           {error, not_a_list}
-                   end,
+    {ok, B2, E2} = eval_params(B = erl_syntax:list_head(T), A, E),
     case erl_syntax:type(B2) of
         list ->
             {ok, erl_syntax:list_head(B2), E2};
@@ -74,14 +77,7 @@ call_func("car", T, 1, A, E) ->
             {error, not_a_list}
     end;
 call_func("cdr", T, 1, A, E) ->
-    {ok, B2, E2} = case erl_syntax:type(B=erl_syntax:list_head(T)) of
-                       variable ->
-                           var_replace(B, A, E);
-                       list ->
-                           step(B, A, E);
-                       _ ->
-                           {error, not_a_list}
-                   end,
+    {ok, B2, E2} = eval_params(B = erl_syntax:list_head(T), A, E),
     case erl_syntax:type(B2) of
         list ->
             {ok, erl_syntax:list_tail(B2), E2};
@@ -106,17 +102,8 @@ call_func(S, T, TL, A, E) ->
         {F, An} when An == TL ->
             {Args, E2} = lists:mapfoldl(
                            fun(Elm, Ac) ->
-                                   case erl_syntax:type(Elm)  of
-                                       variable ->
-                                           {ok, R, E2} = var_replace(Elm, A, Ac),
-                                           {R, E2};
-                                       list ->
-                                           {ok, R, E2} = step(Elm, A, Ac),
-                                           {R, E2};
-                                       _ ->
-                                           {ok, R, E2} = step(Elm, A, Ac),
-                                           {R, E2}
-                                   end
+                                   {ok, R, E2} = step(Elm, A, Ac),
+                                   {R, E2}
                            end, 
                            E,
                            erl_syntax:list_elements(T)),
