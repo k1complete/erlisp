@@ -1,0 +1,50 @@
+-module(match_test).
+
+-include_lib("eunit/include/eunit.hrl").
+-include_lib("syntax_tools/include/merl.hrl").
+-define(TQ(Line, T), merl:quote(Line, T)).
+
+binding_test() ->
+    Line = ?LINE,
+    Left = ?TQ(Line, "[[H|T], {T1, T2, T3}]"),
+    Right = ?TQ(Line, "[[1,2,3], {a, 1, 2}]"),
+    L = int:binding(Left, Right, [], []),
+    ?assertEqual(?TQ(Line, "[[H|T], {T1,T2,T3}]  = [[1,2,3], {a, 1, 2}]"), 
+                 erl_syntax:revert(L)).
+
+do_eval_match_test() ->
+    Line = ?LINE,
+    Left = ?TQ(Line, "[[H|T], {T1, T2, T3}]"),
+    Right = ?TQ(Line, "[[1,2,3], {a, 1, 2}]"),
+    L = int:binding(Left, Right, [], []),
+    ?assertEqual(?TQ(Line, "[[H|T], {T1,T2,T3}]  = [[1,2,3], {a, 1, 2}]"), 
+                 erl_syntax:revert(L)),
+    L2 = int:do_eval_match(L, [], #{}),
+    ?assertEqual(#{"H" => {integer, Line, 1},
+                   "T" => {tree, list,
+                           {attr, 0, [], none},
+                           {list, [{integer, Line, 2},{integer, Line, 3}], none}},
+                   "T1" => {atom, Line, a},
+                   "T2" => {integer, Line, 1},
+                   "T3" => {integer, Line, 2}
+                  }, 
+                 L2).
+
+    
+do_eval_underscore_match_test() ->
+    Line = ?LINE,
+    Left = ?TQ(Line, "[[H|_], {H, _, T3}]"),
+    Right = ?TQ(Line, "[[1,2,3], {a, 1, 2}]"),
+    L = int:binding(Left, Right, [], []),
+    ?assertEqual(?TQ(Line, "[[H|_], {H,_,T3}]  = [[1,2,3], {a, 1, 2}]"), 
+                 erl_syntax:revert(L)),
+    ?assertException(throw, 
+                     {error, {badmatch, {"H", 
+                                         {atom, Line, a}, 
+                                         {integer, Line, 1}}}},  
+                     int:do_eval_match(L, [], #{})).
+
+
+    
+
+
