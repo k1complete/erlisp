@@ -3,7 +3,6 @@
 -include_lib("syntax_tools/include/merl.hrl").
 -export([step/3] ).
 -export([binding/4, do_expand/5]).
--export([do_eval_match/3, tuple_match/4]).
 
 -export([test/0] ).
 
@@ -139,69 +138,12 @@ ismacro(S, E) ->
             false
     end.
 
-list_match([], [], _Arguments, Env) ->
-    Env;
-list_match(P, B, Arguments, Env) ->
-    Ph = erl_syntax:list_head(P),
-    Pt = erl_syntax:list_tail(P), 
-    case erl_syntax:type(B) of
-        list ->
-            Bh = erl_syntax:list_head(B),
-            Bt = erl_syntax:list_tail(B),
-            Envh = do_eval_match(Ph, Bh, Arguments, Env),
-            do_eval_match(Pt, Bt, Arguments, Envh);
-        _  ->
-            {error, badmatch}
-    end.
-
--spec tuple_match(list(), list(), any(), env()) -> env().
-tuple_match([], [], _Arguments, Env) ->
-    Env;
-tuple_match(Pe, Be, Arguments, Env) ->
-    [Ph|Pt] = Pe,
-    [Bh|Bt] = Be,
-    case erl_syntax:type(Ph) of
-        underscore ->
-            tuple_match(Pt, Bt, Arguments, Env);
-        _ ->
-            NewEnv = do_eval_match(Ph, Bh, Arguments, Env),
-            tuple_match(Pt, Bt, Arguments, NewEnv)
-    end.
-
--spec do_eval_match(tree(), tree(), any(), env()) -> env().
-do_eval_match(P, B, Arguments, Env) ->
-    case erl_syntax:type(P) of
-        variable ->
-            Pname = erl_syntax:variable_literal(P),
-            case maps:find(Pname, Env) of
-                error ->
-                    maps:put(Pname, B, Env);
-                {ok, Value} ->
-                    throw({error, {badmatch, {Pname, B, Value}}})
-            end;
-        list ->
-            list_match(P, B, Arguments, Env);
-        tuple ->
-            Pe = erl_syntax:tuple_elements(P),
-            Be = erl_syntax:tuple_elements(B),
-            tuple_match(Pe, Be, Arguments, Env);
-        underscore ->
-            Env;
-        _ ->
-            Env
-    end.
-
-do_eval_match(Matching, Arguments, Env) ->
-    Pattern = erl_syntax:match_expr_pattern(Matching),
-    Body = erl_syntax:match_expr_body(Matching),
-    do_eval_match(Pattern, Body, Arguments, Env).
-
 binding(Left, Right, _Arguments, _Env) ->
     erl_syntax:copy_pos(Left, erl_syntax:match_expr(Left, Right)).
 
 do_expand(X, Tree, _Treetail, Arguments, Env) ->
     Bindings = binding(erl_syntax:list_head(X), Tree, Arguments, Env),
-    do_eval_match(Bindings, Arguments, Env).
+    pattern_match:do_eval_match(Bindings, Arguments, Env).
 
 expand(Symbol, Tree, Treetail, Arguments, Env) ->
     case maps:find(Symbol, Env, undefined) of

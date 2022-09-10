@@ -19,7 +19,7 @@ do_eval_match_test() ->
     L = int:binding(Left, Right, [], []),
     ?assertEqual(?TQ(Line, "[[H|T], {T1,T2,T3}]  = [[1,2,3], {a, 1, 2}]"), 
                  erl_syntax:revert(L)),
-    L2 = int:do_eval_match(L, [], #{}),
+    L2 = pattern_match:do_eval_match(L, [], #{}),
     ?assertEqual(#{"H" => {integer, Line, 1},
                    "T" => {tree, list,
                            {attr, 0, [], none},
@@ -42,7 +42,7 @@ do_eval_underscore_match_test() ->
                      {error, {badmatch, {"H", 
                                          {atom, Line, a}, 
                                          {integer, Line, 1}}}},  
-                     int:do_eval_match(L, [], #{})).
+                     pattern_match:do_eval_match(L, [], #{})).
 
 
     
