@@ -141,16 +141,24 @@ ismacro(S, E) ->
 binding(Left, Right, _Arguments, _Env) ->
     erl_syntax:copy_pos(Left, erl_syntax:match_expr(Left, Right)).
 
-do_expand(X, Tree, _Treetail, Arguments, Env) ->
-    Bindings = binding(erl_syntax:list_head(X), Tree, Arguments, Env),
-    pattern_match:do_eval_match(Bindings, Arguments, Env).
+do_expand(X, Tree, _TreeLength, Arguments, Env) ->
+    %% X=[args body]
+    io:format("~p", [X]),
+    Args = erl_syntax:list_head(X),
+    Body = erl_syntax:list_head(erl_syntax:list_tail(X)),
+    Bindings = binding(Args, Tree, Arguments, Env),
+    NewEnv = pattern_match:do_eval_match(Bindings, Arguments, Env),
+    {ok, NewTree, _RetEnv} = int:step(Body, Arguments, NewEnv),
+    NewTree.
+    
+    
 
-expand(Symbol, Tree, Treetail, Arguments, Env) ->
+expand(Symbol, Tree, TreeLength, Arguments, Env) ->
     case maps:find(Symbol, Env, undefined) of
         undefine ->
             {ok, Tree, Env};
         X ->
-            do_expand(X, Tree, Treetail, Arguments, Env)
+            do_expand(X, Tree, TreeLength, Arguments, Env)
     end.
 
 -spec call_func(atom(), tree(), tree(), tree(), env()) -> 
