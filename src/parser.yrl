@@ -1,8 +1,7 @@
 
-
 Nonterminals
 
-expressions sexpression elements
+expressions sexpression elements literal
 term hterm atom asymbol  lines.
 
 Terminals
@@ -22,13 +21,14 @@ expressions ->
         '$1'.
 expressions ->
     expressions sexpression : 
-        setline(erl_syntax:list('$1', ['$2']), '$2').
+        lists:append('$1' , ['$2']).
 sexpression ->
     '(' ')' : nil.
 sexpression ->
-    '(' elements ')' : 
+    '(' elements ')' :
+        '$2'.
 %        erl_syntax:list('$2').
-        setline(erl_syntax:list('$2'), hd('$2')).
+%        setline(erl_syntax:list('$2'), hd('$2')).
 
 elements ->
     hterm : ['$1'].
@@ -37,18 +37,18 @@ elements ->
 
 
 term ->
-    atom : '$1'.
+    literal : '$1'.
 term ->
     asymbol : '$1'.
 term ->
-    string : setline(erl_syntax:string(tokenvalue('$1')), '$1').
+    string : '$1'.
 term ->
     sexpression : '$1'.
 
 hterm ->
     asymbol : '$1'.
 hterm ->
-    atom : '$1'.
+    literal : '$1'.
 hterm ->
     sexpression : '$1'.
 
@@ -56,37 +56,40 @@ asymbol ->
     module_function : setline(mf(tokenvalue('$1')), '$1').
 asymbol ->
     symbol : 
-        setline(erl_syntax:atom(tokenvalue('$1')), '$1').
+        setline(tokenvalue('$1'), '$1').
 asymbol ->
     underscore : 
-        setline(erl_syntax:underscore(), '$1').
+        '$1'.
 
-atom ->
+literal ->
     integer :
-        setline(erl_syntax:integer(tokenvalue('$1')), '$1').
-atom ->
+        tokenvalue('$1').
+literal ->
     float : 
-        setline(erl_syntax:float(tokenvalue('$1')), '$1').
-    
-  
+        tokenvalue('$1').  
 
 Erlang code.
+
+-include_lib("erlisp.hrl").
+
 -export([setline/2]).
 
--include_lib("scan.hrl").
+
 tokenvalue(T) ->
     element(3, T).
 
+set_pos(Tree, Pos) ->
+    #term{value=Tree, loc=Pos, type=atom}.
+setline({Module, Function}, Pos) ->
+    set_pos({Module, Function}, Pos);
 setline(Tree, {_t, Line}) ->
     Pos = erl_anno:new(Line),
-    erl_syntax:set_pos(Tree, Pos);
+    set_pos(Tree, Pos);
 setline(Tree, {_t, Line, _v}) ->
     Pos = erl_anno:new(Line),
-    erl_syntax:set_pos(Tree, Pos);
-setline(Tree, {tree, _t, _a, _v} = L) ->
-    erl_syntax:copy_pos(L, Tree).
+    set_pos(Tree, Pos).
 
 mf(Text) ->
     [Module, Function] = string:split(Text, ":"),
-    erl_syntax:module_qualifier(Module, Function).
+    {Module, Function}.
 

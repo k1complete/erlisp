@@ -1,29 +1,51 @@
 -module(transpile).
 -include_lib("syntax_tools/include/merl.hrl").
+-include_lib("erlisp.hrl").
 -compile([{debug_info, true}]).
 -export([lst/0]).
-
--export([form/2, form_trans/2, term/2, infix_op/3]).
+-include("scan.hrl").
+-export([form/2, form_trans/2, term/2, infix_op/4]).
 -type tree() :: erl_syntax:syntaxTree().
 
-
+erl_type(A) ->
+    io:format("A is ~p\n", [A]),
+    case A of
+        #term{value=X, loc=Loc,type=T} ->
+            T;
+        X when is_atom(X) ->
+            atom;
+        X when is_binary(X) -> 
+            binary;
+        X when is_integer(X) ->
+            integer;
+        X when is_list(X)  ->
+            list;
+        X when is_bitstring(X) ->
+            bitstring
+    end.
 term(A, E) ->
-    X = erl_syntax:type(A),
+    term(A, 0, E).
+
+term(A, Loc, E) ->
+    X = erl_type(A),
+    io:format("termX ~p~p~n", [X, A]),
     case X of
         atom ->
-            A,
-            B = case erl_syntax:atom_name(A) of
+            #term{value=Atom, loc=Aloc} = A,
+            A2 = erl_syntax:atom(Atom),
+            io:format("A2 ~p~n", [A2]),
+            B = case erl_syntax:atom_name(A2) of
                     "_" ->
                         erl_syntax:underscore();
                     N ->
                         %S=binary_to_list(unicode:characters_to_binary(N)),
                         S = N,
-                        io:format("S ~ts", [S]),
+                        io:format("<<<Variable ~ts>>>", [S]),
                         erl_syntax:variable(S)
                 end,
-            erl_syntax:copy_pos(A, B);
+            erl_syntax:set_pos(B, Aloc);
         integer ->
-            A;
+            erl_syntax:set_pos(erl_syntax:integer(A), Loc);
         list ->
             form(A, E);
         variable  ->
@@ -36,26 +58,26 @@ term(A, E) ->
 
 dispatch_infix_op(A) ->
     L = #{
-          "==" => fun infix_op/3,
-          "/=" => fun infix_op/3,
-          "=<" => fun infix_op/3,
-          "<" => fun infix_op/3,
-          ">=" => fun infix_op/3,
-          ">" => fun infix_op/3,
-          "=:=" => fun infix_op/3,
-          "=/=" => fun infix_op/3,
-          "+" => fun infix_op/3,
-          "-" => fun infix_op/3,
-          "*" => fun infix_op/3,
-          "/" => fun infix_op/3,
-          "bnot" => fun infix_op/3,
-          "div" => fun infix_op/3,
-          "rem" => fun infix_op/3,
-          "band" => fun infix_op/3,
-          "bor" => fun infix_op/3,
-          "bxor" => fun infix_op/3,
-          "bsl" => fun infix_op/3,
-          "bsr" => fun infix_op/3
+          "==" => fun infix_op/4,
+          "/=" => fun infix_op/4,
+          "=<" => fun infix_op/4,
+          "<" => fun infix_op/4,
+          ">=" => fun infix_op/4,
+          ">" => fun infix_op/4,
+          "=:=" => fun infix_op/4,
+          "=/=" => fun infix_op/4,
+          "+" => fun infix_op/4,
+          "-" => fun infix_op/4,
+          "*" => fun infix_op/4,
+          "/" => fun infix_op/4,
+          "bnot" => fun infix_op/4,
+          "div" => fun infix_op/4,
+          "rem" => fun infix_op/4,
+          "band" => fun infix_op/4,
+          "bor" => fun infix_op/4,
+          "bxor" => fun infix_op/4,
+          "bsl" => fun infix_op/4,
+          "bsr" => fun infix_op/4
          },
     maps:get(A, L, undef).
 dispatch_special(A) ->
@@ -71,37 +93,40 @@ dispatch_special(A) ->
 expand_macro(A, _E) ->
     A.
 
--spec form(tree(), any()) -> tree().
+-type sexp() :: list().
+
+-spec form(sexp(), any()) -> tree().
 form(A, E) ->
     B = expand_macro(A, E),
-    form_trans(B, E)
+    R = form_trans(B, E),
+    io:format("formed ~p~n", [R]),
+    R
     .
-form_trans(A, E) ->
-    X = erl_syntax:list_head(A),
-    T = erl_syntax:list_tail(A),
-    H = erl_syntax:type(X),
-    case H of 
-        atom ->
-            Hn = erl_syntax:atom_name(X),
-            io:format("Form: ~p~n", [T]),
-            Args = erl_syntax:list_elements(T),
-            io:format("FormL: ~p~n Hn: ~p~n", [Args, Hn]),
-            case Inf=dispatch_infix_op(Hn) of
+
+form_trans([XT=#term{value=X, loc=Loc}| T], E) ->
+    io:format("X: ~p, T: ~p~n", [X, T]),
+    R=case Inf=dispatch_infix_op(X) of
+        undef ->
+            case Spf=dispatch_special(X) of
                 undef ->
-                    case Spf=dispatch_special(Hn) of
-                        undef ->
-                            call_function(X, T, E);
-                        Spf ->
-                            io:format("SPf: ~p~n: ~p~n", [X, T]),
-                            Spf(X, T, E)
-                    end;
-                Inf ->
-                    Op = erl_syntax:copy_pos(X, erl_syntax:operator(Hn)), 
-                    Inf(Op, Args, E)
+                    call_function(XT, T, E);
+                Spf ->
+                    io:format("SPf: ~p~nArgs: ~p~n", [X, T]),
+                    R1=Spf(XT, T, E),
+                    io:format("R1: ~p~n", [R1]),
+                    R1
             end;
-        _ ->
-            X
-    end.
+        Inf ->
+            Op = X,
+            Args = T,
+            Inf(Op, Loc, Args, E)
+    end,
+    io:format("form trans : ~p~n", [R]),
+    R
+    ;
+form_trans([List| T], E) when is_list(List) ->
+    form_trans([form_trans(List, E)| T], E).
+
 export_(X, L, _E) ->
     Aq = lists:map(fun(E) ->
                            [F, A] = erl_syntax:list_elements(E),
@@ -114,53 +139,65 @@ module_(X, L, _E) ->
     Module = erl_syntax:list_head(L),
     E = erl_syntax:attribute(erl_syntax:atom(module), [Module]),
     erl_syntax:copy_pos(X, E).
-
-match_op(X, L, E) ->
-    [Left, Right] = erl_syntax:list_elements(L),
+match_op(#term{value=X, loc=Loc}, L, E) ->
+    [Left, Right] = L,
     io:format("Match: ~p ~p~n", [Left, Right]),
+    LeftT = term(Left, E),
+    RightT= term(Right, E),
+    io:format("MatchT: ~p ~p~n", [LeftT, RightT]),
     Me = erl_syntax:match_expr(term(Left, E), term(Right, E)),
     io:format("Match2: ~p~n", [Me]),
-    erl_syntax:copy_pos(X, Me).
+    erl_syntax:set_pos(Me, Loc).
 
 anary_op(Op, Left, _E) ->
     Nexp = erl_syntax:prefix_expr(Op, Left),
     erl_syntax:copy_pos(Op, Nexp).
 
-infix_op(Op, [Left|T], E) ->
-    infix_op_do(Op, [term(Left, E)|T], E).
+infix_op(Op, Loc, Arg=[Left|Right], E) ->
+    OpType = erl_syntax:operator(Op),
+    Xp =infix_op_do(OpType, [term(Left, Loc, E) |Right], E),
+    io:format("Tree ~p~nLoc ~p~n", [Xp, Loc]),
+    erl_syntax:set_pos(Xp, Loc).
 
 infix_op_do(Op, [Left|T], E) ->
+    io:format("infix L: ~p, R: ~p~n", [Left, T]),
+    Pos = erl_syntax:get_pos(Left),
     case T of
         [] -> 
             anary_op(Op, Left, E);
         [Right|Tail] ->
             case Tail of
                 [] ->
-                    Nexp = erl_syntax:infix_expr(Left, Op, term(Right, E)),
-                    Exp = erl_syntax:copy_pos(Right, Nexp),
+                    RightTerm = term(Right, Pos, E),
+                    Nexp = erl_syntax:infix_expr(Left, Op, RightTerm),
+                    Exp = erl_syntax:copy_pos(RightTerm, Nexp),
                     Exp;
                 _ ->
-                    Nexp = erl_syntax:infix_expr(Left, Op, term(Right, E)),
+                    RightEx = term(Right, Pos, E),
+                    Nexp = erl_syntax:infix_expr(Left, Op, RightEx),
                     Exp = erl_syntax:copy_pos(Right, Nexp),
                     infix_op_do(Op, [Exp|Tail], E)
             end
     end.
 
 -define(MQ(L, T, B), merl:qquote(erl_syntax:get_pos(L), T, B)).
+-define(MQP(L, T, B), merl:qquote(L, T, B)).
+
 
 cons_(C, L, E) ->
     io:format("cons: ~p~n", [L]),
-    Head = erl_syntax:list_head(L),
-    Tail = erl_syntax:list_elements(erl_syntax:list_tail(L)),
+    [Head|Tail] = L,
+    #term{loc=Loc} = C,
     case Tail of
         [] -> Head;
         [X] ->
             HHead = term(Head, E),
             io:format("HHead: ~p~n", [HHead]),
-            TTail = term(X, E),
-            io:format("TTail: ~p~n", [TTail]),
-
-            ?MQ(C, "[_@HHead|_@TTail]", [{'HHead', HHead}, {'TTail', TTail}])
+            TTail0 = term(X, E),
+%            TTail = erl_syntax:set_pos(erl_syntax:cons(TTail0, erl_syntax:nil()), Loc),
+            TTail = TTail0,
+            io:format("TTail: ~p C: ~p~n", [TTail, C]),
+            ?MQP(Loc, "[_@HHead|_@TTail]", [{'HHead', HHead}, {'TTail', TTail}])
     end.
 
 forms(L, E) ->    
@@ -171,7 +208,7 @@ forms(L, E) ->
             LF;
         _ -> lists:map(fun(A) ->
                                io:format("E ~p~n", [A]),
-                               form(A, E)
+                               form_trans(A, E)
                        end, erl_syntax:list_elements(L))
     end.
 
@@ -220,7 +257,7 @@ defun_(X, L, E) ->
             io:format("Y: ~p~n", [X])
     end.
 
-call_function(X, T, E) ->
+call_function({term, X, Loc}, T, E) ->
     io:format("call X ~p~nT ~p~n", [X, T]),
     FHead = term(erl_syntax:list_head(T), E),
     {M, F} = getmf(X),
@@ -247,19 +284,41 @@ getmf(X) ->
              erl_syntax:copy_pos(X, erl_syntax:atom(hd(F)))}
     end.
 
+quote_(_X, [], _E) ->
+    #term{loc=Pos} = _X,
+    erl_syntax:set_pos(erl_syntax:nil(), Pos);
+quote_(_X, L, _E) when is_list(L), length(L)>1 ->
+    #term{loc=Pos} = _X,
+    R =lists:map(fun(E) ->
+                         quote_(_X, E, _E)
+                 end, L),
+    erl_syntax:set_pos(erl_syntax:list(R), Pos)
+    ;
 quote_(_X, L, _E) ->
-    io:format("quote ~p~n", [L]),
-    L2 = erl_syntax_lib:map(fun(A) ->
-                                    case erl_syntax:type(A) of
-                                        variable ->
-                                            V = erl_syntax:atom(erl_syntax:variable_name(A)),
-                                            erl_syntax:copy_pos(A, V);
-                                        _ ->
-                                            A
-                                    end
-                            end, L),
-    erl_syntax:list_head(L2).
-
+    io:format("quote ~p ~p~n", [_X, L]),
+    #term{loc=Pos} = _X,
+    
+    E = case L of
+            [Elem] -> Elem;
+            _ -> L
+        end,
+    S = case E of
+            #term{value='_', type=atom} ->
+                erl_syntax:underscore();
+            #term{value=X} -> 
+                io:format("atomtry ~ts", [X]),
+                erl_syntax:atom(X);
+            E when is_integer(E) ->
+                erl_syntax:integer(E);
+            %%list_to_atom(X);
+            [H|T] -> 
+                HV = erl_syntax:set_pos(term(H, _E), Pos),
+                erl_syntax:cons(HV, quote_(_X, T, _E));
+            _ -> E
+        end,
+    R = erl_syntax:set_pos(S, Pos),
+    io:format("quote_ R: ~p~n", [R]),
+    R.
 
 
 lst() ->

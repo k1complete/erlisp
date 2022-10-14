@@ -20,13 +20,13 @@ Rules.
 {Digits}\.{Digits}((E|e)(\+|\-)?{Digits})? :
   {token, {float, ?LC(TokenLine, TokenLen), list_to_float(TokenChars)}}.
 {Variables} : 
-  {token, {symbol, ?LC(TokenLine, TokenLen), list_to_atom(TokenChars)}}.
+  {token, {symbol, ?LC(TokenLine, TokenLen), TokenChars}}.
 {Op} : 
-  {token, {symbol, ?LC(TokenLine, TokenLen), list_to_atom(TokenChars)}}.
+  {token, {symbol, ?LC(TokenLine, TokenLen), TokenChars}}.
 {Symbols} : 
-  {token, {symbol, ?LC(TokenLine, TokenLen), list_to_atom(TokenChars)}}.
+  {token, {symbol, ?LC(TokenLine, TokenLen), TokenChars}}.
 {Symbols}:{Symbols} : 
-  {token, {module_function, ?LC(TokenLine, TokenLen), list_to_atom(TokenChars)}}.
+  {token, {module_function, ?LC(TokenLine, TokenLen), TokenChars}}.
 \( :
   {token, {'(', ?LC(TokenLine, TokenLen)}}.
 \) :
@@ -79,6 +79,3 @@ file(F, Loc, TokenList) ->
         {eof, End} ->
             {ok, TokenList ++ [{'$end', {End+1,1}}]}
     end.
-
-    
-    

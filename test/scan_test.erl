@@ -20,11 +20,15 @@ process(Expected, Got) ->
     Line=?LINE,
     {ok, Tokens, _Lines} = scan:string(Got, Line),
     {ok, Tree} = parser:parse(Tokens),
+    io:format("Process-form: ~p~n", [Tree]),
     Trees = transpile:form(Tree, []),
 %    {erl_prettypr:format(merl:quote(Expected)),
 %     erl_prettypr:format(Trees)}.
+    Mr = merl:quote(Line, Expected),
+    io:format("transpiled: ~p~n~p~n", [Trees, Mr]),
     {merl:quote(Line, Expected),
      erl_syntax:revert(loctoline(Trees))}.
+
    
 
 utf8_test() ->    
@@ -33,8 +37,11 @@ utf8_test() ->
     {ok, Tokens, _Lines} = scan:string(Got, Line),
     {ok, Tree} = parser:parse(Tokens),
     Trees = transpile:form(Tree, []),
-    io:format("~ts~n", [erl_syntax:variable_literal(Trees)]),
-    ?assertEqual("Aあ", erl_syntax:variable_literal(Trees)).
+%%    LetHead = erl_syntax:list_head(Trees),
+    LetHead = Trees,
+    io:format("LetHead ~p~n", [LetHead]),
+    Let = erl_syntax:atom_value(LetHead),
+    ?assertEqual('Aあ', Let).
 infix_test() ->
     lists:map(fun({AM, BM}) ->
                       {A, B} = process(AM, BM),
@@ -64,7 +71,7 @@ infix_test() ->
               ]).
 match_test() ->
     {A, B} = process("_ = [1,2,3]", "(match _ (quote (1 2 3)))"),
-    ?assertEqual(A, B).
+    ?assertEqual(erl_syntax:revert(A), B).
 match2_test() ->
     {A, B} = process("[X, Y, 3] = [1,2,3]", "(match (cons X (cons Y (quote (3)))) (quote (1 2 3)))"),
     ?assertEqual(A, B).
