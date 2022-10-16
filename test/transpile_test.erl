@@ -7,15 +7,19 @@
 
 length_test() ->
     Line = ?LINE,
-    C4=transpile:form(?TQ(Line, "[length, [cons, 1, [cons, 2, []]]]"), []),
+    {ok, Tokens, _Lines} = scan:string("(length (cons 1 (cons 2 nil)))", Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:form(Tree, []),
     C5=?TQ(Line, "length([1,2])"),
-    ?assertEqual(C5, erl_syntax:revert(C4)).
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
     
 lists_reverse_test() ->
     Line = ?LINE,
-    C4=transpile:form(?TQ(Line, "['lists:reverse', [cons, 1, [cons, 2, []]]]"), []), 
+    {ok, Tokens, _Lines} = scan:string("(lists:reverse (cons 1 (cons 2 nil)))", Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:form(Tree, []),
     C5=?TQ(Line, "lists:reverse([1,2])"),
-    ?assertEqual(C5, erl_syntax:revert(C4)).
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
 
 lists_reverse2_test() ->
     Line = ?LINE,

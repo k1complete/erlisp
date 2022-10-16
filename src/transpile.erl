@@ -4,7 +4,8 @@
 -compile([{debug_info, true}]).
 -export([lst/0]).
 -include("scan.hrl").
--export([form/2, form_trans/2, term/2, infix_op/4]).
+-export([form/2, form_trans/2, term/2, infix_op/4,
+        locline/1]).
 -type tree() :: erl_syntax:syntaxTree().
 
 erl_type(A) ->
@@ -23,13 +24,23 @@ erl_type(A) ->
         X when is_bitstring(X) ->
             bitstring
     end.
+
+module_function(A, Loc) ->
+    {M, F} = A#term.value,
+    erl_syntax:set_pos(erl_syntax:module_qualifier(
+                         erl_syntax:set_pos(erl_syntax:atom(M), Loc), 
+                         erl_syntax:set_pos(erl_syntax:atom(F), Loc)), 
+                       Loc).
+
 term(A, E) ->
     term(A, 0, E).
 
 term(A, Loc, E) ->
     X = erl_type(A),
-    io:format("termX ~p~p~n", [X, A]),
+    io:format("termX ~p~p[~p]~n", [X, A, Loc]),
     case X of
+        module_function ->
+            module_function(A, Loc);
         atom ->
             #term{value=Atom, loc=Aloc} = A,
             A2 = erl_syntax:atom(Atom),
@@ -37,6 +48,8 @@ term(A, Loc, E) ->
             B = case erl_syntax:atom_name(A2) of
                     "_" ->
                         erl_syntax:underscore();
+                    "nil" ->
+                        erl_syntax:nil();
                     N ->
                         %S=binary_to_list(unicode:characters_to_binary(N)),
                         S = N,
@@ -191,9 +204,9 @@ cons_(C, L, E) ->
     case Tail of
         [] -> Head;
         [X] ->
-            HHead = term(Head, E),
+            HHead = term(Head, Loc, E),
             io:format("HHead: ~p~n", [HHead]),
-            TTail0 = term(X, E),
+            TTail0 = term(X, Loc, E),
 %            TTail = erl_syntax:set_pos(erl_syntax:cons(TTail0, erl_syntax:nil()), Loc),
             TTail = TTail0,
             io:format("TTail: ~p C: ~p~n", [TTail, C]),
@@ -257,32 +270,65 @@ defun_(X, L, E) ->
             io:format("Y: ~p~n", [X])
     end.
 
-call_function({term, X, Loc}, T, E) ->
-    io:format("call X ~p~nT ~p~n", [X, T]),
-    FHead = term(erl_syntax:list_head(T), E),
-    {M, F} = getmf(X),
+locconv(E) ->
+    Line = erl_anno:line(erl_syntax:get_pos(E)),
+    Pos = erl_anno:new(Line),
+    erl_syntax:set_pos(E, Pos).
+    
+locline(F) ->
+    erl_syntax_lib:map(fun(E) -> 
+                               locconv(E)
+                       end, F).
+
+call_function(Fun=#term{value=X, loc=Loc}, T, E) ->
+    io:format("call X ~p~nT ~p~nFun ~p~n", [X, T, Fun]),
+    FHead = term(hd(T), E),
+    io:format("call X2 ~p~nT ~p~n", [term(Fun,E, Loc), FHead]),
+    %FName = erl_syntax:set_pos(erl_syntax:atom(X), Loc),
+    %FName = term(Fun, E, Loc),
+    {M, F} = getmodfun(Fun),
+    io:format("MQP: ~p : ~p : arg ~p~n", [M, F, FHead]),
     case M of
         undef ->
-            ?MQ(X, "'@F'(_@FHead)", 
+            io:format("MQ: ~p : arg ~p~n", [F, FHead]),
+            ?MQP(Loc, "'@F'(_@FHead)", 
                 [{'F', F},
                  {'FHead', FHead}]);
         _ ->
-            ?MQ(X, "'@M':'@F'(_@FHead)", 
+            io:format("MQMF: ~p ~n FUN: ~p ~n arg: ~p~n", [M, F, FHead]),
+            ?MQP(Loc, "'@M':'@F'(_@FHead)", 
                 [{'M', M},
                  {'F', F},
                  {'FHead', FHead}])
     end.
 
+getmodfun(#term{type=Type, value=X, loc=Loc}) ->
+    case Type of
+        atom ->
+            {undef, erl_syntax:set_pos(erl_syntax:atom(X), Loc)};
+        module_function ->
+            {M, F} = X,
+            MA=erl_syntax:set_pos(erl_syntax:atom(M), Loc),
+            FA=erl_syntax:set_pos(erl_syntax:atom(F), Loc),
+            {MA, FA}
+    end.
 
 getmf(X) ->
-    [M|F] = string:split(erl_syntax:atom_name(X), ":"),
-    case F of
-        [] ->
-            {undef, erl_syntax:copy_pos(X, erl_syntax:atom(M))};
-        _ ->
-            {erl_syntax:copy_pos(X, erl_syntax:atom(M)),
-             erl_syntax:copy_pos(X, erl_syntax:atom(hd(F)))}
+    case erl_syntax:type(X) of
+        atom ->
+            [M|F] = string:split(erl_syntax:atom_name(X), ":"),
+            case F of
+                [] ->
+                    {undef, erl_syntax:copy_pos(X, erl_syntax:atom(M))};
+                _ ->
+                    {erl_syntax:copy_pos(X, erl_syntax:atom(M)),
+                     erl_syntax:copy_pos(X, erl_syntax:atom(hd(F)))}
+            end;
+        module_qualimodifier ->
+            {erl_syntax:module_qualifier_argument(X),
+             erl_syntax:module_qualifier_body(X)}
     end.
+
 
 quote_(_X, [], _E) ->
     #term{loc=Pos} = _X,
