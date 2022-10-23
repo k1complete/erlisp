@@ -119,7 +119,7 @@ form(A, E) ->
 form_trans([XT=#term{value=X, loc=Loc}| T], E) ->
     io:format("X: ~p, T: ~p~n", [X, T]),
     R=case Inf=dispatch_infix_op(X) of
-        undef ->
+          undef ->
             case Spf=dispatch_special(X) of
                 undef ->
                     call_function(XT, T, E);
@@ -129,11 +129,12 @@ form_trans([XT=#term{value=X, loc=Loc}| T], E) ->
                     io:format("R1: ~p~n", [R1]),
                     R1
             end;
-        Inf ->
-            Op = X,
-            Args = T,
-            Inf(Op, Loc, Args, E)
-    end,
+          Inf ->
+              Op = X,
+              Args = T,
+              io:format("Ops: ~p : Loc ~p~n", [Op, Loc]),
+              Inf(Op, Loc, Args, E)
+      end,
     io:format("form trans : ~p~n", [R]),
     R
     ;
@@ -167,9 +168,10 @@ anary_op(Op, Left, _E) ->
     erl_syntax:copy_pos(Op, Nexp).
 
 infix_op(Op, Loc, Arg=[Left|Right], E) ->
-    OpType = erl_syntax:operator(Op),
+    io:format("TreeInfix~n", []),
+    OpType = erl_syntax:set_pos(erl_syntax:operator(Op), Loc),
     Xp =infix_op_do(OpType, [term(Left, Loc, E) |Right], E),
-    io:format("Tree ~p~nLoc ~p~n", [Xp, Loc]),
+    io:format("TreeInfix ~p~nLoc ~p~n", [Xp, Loc]),
     erl_syntax:set_pos(Xp, Loc).
 
 infix_op_do(Op, [Left|T], E) ->
@@ -256,16 +258,25 @@ match_defun_(Name, Clauses, E) ->
     erl_syntax:copy_pos(Name, Md).
 
 defun_(X, L, E) ->
-    [Name, Args | Rest] = erl_syntax:list_elements(L),
-    case erl_syntax:type(erl_syntax:list_head(Args)) of
-        list ->
+    io:format("defun_ : ~p~n", [X]),
+    Line = X#term.loc,
+    [Name, Args | Rest] = L,
+    io:format("Name, Args | Rest =~n  ~p~n ~p~n ~p ~n", [Name, Args, Rest]),
+    case hd(Args) of
+        A when is_list(A) ->
             match_defun_(Name, [Args|Rest], E);
-        variable ->
+        _  ->
             Body = lists:map(fun(A) -> form(A, E) end, Rest),
-            ?MQ(X, "'@Name'(_@@Args) -> _@@Body.", 
-                [{'Name', Name}, 
-                 {'Args', erl_syntax:list_elements(Args)}, 
-                 {'Body', Body}]);
+            io:format("simpleArgs ~p ~n", [Args]),
+            ArgList = lists:map(fun(A) -> term(A, E) end, Args),
+            FunName = erl_syntax:atom(Name#term.value),
+            io:format("MO: ~p ~p~n", [Line, FunName]),
+            MQ=?MQP(Line, "'@name'(_@@args) -> _@@body.", 
+                 [{'name', FunName}, 
+                  {'args', ArgList},
+                  {'body', Body}]),
+            io:format("MQ2: ~p~n", [MQ]),
+            MQ;
         X ->
             io:format("Y: ~p~n", [X])
     end.

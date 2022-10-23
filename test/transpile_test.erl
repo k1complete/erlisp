@@ -23,27 +23,35 @@ lists_reverse_test() ->
 
 lists_reverse2_test() ->
     Line = ?LINE,
-    C4=transpile:form(?TQ(Line, "['lists:reverse', [quote, [1, 2, 3]]]"), []),
+    {ok, Tokens, _Lines} = scan:string("(lists:reverse (quote (1 2 3)))", Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:form(Tree, []),
     C5=?TQ(Line, "lists:reverse([1,2,3])"),
-    ?assertEqual(C5, erl_syntax:revert(C4)).
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
     
 quote_var_test() ->
     Line = ?LINE,
-    C4 = transpile:form(merl:quote(Line, "[quote, A]"), []), 
+    {ok, Tokens, _Lines} = scan:string("(quote A)", Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:form(Tree, []),
     C5 = merl:quote(Line, "'A'"),
-    ?assertEqual(C5, erl_syntax:revert(C4)).
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
 
 quote_list_test() ->
     Line = ?LINE,
-    C4 = transpile:form(?TQ(Line, "[quote, [a, A, 1]]"), []), 
+    {ok, Tokens, _Lines} = scan:string("(quote ((quote a) A 1))", Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:form(Tree, []),
     C5 = ?TQ(Line, "[a, 'A', 1]"),
-    ?assertEqual(erl_syntax:revert(C5), erl_syntax:revert(C4)).
+    ?assertEqual(erl_syntax:revert(C5), erl_syntax:revert(transpile:locline(C4))).
     
 defun_form_test() ->
     Line = ?LINE,
-    C4 = transpile:form(?TQ(Line, "[defun, plus, [A, B], ['+', A, B]]"), []),
+    {ok, Tokens, _Lines} = scan:string("(defun plus (A B) (+ A B))", Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:form(Tree, []),
     C5 = merl:quote(Line, "plus(A, B) -> A + B."),
-    ?assertEqual(C5, erl_syntax:revert(C4)).
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
 
 defun_form2_test() ->
     Line = ?LINE,
