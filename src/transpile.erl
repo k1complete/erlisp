@@ -251,15 +251,9 @@ clause_(L, E) ->
                         false ->
                             NBody = [When | Tail],
                             io:format("NBody ~p~n", [NBody]),
-                            NBodyList =case length(NBody) of
-                                         1 ->
-                                             form(hd(NBody), E);
-                                         _ ->
-                                             NBodies = lists:map(fun(Elem) ->
-                                                        form(Elem, E)
-                                                                 end, NBody),
-                                             erl_syntax:list(NBodies)
-                                       end,
+                            NBodyList = lists:map(fun(Elem) ->
+                                                          form(Elem, E)
+                                                  end, NBody),
                             {[], NBodyList}
                     end,
     io:format("Arg: ~p~nG: ~p~nB: ~p~n", [PArgs, Guard, Body]),
