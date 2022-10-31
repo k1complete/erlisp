@@ -85,19 +85,25 @@ export_test() ->
 
 module_test() ->
     Line = ?LINE,
-    C4 = transpile:form(?TQ(Line,
-                            ["[module, b]"]), []),
+    Cmd = ["(module b)"],
+    {ok, Tokens, _Lines} = scan:string(lists:flatten(Cmd), Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:form(Tree, []),
     C5 = merl:quote(Line, ["-module(b)."]),
-    ?assertEqual(C5, erl_syntax:revert(C4)).
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
 
 equal_test() ->
     Line=?LINE,
 %    C4 = transpile:form(?Q(Line, "['==', 1, 2]")),
-    C4 = transpile:form({cons,1,
-                         {atom,1,'=='},
-                         {cons,1,{integer,1,1},{cons,1,{integer,1,2},{nil,1}}}}, []),
-    C5 = merl:quote( "1 == 2"),
-    ?assertEqual(C5, erl_syntax:revert(C4)).
+    Cmd = ["(== 1 2)"],
+    {ok, Tokens, _Lines} = scan:string(lists:flatten(Cmd), Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:form(Tree, []),
+    %C40 = transpile:form({cons,1,
+    %                     {atom,1,'=='},
+    %                     {cons,1,{integer,1,1},{cons,1,{integer,1,2},{nil,1}}}}, []),
+    C5 = merl:quote(Line, "1 == 2"),
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
 
 macro_test() ->
     C4 = macro:expand_form({cons,1,

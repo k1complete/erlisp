@@ -157,9 +157,12 @@ export_(X, L, E) ->
     erl_syntax:set_pos(R, Loc).
 
 module_(X, L, _E) ->
-    Module = erl_syntax:list_head(L),
-    E = erl_syntax:attribute(erl_syntax:atom(module), [Module]),
-    erl_syntax:copy_pos(X, E).
+    Loc = X#term.loc,
+    Module = hd(L),
+    M = term_make_atom(Module),
+    io:format("module_ ~p~n", [M]),
+    E = erl_syntax:attribute(erl_syntax:atom(module), [M]),
+    erl_syntax:set_pos(E, Loc).
 match_op(#term{value=X, loc=Loc}, L, E) ->
     [Left, Right] = L,
     io:format("Match: ~p ~p~n", [Left, Right]),
