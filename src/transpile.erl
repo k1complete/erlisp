@@ -139,6 +139,7 @@ form_trans([XT=#term{value=X, loc=Loc}| T], E) ->
     R
     ;
 form_trans([List| T], E) when is_list(List) ->
+    io:format("nested ~p~n", [List]),
     form_trans([form_trans(List, E)| T], E).
 
 export_(X, L, _E) ->
@@ -156,10 +157,10 @@ module_(X, L, _E) ->
 match_op(#term{value=X, loc=Loc}, L, E) ->
     [Left, Right] = L,
     io:format("Match: ~p ~p~n", [Left, Right]),
-    LeftT = term(Left, E),
-    RightT= term(Right, E),
+    LeftT = term(Left, Loc, E),
+    RightT= term(Right, Loc, E),
     io:format("MatchT: ~p ~p~n", [LeftT, RightT]),
-    Me = erl_syntax:match_expr(term(Left, E), term(Right, E)),
+    Me = erl_syntax:match_expr(term(Left, Loc, E), term(Right, Loc, E)),
     io:format("Match2: ~p~n", [Me]),
     erl_syntax:set_pos(Me, Loc).
 
@@ -228,34 +229,52 @@ forms(L, E) ->
     end.
 
 clause_(L, E) ->
-    [Args, When| Tail] = erl_syntax:list_elements(L),
+    [Args, When| Tail] = L,
     PArgs = lists:map(fun(A) ->
-                        %      io:format("P ~p~n", [A]),
-                              term(A, E) 
-                      end, erl_syntax:list_elements(Args)),
-    io:format("When: ~p~n", [Tail]),
-    {Guard, Body} = case erl_syntax:is_atom(erl_syntax:list_head(When), 'when') of
+                              R = term(A, E),
+                              io:format("<P> ~p~n", [R]),
+                              R
+                      end, Args),
+    io:format("When: ~p~n", [(hd(When))#term.value]),
+    {Guard, Body} = case (hd(When))#term.value=='when' of
                         true ->
                             {form(When, E), form(Tail, E)};
                         false ->
-                            NTail = case Tail of
-                                        [] -> erl_syntax:nil();
-                                        _ -> Tail
-                                    end,
-                            NBody = erl_syntax:cons(When, NTail),
-                            {[], forms(NBody, E)}
+                            NBody = [When | Tail],
+                            io:format("NBody ~p~n", [NBody]),
+                            NBodyList =case length(NBody) of
+                                         1 ->
+                                             form(hd(NBody), E);
+                                         _ ->
+                                             NBodies = lists:map(fun(Elem) ->
+                                                        form(Elem, E)
+                                                                 end, NBody),
+                                             erl_syntax:list(NBodies)
+                                       end,
+                            {[], NBodyList}
                     end,
-    io:format("G: ~p, B: ~p~n", [Guard, Body]),
-    ?MQ(Args, "(_@PArgs) when _@__Guard -> _@Body",
-        [{'PArgs', PArgs}, {'Guard', Guard}, {'Body', Body} ]).
+    io:format("Arg: ~p~nG: ~p~nB: ~p~n", [PArgs, Guard, Body]),
+    Loc = erl_syntax:get_pos(hd(PArgs)),
+    S=?MQP(Loc, "(_@PArgs) when _@__Guard -> _@Body",
+        [{'PArgs', PArgs}, {'Guard', Guard}, {'Body', Body} ]),
+    io:format("SSS: ~p~n", [S]),
+    S.
 
 
 match_defun_(Name, Clauses, E) ->
-    Md = erl_syntax:function(Name, 
+    io:format("match-defun ~p~n", [Name]),
+    FuncName = erl_syntax:set_pos(erl_syntax:atom(Name#term.value), Name#term.loc),
+    Md = erl_syntax:function(FuncName, 
                              lists:map(fun(A) ->
-                                               clause_(A, E)
+                                               AST = A,
+                                               io:format("AST ~p~n", [AST]),
+                                               clause_(AST, E)
                                        end, Clauses)),
-    erl_syntax:copy_pos(Name, Md).
+    Ret=erl_syntax:copy_pos(FuncName, Md),
+    io:format("~nmatch_defun_output ~p~n", [erl_syntax:get_pos(Ret)]),
+    merl:print(Ret),
+    io:format("~n ", []),
+    Ret.
 
 defun_(X, L, E) ->
     io:format("defun_ : ~p~n", [X]),

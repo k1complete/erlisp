@@ -55,20 +55,25 @@ defun_form_test() ->
 
 defun_form2_test() ->
     Line = ?LINE,
-    C4 = transpile:form(?TQ(Line, "[defun, plus, [A, B], ['+', A, B], ['+', A, B]]"), []),
+    {ok, Tokens, _Lines} = scan:string("(defun plus (A B) (+ A B) (+ A B))", Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4 = transpile:form(Tree, []),
     C5 = merl:quote(Line, "plus(A, B) -> A + B, A + B."),
-    ?assertEqual(C5, erl_syntax:revert(C4)).
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
 
 defun_match_test() ->
     Line = ?LINE,
-    C4 = transpile:form(?TQ(Line, 
-                            ["[defun, plus, [[[match, A,1], B], ",
-                             "['+', A, B]], ",
-                             "[[A, B], ['+', A, B]]]"]), []),
+    Cmd = ["(defun plus (((match A 1) B)\n",
+           "(+ A B))\n",
+           "((A B) (+ A B)))\n"],
+    {ok, Tokens, _Lines} = scan:string(lists:flatten(Cmd), Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:form(Tree, []),
+    io:format("~nC4 ~p~n", [C4]),
     C5 = merl:quote(Line, ["plus(A=1, B) ->", 
                            " A+B;",
                           "plus(A, B) -> A + B."]),
-    ?assertEqual(C5, erl_syntax:revert(C4)).
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
 export_test() ->
     Line = ?LINE,
     C4 = transpile:form(?TQ(Line,
