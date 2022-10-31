@@ -141,14 +141,20 @@ form_trans([XT=#term{value=X, loc=Loc}| T], E) ->
 form_trans([List| T], E) when is_list(List) ->
     io:format("nested ~p~n", [List]),
     form_trans([form_trans(List, E)| T], E).
+term_make_atom(Term) ->
+    erl_syntax:set_pos(erl_syntax:atom(Term#term.value), Term#term.loc).
 
-export_(X, L, _E) ->
-    Aq = lists:map(fun(E) ->
-                           [F, A] = erl_syntax:list_elements(E),
+export_(X, L, E) ->
+    Loc = X#term.loc,
+    io:format("export X ~p~n", [X]),
+    Aq = lists:map(fun([Fn, Arg]) ->
+                           F = term_make_atom(Fn),
+                           A = term(Arg, Loc, E),
+                           io:format("FA Fis ~p~n Ais ~p~n", [F, A]),
                            erl_syntax:arity_qualifier(F, A)
-                   end, erl_syntax:list_elements(L)),
-    E = erl_syntax:attribute(erl_syntax:atom(export),[erl_syntax:list(Aq)]),
-    erl_syntax:copy_pos(X, E).
+                   end, L),
+    R = erl_syntax:attribute(erl_syntax:atom(export),[erl_syntax:list(Aq)]),
+    erl_syntax:set_pos(R, Loc).
 
 module_(X, L, _E) ->
     Module = erl_syntax:list_head(L),

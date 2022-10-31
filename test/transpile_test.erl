@@ -76,10 +76,13 @@ defun_match_test() ->
     ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
 export_test() ->
     Line = ?LINE,
-    C4 = transpile:form(?TQ(Line,
-                            ["[export, [a, 2], [b, 3]]"]), []),
+    Cmd = ["(export (a 2) (b 3))"],
+    {ok, Tokens, _Lines} = scan:string(lists:flatten(Cmd), Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:form(Tree, []),
     C5 = merl:quote(Line, ["-export([a/2, b/3])."]),
-    ?assertEqual(C5, erl_syntax:revert(C4)).
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+
 module_test() ->
     Line = ?LINE,
     C4 = transpile:form(?TQ(Line,
