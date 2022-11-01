@@ -236,6 +236,10 @@ forms(L, E) ->
                                form_trans(A, E)
                        end, erl_syntax:list_elements(L))
     end.
+is_when(#term{type=atom, value="when"}) ->
+    true;
+is_when(_) ->
+    false.
 
 clause_(L, E) ->
     [Args, When| Tail] = L,
@@ -244,18 +248,18 @@ clause_(L, E) ->
                               io:format("<P> ~p~n", [R]),
                               R
                       end, Args),
+    io:format("WArg: ~p~n", [When]),
     io:format("When: ~p~n", [(hd(When))#term.value]),
-    {Guard, Body} = case (hd(When))#term.value=='when' of
-                        true ->
-                            {form(When, E), form(Tail, E)};
-                        false ->
-                            NBody = [When | Tail],
-                            io:format("NBody ~p~n", [NBody]),
-                            NBodyList = lists:map(fun(Elem) ->
-                                                          form(Elem, E)
-                                                  end, NBody),
-                            {[], NBodyList}
-                    end,
+    {Guard, NBodyList} = case is_when(hd(When)) of
+                             true ->
+                                 io:format("Guard: ~p~n", [tl(When)]),
+                                 [WhenGuard | _] = tl(When),
+                                 io:format("Body: ~p~n", [Tail]),
+                                 {form(WhenGuard, E), Tail};
+                             false ->
+                                 {[], NBody = [When | Tail]}
+                         end,
+    Body = lists:map(fun(Elem) -> form(Elem, E) end, NBodyList),
     io:format("Arg: ~p~nG: ~p~nB: ~p~n", [PArgs, Guard, Body]),
     Loc = erl_syntax:get_pos(hd(PArgs)),
     S=?MQP(Loc, "(_@PArgs) when _@__Guard -> _@Body",
