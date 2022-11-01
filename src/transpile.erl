@@ -1,4 +1,5 @@
 -module(transpile).
+
 -include_lib("syntax_tools/include/merl.hrl").
 -include_lib("erlisp.hrl").
 -compile([{debug_info, true}]).
@@ -7,11 +8,12 @@
 -export([form/2, form_trans/2, term/2, infix_op/4,
         locline/1]).
 -type tree() :: erl_syntax:syntaxTree().
+-type env() :: list().
 
 erl_type(A) ->
     io:format("A is ~p\n", [A]),
     case A of
-        #term{value=X, loc=Loc,type=T} ->
+        #item{value=_X, loc=_Loc,type=T} ->
             T;
         X when is_atom(X) ->
             atom;
@@ -26,7 +28,7 @@ erl_type(A) ->
     end.
 
 module_function(A, Loc) ->
-    {M, F} = A#term.value,
+    {M, F} = A#item.value,
     erl_syntax:set_pos(erl_syntax:module_qualifier(
                          erl_syntax:set_pos(erl_syntax:atom(M), Loc), 
                          erl_syntax:set_pos(erl_syntax:atom(F), Loc)), 
@@ -42,7 +44,7 @@ term(A, Loc, E) ->
         module_function ->
             module_function(A, Loc);
         atom ->
-            #term{value=Atom, loc=Aloc} = A,
+            #item{value=Atom, loc=Aloc} = A,
             A2 = erl_syntax:atom(Atom),
             io:format("A2 ~p~n", [A2]),
             B = case erl_syntax:atom_name(A2) of
@@ -116,7 +118,7 @@ form(A, E) ->
     R
     .
 
-form_trans([XT=#term{value=X, loc=Loc}| T], E) ->
+form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
     io:format("X: ~p, T: ~p~n", [X, T]),
     R=case Inf=dispatch_infix_op(X) of
           undef ->
@@ -142,10 +144,10 @@ form_trans([List| T], E) when is_list(List) ->
     io:format("nested ~p~n", [List]),
     form_trans([form_trans(List, E)| T], E).
 term_make_atom(Term) ->
-    erl_syntax:set_pos(erl_syntax:atom(Term#term.value), Term#term.loc).
+    erl_syntax:set_pos(erl_syntax:atom(Term#item.value), Term#item.loc).
 
 export_(X, L, E) ->
-    Loc = X#term.loc,
+    Loc = X#item.loc,
     io:format("export X ~p~n", [X]),
     Aq = lists:map(fun([Fn, Arg]) ->
                            F = term_make_atom(Fn),
@@ -157,13 +159,13 @@ export_(X, L, E) ->
     erl_syntax:set_pos(R, Loc).
 
 module_(X, L, _E) ->
-    Loc = X#term.loc,
+    Loc = X#item.loc,
     Module = hd(L),
     M = term_make_atom(Module),
     io:format("module_ ~p~n", [M]),
     E = erl_syntax:attribute(erl_syntax:atom(module), [M]),
     erl_syntax:set_pos(E, Loc).
-match_op(#term{value=X, loc=Loc}, L, E) ->
+match_op(#item{value=_X, loc=Loc}, L, E) ->
     [Left, Right] = L,
     io:format("Match: ~p ~p~n", [Left, Right]),
     LeftT = term(Left, Loc, E),
@@ -177,7 +179,7 @@ anary_op(Op, Left, _E) ->
     Nexp = erl_syntax:prefix_expr(Op, Left),
     erl_syntax:copy_pos(Op, Nexp).
 
-infix_op(Op, Loc, Arg=[Left|Right], E) ->
+infix_op(Op, Loc, [Left|Right], E) ->
     io:format("TreeInfix~n", []),
     OpType = erl_syntax:set_pos(erl_syntax:operator(Op), Loc),
     Xp =infix_op_do(OpType, [term(Left, Loc, E) |Right], E),
@@ -212,7 +214,7 @@ infix_op_do(Op, [Left|T], E) ->
 cons_(C, L, E) ->
     io:format("cons: ~p~n", [L]),
     [Head|Tail] = L,
-    #term{loc=Loc} = C,
+    #item{loc=Loc} = C,
     case Tail of
         [] -> Head;
         [X] ->
@@ -225,22 +227,12 @@ cons_(C, L, E) ->
             ?MQP(Loc, "[_@HHead|_@TTail]", [{'HHead', HHead}, {'TTail', TTail}])
     end.
 
-forms(L, E) ->    
-    case erl_syntax:list_length(L) of
-        1 ->
-            io:format("L ~p~n", [L]),
-            LF = form(erl_syntax:list_head(L), E),
-            LF;
-        _ -> lists:map(fun(A) ->
-                               io:format("E ~p~n", [A]),
-                               form_trans(A, E)
-                       end, erl_syntax:list_elements(L))
-    end.
-is_when(#term{type=atom, value="when"}) ->
+is_when(#item{type=atom, value="when"}) ->
     true;
 is_when(_) ->
     false.
 
+-spec clause_(list(), env()) -> tree().
 clause_(L, E) ->
     [Args, When| Tail] = L,
     PArgs = lists:map(fun(A) ->
@@ -249,7 +241,7 @@ clause_(L, E) ->
                               R
                       end, Args),
     io:format("WArg: ~p~n", [When]),
-    io:format("When: ~p~n", [(hd(When))#term.value]),
+    io:format("When: ~p~n", [(hd(When))#item.value]),
     {Guard, NBodyList} = case is_when(hd(When)) of
                              true ->
                                  io:format("Guard: ~p~n", [tl(When)]),
@@ -257,7 +249,7 @@ clause_(L, E) ->
                                  io:format("Body: ~p~n", [Tail]),
                                  {form(WhenGuard, E), Tail};
                              false ->
-                                 {[], NBody = [When | Tail]}
+                                 {[], [When | Tail]}
                          end,
     Body = lists:map(fun(Elem) -> form(Elem, E) end, NBodyList),
     io:format("Arg: ~p~nG: ~p~nB: ~p~n", [PArgs, Guard, Body]),
@@ -270,7 +262,7 @@ clause_(L, E) ->
 
 match_defun_(Name, Clauses, E) ->
     io:format("match-defun ~p~n", [Name]),
-    FuncName = erl_syntax:set_pos(erl_syntax:atom(Name#term.value), Name#term.loc),
+    FuncName = erl_syntax:set_pos(erl_syntax:atom(Name#item.value), Name#item.loc),
     Md = erl_syntax:function(FuncName, 
                              lists:map(fun(A) ->
                                                AST = A,
@@ -285,7 +277,7 @@ match_defun_(Name, Clauses, E) ->
 
 defun_(X, L, E) ->
     io:format("defun_ : ~p~n", [X]),
-    Line = X#term.loc,
+    Line = X#item.loc,
     [Name, Args | Rest] = L,
     io:format("Name, Args | Rest =~n  ~p~n ~p~n ~p ~n", [Name, Args, Rest]),
     case hd(Args) of
@@ -295,16 +287,14 @@ defun_(X, L, E) ->
             Body = lists:map(fun(A) -> form(A, E) end, Rest),
             io:format("simpleArgs ~p ~n", [Args]),
             ArgList = lists:map(fun(A) -> term(A, E) end, Args),
-            FunName = erl_syntax:atom(Name#term.value),
+            FunName = erl_syntax:atom(Name#item.value),
             io:format("MO: ~p ~p~n", [Line, FunName]),
             MQ=?MQP(Line, "'@name'(_@@args) -> _@@body.", 
                  [{'name', FunName}, 
                   {'args', ArgList},
                   {'body', Body}]),
             io:format("MQ2: ~p~n", [MQ]),
-            MQ;
-        X ->
-            io:format("Y: ~p~n", [X])
+            MQ
     end.
 
 locconv(E) ->
@@ -317,7 +307,7 @@ locline(F) ->
                                locconv(E)
                        end, F).
 
-call_function(Fun=#term{value=X, loc=Loc}, T, E) ->
+call_function(Fun=#item{value=X, loc=Loc}, T, E) ->
     io:format("call X ~p~nT ~p~nFun ~p~n", [X, T, Fun]),
     FHead = term(hd(T), E),
     io:format("call X2 ~p~nT ~p~n", [term(Fun,E, Loc), FHead]),
@@ -339,7 +329,7 @@ call_function(Fun=#term{value=X, loc=Loc}, T, E) ->
                  {'FHead', FHead}])
     end.
 
-getmodfun(#term{type=Type, value=X, loc=Loc}) ->
+getmodfun(#item{type=Type, value=X, loc=Loc}) ->
     case Type of
         atom ->
             {undef, erl_syntax:set_pos(erl_syntax:atom(X), Loc)};
@@ -350,28 +340,11 @@ getmodfun(#term{type=Type, value=X, loc=Loc}) ->
             {MA, FA}
     end.
 
-getmf(X) ->
-    case erl_syntax:type(X) of
-        atom ->
-            [M|F] = string:split(erl_syntax:atom_name(X), ":"),
-            case F of
-                [] ->
-                    {undef, erl_syntax:copy_pos(X, erl_syntax:atom(M))};
-                _ ->
-                    {erl_syntax:copy_pos(X, erl_syntax:atom(M)),
-                     erl_syntax:copy_pos(X, erl_syntax:atom(hd(F)))}
-            end;
-        module_qualimodifier ->
-            {erl_syntax:module_qualifier_argument(X),
-             erl_syntax:module_qualifier_body(X)}
-    end.
-
-
 quote_(_X, [], _E) ->
-    #term{loc=Pos} = _X,
+    #item{loc=Pos} = _X,
     erl_syntax:set_pos(erl_syntax:nil(), Pos);
 quote_(_X, L, _E) when is_list(L), length(L)>1 ->
-    #term{loc=Pos} = _X,
+    #item{loc=Pos} = _X,
     R =lists:map(fun(E) ->
                          quote_(_X, E, _E)
                  end, L),
@@ -379,16 +352,16 @@ quote_(_X, L, _E) when is_list(L), length(L)>1 ->
     ;
 quote_(_X, L, _E) ->
     io:format("quote ~p ~p~n", [_X, L]),
-    #term{loc=Pos} = _X,
+    #item{loc=Pos} = _X,
     
     E = case L of
             [Elem] -> Elem;
             _ -> L
         end,
     S = case E of
-            #term{value='_', type=atom} ->
+            #item{value='_', type=atom} ->
                 erl_syntax:underscore();
-            #term{value=X} -> 
+            #item{value=X} -> 
                 io:format("atomtry ~ts", [X]),
                 erl_syntax:atom(X);
             E when is_integer(E) ->

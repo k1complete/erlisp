@@ -2,7 +2,7 @@
 -type location() :: erl_anno:location().
 -type atype() :: variable | function | atom | string.
 
--record(term, 
+-record(item, 
         {value :: atom(),
          loc :: location(),
          type :: atype()}).

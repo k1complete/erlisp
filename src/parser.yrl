@@ -79,10 +79,10 @@ tokenvalue(T) ->
     element(3, T).
 
 set_pos(Tree, Pos) ->
-    #term{value=Tree, loc=Pos, type=atom}.
-setline({Module, Function}, {Type, Line, Value}) ->
+    #item{value=Tree, loc=Pos, type=atom}.
+setline({Module, Function}, {Type, Line, _Value}) ->
     Pos=erl_anno:new(Line),
-    #term{value={Module, Function}, loc=Pos, type=Type};
+    #item{value={Module, Function}, loc=Pos, type=Type};
 setline(Tree, {_t, Line}) ->
     Pos = erl_anno:new(Line),
     set_pos(Tree, Pos);
