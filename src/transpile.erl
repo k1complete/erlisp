@@ -340,19 +340,18 @@ getmodfun(#item{type=Type, value=X, loc=Loc}) ->
             {MA, FA}
     end.
 
-quote_(_X, [], _E) ->
-    #item{loc=Pos} = _X,
+quote_(#item{loc=Pos}, [], _) ->
     erl_syntax:set_pos(erl_syntax:nil(), Pos);
-quote_(_X, L, _E) when is_list(L), length(L)>1 ->
-    #item{loc=Pos} = _X,
+quote_(X, L, _Env) when is_list(L), length(L)>1 ->
+    #item{loc=Pos} = X,
     R =lists:map(fun(E) ->
-                         quote_(_X, E, _E)
+                         quote_(X, E, _Env)
                  end, L),
     erl_syntax:set_pos(erl_syntax:list(R), Pos)
     ;
-quote_(_X, L, _E) ->
-    io:format("quote ~p ~p~n", [_X, L]),
-    #item{loc=Pos} = _X,
+quote_(X, L, _Env) ->
+    io:format("quote ~p ~p~n", [X, L]),
+    #item{loc=Pos} = X,
     
     E = case L of
             [Elem] -> Elem;
@@ -361,21 +360,22 @@ quote_(_X, L, _E) ->
     S = case E of
             #item{value='_', type=atom} ->
                 erl_syntax:underscore();
-            #item{value=X} -> 
-                io:format("atomtry ~ts", [X]),
-                erl_syntax:atom(X);
+            #item{value=V, type=atom} -> 
+                io:format("atomtry ~ts", [V]),
+                erl_syntax:atom(V);
+            #item{value=V, type=string} ->
+                erl_syntax:string(V);
             E when is_integer(E) ->
                 erl_syntax:integer(E);
             %%list_to_atom(X);
             [H|T] -> 
-                HV = erl_syntax:set_pos(term(H, _E), Pos),
-                erl_syntax:cons(HV, quote_(_X, T, _E));
+                HV = erl_syntax:set_pos(term(H, _Env), Pos),
+                erl_syntax:cons(HV, quote_(X, T, _Env));
             _ -> E
         end,
     R = erl_syntax:set_pos(S, Pos),
     io:format("quote_ R: ~p~n", [R]),
     R.
-
 
 lst() ->
     E = [],

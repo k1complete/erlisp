@@ -28,7 +28,41 @@ lists_reverse2_test() ->
     C4=transpile:form(Tree, []),
     C5=?TQ(Line, "lists:reverse([1,2,3])"),
     ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+
+lists_reverse3_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Lines} = scan:string("(lists:reverse '(1 2 3)))", Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:form(Tree, []),
+    C5=?TQ(Line, "lists:reverse([1,2,3])"),
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
     
+quote_macro_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Lines} = scan:string("'(a A 1)", Line),
+    io:format("macro ~p~n", [Tokens]),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:form(Tree, []),
+    C5 = ?TQ(Line, "[a, 'A', 1]"),
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    
+
+literal_atom_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Lines} = scan:string("A", Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:term(Tree, []),
+    C5 = merl:quote(Line, "A"),
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+
+quote_atom_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Lines} = scan:string("'A", Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:term(Tree, []),
+    C5 = merl:quote(Line, "'A'"),
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+
 quote_var_test() ->
     Line = ?LINE,
     {ok, Tokens, _Lines} = scan:string("(quote A)", Line),
@@ -131,6 +165,15 @@ equal_test() ->
     %                     {atom,1,'=='},
     %                     {cons,1,{integer,1,1},{cons,1,{integer,1,2},{nil,1}}}}, []),
     C5 = merl:quote(Line, "1 == 2"),
+    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+
+call_function_test() ->
+    Line=?LINE,
+    Cmd = ["(hd (quote (1 2 3)))"],
+    {ok, Tokens, _Lines} = scan:string(lists:flatten(Cmd), Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C4=transpile:form(Tree, []),
+    C5 = merl:quote(Line, "hd([1,2,3])"),
     ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
 
 macro_test() ->

@@ -1,7 +1,7 @@
 
 Nonterminals
 
-expressions sexpression elements literal
+expressions expression sexpression elements literal
 term hterm atom asymbol  lines.
 
 Terminals
@@ -17,40 +17,57 @@ lines ->
     expressions : 
         '$1'.
 expressions ->
-    sexpression : 
+    expression : 
         '$1'.
 expressions ->
-    expressions sexpression : 
+    expressions expression : 
         lists:append('$1' , ['$2']).
+
+expression ->
+    hterm : 
+        io:format("Exp0 ~p~n", ['$1']), 
+        '$1'.
+expression ->
+    '\'' hterm : 
+        A=[#item{value="quote", type=atom, loc=getpos('$2')}, '$2'],
+        io:format("ExTerm ~p~n", [A]),
+        A.
+    
 sexpression ->
     '(' ')' : nil.
 sexpression ->
-    '(' elements ')' :
+    '(' elements ')' : 
+        io:format("Exp ~p~n", ['$2']),
         '$2'.
-%        erl_syntax:list('$2').
-%        setline(erl_syntax:list('$2'), hd('$2')).
 
 elements ->
     hterm : ['$1'].
 elements ->
     elements term : lists:append('$1', ['$2']).
 
+term ->
+    asymbol : 
+        io:format("Term ~p~n", ['$1']), '$1'.
+term ->
+    literal : 
+        io:format("Term ~p~n", ['$1']), '$1'.
+term ->
+    string : 
+        io:format("Term ~p~n", ['$1']),'$1'.
+term ->
+    sexpression : 
+        io:format("Term ~p~n", ['$1']),'$1'.
 
-term ->
-    literal : '$1'.
-term ->
-    asymbol : '$1'.
-term ->
-    string : '$1'.
-term ->
-    sexpression : '$1'.
+hterm ->
+    asymbol : 
+        io:format("HTerm ~p~n", ['$1']), '$1'.
+hterm ->
+    literal : 
+        io:format("HTerm ~p~n", ['$1']), '$1'.
+hterm ->
+    sexpression : 
+        io:format("HTerm ~p~n", ['$1']), '$1'.
 
-hterm ->
-    asymbol : '$1'.
-hterm ->
-    literal : '$1'.
-hterm ->
-    sexpression : '$1'.
 
 asymbol ->
     module_function : setline(mf(tokenvalue('$1')), '$1').
@@ -89,6 +106,8 @@ setline(Tree, {_t, Line}) ->
 setline(Tree, {_t, Line, _v}) ->
     Pos = erl_anno:new(Line),
     set_pos(Tree, Pos).
+getpos(Tree) ->
+    Tree#item.loc.
 
 mf(Text) ->
     [Module, Function] = string:split(Text, ":"),
