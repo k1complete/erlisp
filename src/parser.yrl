@@ -18,30 +18,26 @@ lines ->
         '$1'.
 expressions ->
     expression : 
+        io:format("ExpOK ~p~n", ['$1']),
         '$1'.
 expressions ->
     expressions expression : 
         lists:append('$1' , ['$2']).
 
 expression ->
-    hterm : 
+    term : 
         io:format("Exp0 ~p~n", ['$1']), 
         '$1'.
-expression ->
-    '\'' hterm : 
-        A=[#item{value="quote", type=atom, loc=getpos('$2')}, '$2'],
-        io:format("ExTerm ~p~n", [A]),
-        A.
-    
+
 sexpression ->
     '(' ')' : nil.
 sexpression ->
     '(' elements ')' : 
-        io:format("Exp ~p~n", ['$2']),
+        io:format("SexpFromElem ~p~n", ['$2']),
         '$2'.
 
 elements ->
-    hterm : ['$1'].
+    term : ['$1'].
 elements ->
     elements term : lists:append('$1', ['$2']).
 
@@ -56,7 +52,13 @@ term ->
         io:format("Term ~p~n", ['$1']),'$1'.
 term ->
     sexpression : 
-        io:format("Term ~p~n", ['$1']),'$1'.
+        io:format("TermFromSexp ~p~n", ['$1']),'$1'.
+term ->
+    '\'' term : 
+        io:format("OK ~p~n", ['$1']),
+        A=[setline("quote", '$1'), '$2'],
+        io:format("Term Quote ~p~n", [A]),
+        A.
 
 hterm ->
     asymbol : 
@@ -106,8 +108,6 @@ setline(Tree, {_t, Line}) ->
 setline(Tree, {_t, Line, _v}) ->
     Pos = erl_anno:new(Line),
     set_pos(Tree, Pos).
-getpos(Tree) ->
-    Tree#item.loc.
 
 mf(Text) ->
     [Module, Function] = string:split(Text, ":"),

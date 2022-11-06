@@ -31,7 +31,7 @@ lists_reverse2_test() ->
 
 lists_reverse3_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:string("(lists:reverse '(1 2 3)))", Line),
+    {ok, Tokens, _Lines} = scan:string("(lists:reverse '(1 2 3))", Line),
     {ok, Tree} = parser:parse(Tokens),
     C4=transpile:form(Tree, []),
     C5=?TQ(Line, "lists:reverse([1,2,3])"),

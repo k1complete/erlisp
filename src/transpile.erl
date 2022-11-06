@@ -70,6 +70,45 @@ term(A, Loc, E) ->
         _ ->
             A
     end.
+term_to_ast(A, Loc, Env, Quote) ->
+    X = erl_type(A),
+    io:format("termX ~p~p[~p]~n", [X, A, Loc]),
+    case X of
+        module_function ->
+            module_function(A, Loc);
+        atom ->
+            #item{value=Atom, loc=Aloc} = A,
+            A2 = erl_syntax:atom(Atom),
+            io:format("A2 ~p~n", [A2]),
+            B = case erl_syntax:atom_name(A2) of
+                    "_" ->
+                        erl_syntax:underscore();
+                    "nil" ->
+                        erl_syntax:nil();
+                    N ->
+                        %S=binary_to_list(unicode:characters_to_binary(N)),
+                        S = N,
+                        case Quote of
+                            true ->
+                                erl_syntax:atom(S);
+                            false ->
+                                io:format("<<<Variable ~ts>>>", [S]),
+                                erl_syntax:variable(S)
+                        end
+                end,
+            erl_syntax:set_pos(B, Aloc);
+        integer ->
+            erl_syntax:set_pos(erl_syntax:integer(A), Loc);
+        list ->
+            form(A, Env);
+        variable  ->
+            A;
+        underscore ->
+            A;
+        _ ->
+            A
+    end.
+    
 
 dispatch_infix_op(A) ->
     L = #{
@@ -365,11 +404,13 @@ quote_(X, L, _Env) ->
                 erl_syntax:atom(V);
             #item{value=V, type=string} ->
                 erl_syntax:string(V);
+            #item{value=V, type=variable} ->
+                erl_syntax:atom(V);
             E when is_integer(E) ->
                 erl_syntax:integer(E);
             %%list_to_atom(X);
             [H|T] -> 
-                HV = erl_syntax:set_pos(term(H, _Env), Pos),
+                HV = term_to_ast(H, Pos, _Env, true), %% <-
                 erl_syntax:cons(HV, quote_(X, T, _Env));
             _ -> E
         end,
