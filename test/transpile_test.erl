@@ -76,7 +76,7 @@ quote_list_test() ->
     {ok, Tokens, _Lines} = scan:string("(quote ((quote a) A 1))", Line),
     {ok, Tree} = parser:parse(Tokens),
     C4=transpile:form(Tree, []),
-    C5 = ?TQ(Line, "[a, 'A', 1]"),
+    C5 = ?TQ(Line, "[[quote, a], 'A', 1]"),
     ?assertEqual(erl_syntax:revert(C5), erl_syntax:revert(transpile:locline(C4))).
     
 defun_form_test() ->

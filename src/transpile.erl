@@ -10,22 +10,6 @@
 -type tree() :: erl_syntax:syntaxTree().
 -type env() :: list().
 
-erl_type(A) ->
-    io:format("A is ~p\n", [A]),
-    case A of
-        #item{value=_X, loc=_Loc,type=T} ->
-            T;
-        X when is_atom(X) ->
-            atom;
-        X when is_binary(X) -> 
-            binary;
-        X when is_integer(X) ->
-            integer;
-        X when is_list(X)  ->
-            list;
-        X when is_bitstring(X) ->
-            bitstring
-    end.
 
 module_function(A, Loc) ->
     {M, F} = A#item.value,
@@ -34,80 +18,45 @@ module_function(A, Loc) ->
                          erl_syntax:set_pos(erl_syntax:atom(F), Loc)), 
                        Loc).
 
-term(A, E) ->
-    term(A, 0, E).
+term(A, Env) ->
+    term(A, 0, Env).
+term(A, Loc, Env) ->
+    term_to_ast(A, Loc, Env, false).
 
-term(A, Loc, E) ->
-    X = erl_type(A),
-    io:format("termX ~p~p[~p]~n", [X, A, Loc]),
-    case X of
-        module_function ->
-            module_function(A, Loc);
-        atom ->
-            #item{value=Atom, loc=Aloc} = A,
-            A2 = erl_syntax:atom(Atom),
-            io:format("A2 ~p~n", [A2]),
-            B = case erl_syntax:atom_name(A2) of
-                    "_" ->
-                        erl_syntax:underscore();
-                    "nil" ->
-                        erl_syntax:nil();
-                    N ->
-                        %S=binary_to_list(unicode:characters_to_binary(N)),
-                        S = N,
-                        io:format("<<<Variable ~ts>>>", [S]),
-                        erl_syntax:variable(S)
-                end,
-            erl_syntax:set_pos(B, Aloc);
-        integer ->
-            erl_syntax:set_pos(erl_syntax:integer(A), Loc);
-        list ->
-            form(A, E);
-        variable  ->
-            A;
-        underscore ->
-            A;
-        _ ->
-            A
-    end.
 term_to_ast(A, Loc, Env, Quote) ->
-    X = erl_type(A),
-    io:format("termX ~p~p[~p]~n", [X, A, Loc]),
-    case X of
-        module_function ->
+    case A of
+        #item{type=module_function} ->
             module_function(A, Loc);
-        atom ->
-            #item{value=Atom, loc=Aloc} = A,
+        #item{type=atom, value="nil", loc=Aloc} ->
+            R = erl_syntax:nil(),
+            erl_syntax:set_pos(R, Aloc);
+        #item{type=atom, value=Atom, loc=Aloc} when Quote == true ->
             A2 = erl_syntax:atom(Atom),
             io:format("A2 ~p~n", [A2]),
-            B = case erl_syntax:atom_name(A2) of
-                    "_" ->
-                        erl_syntax:underscore();
-                    "nil" ->
-                        erl_syntax:nil();
-                    N ->
-                        %S=binary_to_list(unicode:characters_to_binary(N)),
-                        S = N,
-                        case Quote of
-                            true ->
-                                erl_syntax:atom(S);
-                            false ->
-                                io:format("<<<Variable ~ts>>>", [S]),
-                                erl_syntax:variable(S)
-                        end
-                end,
-            erl_syntax:set_pos(B, Aloc);
-        integer ->
-            erl_syntax:set_pos(erl_syntax:integer(A), Loc);
-        list ->
-            form(A, Env);
-        variable  ->
-            A;
-        underscore ->
-            A;
-        _ ->
-            A
+            S = erl_syntax:atom_name(A2),
+            R = erl_syntax:atom(S),
+            erl_syntax:set_pos(R, Aloc);
+        #item{type=atom, value="_", loc=Aloc} when Quote == false ->
+            R = erl_syntax:underscore(),
+            erl_syntax:set_pos(R, Aloc);
+        #item{type=atom, value=Atom, loc=Aloc} when Quote == false ->
+            A2 = erl_syntax:atom(Atom),
+            io:format("A2 ~p~n", [A2]),
+            S = erl_syntax:atom_name(A2),
+            io:format("<<<Variable ~ts>>>", [S]),
+            R =erl_syntax:variable(S),
+            erl_syntax:set_pos(R, Aloc);
+        Integer when is_integer(Integer) ->
+            erl_syntax:set_pos(erl_syntax:integer(Integer), Loc);
+        _ when is_list(A), Quote == false ->
+            form_trans(A, Env);
+        [] when is_list(A) ->
+            erl_syntax:set_pos(erl_syntax:nil(), Loc);
+        [H|T] when is_list(A) ->
+            R = erl_syntax:cons(term_to_ast(H, Loc, Env, Quote), term_to_ast(T, Loc, Env, Quote)),
+            erl_syntax:set_pos(R, Loc)
     end.
+
     
 
 dispatch_infix_op(A) ->
@@ -396,25 +345,7 @@ quote_(X, L, _Env) ->
             [Elem] -> Elem;
             _ -> L
         end,
-    S = case E of
-            #item{value='_', type=atom} ->
-                erl_syntax:underscore();
-            #item{value=V, type=atom} -> 
-                io:format("atomtry ~ts", [V]),
-                erl_syntax:atom(V);
-            #item{value=V, type=string} ->
-                erl_syntax:string(V);
-            #item{value=V, type=variable} ->
-                erl_syntax:atom(V);
-            E when is_integer(E) ->
-                erl_syntax:integer(E);
-            %%list_to_atom(X);
-            [H|T] -> 
-                HV = term_to_ast(H, Pos, _Env, true), %% <-
-                erl_syntax:cons(HV, quote_(X, T, _Env));
-            _ -> E
-        end,
-    R = erl_syntax:set_pos(S, Pos),
+    R = term_to_ast(E, Pos, _Env, true),
     io:format("quote_ R: ~p~n", [R]),
     R.
 
