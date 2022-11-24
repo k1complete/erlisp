@@ -57,7 +57,7 @@ literal_atom_test() ->
 
 quote_atom_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:string("'A", Line),
+    {ok, Tokens, _Lines} = scan:from_string("'A", Line),
     {ok, Tree} = parser:parse(Tokens),
     C4=transpile:term(Tree, []),
     C5 = merl:quote(Line, "'A'"),
