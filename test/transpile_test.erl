@@ -31,7 +31,8 @@ lists_reverse2_test() ->
 
 lists_reverse3_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:string("(lists:reverse '(1 2 3))", Line),
+    {ok, Tokens, _Lines} = scan:from_string("(lists:reverse '(1 2 3))", Line),
+    %io:format(standard_error, "lists_reverse3_test ~p~n", [Tokens]),
     {ok, Tree} = parser:parse(Tokens),
     C4=transpile:form(Tree, []),
     C5=?TQ(Line, "lists:reverse([1,2,3])"),
@@ -39,8 +40,8 @@ lists_reverse3_test() ->
     
 quote_macro_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:string("'(a A 1)", Line),
-    io:format("macro ~p~n", [Tokens]),
+    {ok, Tokens, _Lines} = scan:from_string("'(a A 1)", Line),
+    io:format("QM macro ~p~n", [Tokens]),
     {ok, Tree} = parser:parse(Tokens),
     C4=transpile:form(Tree, []),
     C5 = ?TQ(Line, "[a, 'A', 1]"),
