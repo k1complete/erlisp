@@ -36,15 +36,21 @@ term_to_ast(A, Loc, Env, Quote) ->
             S = erl_syntax:atom_name(A2),
             R = erl_syntax:atom(S),
             erl_syntax:set_pos(R, Aloc);
-        #item{type=atom, value="_", loc=Aloc} when Quote == false ->
+        #item{type=atom, value="_", loc=Aloc} when Quote == false; Quote == 0 ->
             R = erl_syntax:underscore(),
             erl_syntax:set_pos(R, Aloc);
-        #item{type=atom, value=Atom, loc=Aloc} when Quote == false ->
+        #item{type=atom, value=Atom, loc=Aloc} when Quote == false; Quote == 0 ->
             A2 = erl_syntax:atom(Atom),
             io:format("A2 ~p~n", [A2]),
             S = erl_syntax:atom_name(A2),
             io:format("<<<Variable ~ts>>>", [S]),
             R =erl_syntax:variable(S),
+            erl_syntax:set_pos(R, Aloc);
+        #item{type=atom, value=Atom, loc=Aloc} when Quote > 0 ->
+            A2 = erl_syntax:atom(Atom),
+            io:format("A2 ~p~n", [A2]),
+            S = erl_syntax:atom_name(A2),
+            R = erl_syntax:atom(S),
             erl_syntax:set_pos(R, Aloc);
         Integer when is_integer(Integer) ->
             erl_syntax:set_pos(erl_syntax:integer(Integer), Loc);
@@ -88,7 +94,10 @@ dispatch_special(A) ->
           "export" => fun export_/3,
           "module" => fun module_/3,
           "cons" => fun cons_/3,
+          "list" => fun list_/3,
           "quote" => fun quote_/3,
+          "unquote" => fun unquote_/3,
+          "backquote" => fun backquote_/3,
           "defun" => fun defun_/3
          },
     maps:get(A, L, undef).
@@ -130,7 +139,10 @@ form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
     ;
 form_trans([List| T], E) when is_list(List) ->
     io:format("nested ~p~n", [List]),
-    form_trans([form_trans(List, E)| T], E).
+    form_trans([form_trans(List, E)| T], E);
+form_trans(#item{value=Term, loc=Loc, type=atom}, E) ->
+    erl_syntax:set_pos(erl_syntax:variable(Term), Loc).
+    
 term_make_atom(Term) ->
     erl_syntax:set_pos(erl_syntax:atom(Term#item.value), Term#item.loc).
 
@@ -297,7 +309,9 @@ locline(F) ->
 
 call_function(Fun=#item{value=X, loc=Loc}, T, E) ->
     io:format("call X ~p~nT ~p~nFun ~p~n", [X, T, Fun]),
-    FHead = term(hd(T), E),
+    FHead = lists:map(fun(Elem) ->
+                              term(Elem, E)
+                      end, T),
     io:format("call X2 ~p~nT ~p~n", [term(Fun,E, Loc), FHead]),
     %FName = erl_syntax:set_pos(erl_syntax:atom(X), Loc),
     %FName = term(Fun, E, Loc),
@@ -327,27 +341,75 @@ getmodfun(#item{type=Type, value=X, loc=Loc}) ->
             FA=erl_syntax:set_pos(erl_syntax:atom(F), Loc),
             {MA, FA}
     end.
+    
+list_(X, L, Env) ->
+    R = lists:map(fun(Elem) ->
+                          term(Elem, Env)
+                  end, L),
+    Loc = X#item.loc,
+    erl_syntax:set_pos(erl_syntax:list(R), Loc).
 
-quote_(#item{loc=Pos}, [], _) ->
+oquote_(#item{loc=Pos}, [], _) ->
     erl_syntax:set_pos(erl_syntax:nil(), Pos);
-quote_(X, L, _Env) when is_list(L), length(L)>1 ->
+oquote_(X, L, _Env) when is_list(L), length(L)>1 ->
     #item{loc=Pos} = X,
     R =lists:map(fun(E) ->
                          quote_(X, E, _Env)
                  end, L),
     erl_syntax:set_pos(erl_syntax:list(R), Pos)
-    ;
-quote_(X, L, _Env) ->
-    io:format("quote ~p ~p~n", [X, L]),
+    .
+quote_(X, [E], _Env) ->
+    io:format("quote ~p ~p~n", [X, E]),
     #item{loc=Pos} = X,
-    
-    E = case L of
-            [Elem] -> Elem;
-            _ -> L
-        end,
     R = term_to_ast(E, Pos, _Env, true),
     io:format("quote_ R: ~p~n", [R]),
     R.
+% backquote
+backquote_(X, [E], _Env) when not(is_list(E)) ->
+    term_to_ast(E, X#item.loc, _Env, 1)
+    ;
+backquote_(X, [[#item{value="unquote"}, Form]], _Env) ->
+    io:format("unquote Form:~p~n", [Form]),
+    form(Form, _Env);
+backquote_(X, [E], _Env) when is_list(E) ->
+    io:format("bqquote L:~p~n", [E]),
+    #item{loc=Pos} = X,
+    [Last|Rest] = backquote_elem(E, _Env, []),
+    NewElems = lists:reverse(Rest),
+    NewLast = form(Last, _Env),
+    NewParams = lists:map(fun(Form) ->
+                                 form(Form, _Env)
+                         end, NewElems),
+    io:format("backquote_elemed: ~p~n", [NewParams]),
+    R = erl_syntax:list(NewParams, NewLast),
+    %R = form([make_symbol(append) | NewElem], Pos),
+    % R = term_to_ast(E, Pos, _Env, 1),
+    io:format("quote_ R: ~p~n", [R]),
+    R.
+make_symbol(S) ->
+    #item{value=atom_to_list(S), loc=0, type=atom}.
+make_symbol(S, Pos) ->
+    #item{value=atom_to_list(S), loc=Pos, type=atom}.
+
+backquote_elem([], Env, Acc)  ->
+    [[make_symbol(quote), make_symbol('nil')]| Acc];
+backquote_elem([H|T], Env, Acc) ->
+    NAcc = [[make_symbol(backquote), H] | Acc],
+    backquote_elem(T, Env, NAcc);
+backquote_elem(A, Env, Acc) when is_record(A, item) ->
+    [[make_symbol(quote), A]|Acc].
+
+
+obackquote_(X, [E], _Env) when is_list(E) ->
+    io:format("bqquote X:~p L:~p~n", [X, E]),
+    #item{loc=Pos} = X,
+    R = term_to_ast(E, Pos, _Env, 1),
+    io:format("quote_ R: ~p~n", [R]),
+    R.
+
+    
+unquote_(X, _L, _Env) ->    
+    X.
 
 lst() ->
     E = [],

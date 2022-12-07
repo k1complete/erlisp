@@ -31,12 +31,16 @@ Rules.
   {token, {'(', ?LC(TokenLine, TokenLen)}}.
 \) :
   {token, {')', ?LC(TokenLine, TokenLen)}}.
+\. : 
+  {token, {'.', ?LC(TokenLine, TokenLen)}}.
 \,\@ :
   {token, {',@', ?LC(TokenLine, TokenLen)}}.
 \, :
-  {token, {',', ?LC(TokenLine, TokenLen)}}.
+  {token, {read_macro, ?LC(TokenLine, TokenLen), 'unquote'}}.
 \' :
   {token, {read_macro, ?LC(TokenLine, TokenLen), 'quote'}}.
+\` :
+  {token, {read_macro, ?LC(TokenLine, TokenLen), 'backquote'}}.
 \#\( :
   {token, {'#(', ?LC(TokenLine, TokenLen)}}.
 {QString} :
@@ -62,8 +66,9 @@ Erlang code.
 -export([read_balance/4]).
 -export([read/3]).
 -export([read/6]).
--export([quote/4]).
+-export([reads/4]).
 -export([from_string/2]).
+-export([replace/5]).
 
 col(reset) ->
     put(col, 1),
@@ -103,17 +108,17 @@ read_balance({IO, Prompt}, {Cont, Level}, M, F, A) ->
             case Token of
                 {'(', _} ->
                     %io:format(standard_error, "L ~p, ~p~n", [Cont, Level]),
-                    read(IO, Prompt, {[Token|Cont], Level+1}, M, F, A);
+                    read(IO, Prompt, {[Token|Cont], Level+1}, M, F, EndLoc);
                 {')', _} when Level > 1 ->
                     %io:format(standard_error, "L ~p, ~p~n", [Cont, Level]),
-                    read(IO, Prompt, {[Token|Cont], Level-1}, M, F, A);
+                    read(IO, Prompt, {[Token|Cont], Level-1}, M, F, EndLoc);
                 {')', _} ->
                     %io:format(standard_error, "L ~p, ~p~n", [Cont, Level]),
                     {ok, lists:reverse([Token|Cont]), EndLoc};
                 _ when Level == 0 ->
                     {ok, lists:reverse([Token|Cont]), EndLoc};
                 _ ->
-                    read(IO, Prompt, {[Token|Cont], Level}, M, F, A)
+                    read(IO, Prompt, {[Token|Cont], Level}, M, F, EndLoc)
             end;
         {eof, EndLoc} ->
             %io:format(standard_error, "eof~n", []),
@@ -128,7 +133,7 @@ read(IO, Prompt, {[{read_macro, Loc, Value}|Cont], Level}, M, F, A) ->
 read(IO, Prompt, {Cont, Level}, M, F, A) ->
     case read_balance({IO, Prompt}, {Cont, Level}, scan, token, A) of
         {ok, [{read_macro, Loc, Value}], EndLoc} ->
-            read_macro({IO, Prompt}, M, F, A, Value);
+            read_macro({IO, Prompt}, M, F, EndLoc, Value);
         {ok, Tokens, EndLoc} ->
             %io:format(standard_error, "balanced ~p ~n", [Tokens]),
             {ok, Tokens, EndLoc};
@@ -139,18 +144,20 @@ read(IO, Prompt, A) ->
     read(IO, Prompt, {[], 0}, scan, token, A).
 
 read_macro({IO, Prompt}, M, F, A, Value) ->
-    RM = #{quote => {scan, quote},
-           backquote => {scan, backquote}},
+    RM = #{quote => {scan, replace},
+           backquote => {scan, replace},
+           unquote => {scan, replace}
+          },
     {MM, MF} = maps:get(Value, RM, {scan, not_implemented}),
     %io:format(standard_error, "RM ~p~n", [MF]),
-    apply(MM, MF, [{IO, Prompt}, M, F, A]).
+    apply(MM, MF, [{IO, Prompt}, M, F, A, Value]).
 
-quote({IO, Prompt}, M, F, A) ->
+replace({IO, Prompt}, M, F, A, Value) ->
     %io:format(standard_error, "E ~p~n", [M]),
     {ok, Tokens, EndLoc} = read(IO, Prompt, A),
     %io:format(standard_error, "E ~p~n", [Tokens]),
     NewTokens = [{'(', A},
-                 {symbol, A, "quote"} |
+                 {symbol, A, atom_to_list(Value)} |
                  Tokens] ++ [{')', EndLoc}],
     {ok, NewTokens, EndLoc}.
     

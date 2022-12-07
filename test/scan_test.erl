@@ -103,3 +103,15 @@ plus_test() ->
     B=erl_prettypr:format(TP),
     ?assertEqual(A, B).
 
+multi_line_test() ->
+    Line=?LINE,
+    S="(+ 1\n 1)",
+    {ok, R, NextLoc} = scan:from_string(S, Line),
+    ?assertEqual([{'(',{Line,1}},
+                      {symbol,{Line,2},"+"},
+                      {integer,{Line,4},1},
+                      {integer,{Line+1,2},1},
+                      {')',{Line+1,3}}],
+            R),
+    ?assertEqual(NextLoc, Line+1).
+    

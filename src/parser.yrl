@@ -8,7 +8,7 @@ Terminals
 symbol module_function
 integer float string 
 underscore
-'(' ')' ',' ',@' '\'' '#('.
+'(' ')' ',' ',@' '\'' '#(' '\.'.
 %% variable 
 Rootsymbol lines.
 Endsymbol '$end'.
@@ -35,6 +35,10 @@ sexpression ->
     '(' elements ')' : 
         io:format("SexpFromElem ~p~n", ['$2']),
         '$2'.
+sexpression ->
+    '(' elements '\.' term ')' : 
+        io:format("SexpFromElem ~p~n", ['$2']),
+    lists:append('$2' , '$4').
 
 elements ->
     term : ['$1'].
