@@ -393,11 +393,16 @@ make_symbol(S, Pos) ->
 
 backquote_elem([], Env, Acc)  ->
     [[make_symbol(quote), make_symbol('nil')]| Acc];
-backquote_elem([H|T], Env, Acc) ->
-    NAcc = [[make_symbol(backquote), H] | Acc],
-    backquote_elem(T, Env, NAcc);
 backquote_elem(A, Env, Acc) when is_record(A, item) ->
-    [[make_symbol(quote), A]|Acc].
+    io:format("A ITEM ~p~n", [A]),
+    [[make_symbol(quote), A]|Acc];
+backquote_elem([#item{value="unquote"}, T], Env, Acc) ->
+    io:format("UNQUOTE ELEM <~p> ~n", [T]),
+    [T | Acc];
+backquote_elem([H|T]=L, Env, Acc) ->
+    io:format("ELEM <~p> ~n", [L]),
+    NAcc = [[make_symbol(backquote), H] | Acc],
+    backquote_elem(T, Env, NAcc).
 
 
 obackquote_(X, [E], _Env) when is_list(E) ->
