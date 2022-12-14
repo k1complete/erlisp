@@ -39,4 +39,14 @@ backquote_unquote_variable_dot_test() ->
     {value, Result, Binding} = erl_eval:expr(erl_syntax:revert(C), Binding),
     ?assertEqual([reverse, [1, 2 | 3]], Result).
 
+backquote_unquote_splice_variable_test() ->
+    Line=?LINE,
+    {ok, Tokens, _Line} = scan:from_string("`(reverse (1 ,@(lists:reverse '(4 5)) 2))", Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C = transpile:form(Tree, []),
+    Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
+    io:format("------ ~p ~n binding ~p~n", [C, Binding]),
+    {value, Result, Binding} = erl_eval:expr(erl_syntax:revert(C), Binding),
+    ?assertEqual([reverse, [1, 5, 4, 2]], Result).
+
  

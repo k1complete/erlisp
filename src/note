@@ -1,0 +1,9 @@
+'(a A 1)
+-->
+
+term -> 1
+term -> A
+term -> a
+
+elements -> a A 1
+sexpression -> (a A 1)

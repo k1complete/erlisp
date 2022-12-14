@@ -364,21 +364,26 @@ quote_(X, [E], _Env) ->
     R = term_to_ast(E, Pos, _Env, true),
     io:format("quote_ R: ~p~n", [R]),
     R.
+% dot
+    
 % backquote
 backquote_(X, [E], _Env) when not(is_list(E)) ->
     term_to_ast(E, X#item.loc, _Env, 1)
     ;
-backquote_(X, [[#item{value="unquote"}, Form]], _Env) ->
-    io:format("unquote Form:~p~n", [Form]),
+backquote_(X, [[#item{value="dot"}, [#item{value="unquote"}, Form]]], _Env) ->
+    io:format("dot unquote Form:~p~n", [Form]),
     form(Form, _Env);
 backquote_(X, [E], _Env) when is_list(E) ->
     io:format("bqquote L:~p~n", [E]),
     #item{loc=Pos} = X,
     [Last|Rest] = backquote_elem(E, _Env, []),
     NewElems = lists:reverse(Rest),
-    NewLast = form(Last, _Env),
-    NewParams = lists:map(fun(Form) ->
-                                 form(Form, _Env)
+    NewLast = term(Last, _Env),
+    io:format("backquote_NewElems: ~p~n", [NewElems]),
+    NewParams = lists:map(fun
+                              (Form) ->
+                                  io:format("FORM ~p~n", [Form]),
+                                  term(Form, _Env)
                          end, NewElems),
     io:format("backquote_elemed: ~p~n", [NewParams]),
     R = erl_syntax:list(NewParams, NewLast),
@@ -393,12 +398,22 @@ make_symbol(S, Pos) ->
 
 backquote_elem([], Env, Acc)  ->
     [[make_symbol(quote), make_symbol('nil')]| Acc];
+backquote_elem([[#item{value="dot"}, [#item{value="unquote"}, Form]]], _Env, Acc) ->
+    io:format("dot unquote Form:~p~n", [Form]),
+    [Form | Acc];
 backquote_elem(A, Env, Acc) when is_record(A, item) ->
     io:format("A ITEM ~p~n", [A]),
     [[make_symbol(quote), A]|Acc];
-backquote_elem([#item{value="unquote"}, T], Env, Acc) ->
-    io:format("UNQUOTE ELEM <~p> ~n", [T]),
-    [T | Acc];
+backquote_elem([#item{value="unquote"}| T], Env, Acc) ->
+    [ T | Acc];
+backquote_elem([[#item{value="unquote"}, H]| T], Env, Acc) ->
+    io:format("UNQUOTE ELEM <~p> ~n", [H]),
+    NAcc= [ H | Acc],
+    backquote_elem(T, Env, NAcc);
+backquote_elem([[#item{value="unquote_splice"}, H] | T], Env, Acc) ->
+    io:format("UNQUOTE_SPLICE ELEM <~p> ~n", [H]),
+    NAcc= [ H | Acc],
+    backquote_elem(T, Env, NAcc);
 backquote_elem([H|T]=L, Env, Acc) ->
     io:format("ELEM <~p> ~n", [L]),
     NAcc = [[make_symbol(backquote), H] | Acc],

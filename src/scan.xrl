@@ -34,7 +34,7 @@ Rules.
 \. : 
   {token, {'.', ?LC(TokenLine, TokenLen)}}.
 \,\@ :
-  {token, {',@', ?LC(TokenLine, TokenLen)}}.
+  {token, {read_macro, ?LC(TokenLine, TokenLen), 'unquote_splice'}}.
 \, :
   {token, {read_macro, ?LC(TokenLine, TokenLen), 'unquote'}}.
 \' :
@@ -146,7 +146,8 @@ read(IO, Prompt, A) ->
 read_macro({IO, Prompt}, M, F, A, Value) ->
     RM = #{quote => {scan, replace},
            backquote => {scan, replace},
-           unquote => {scan, replace}
+           unquote => {scan, replace},
+           unquote_splice => {scan, replace}
           },
     {MM, MF} = maps:get(Value, RM, {scan, not_implemented}),
     %io:format(standard_error, "RM ~p~n", [MF]),
