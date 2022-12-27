@@ -298,7 +298,11 @@ defun_(X, L, E) ->
     end.
 
 locconv(E) ->
-    Line = erl_anno:line(erl_syntax:get_pos(E)),
+    Loc = case erl_syntax:get_pos(E) of
+              undefined -> 0;
+              X -> X
+          end,
+    Line = erl_anno:line(Loc),
     Pos = erl_anno:new(Line),
     erl_syntax:set_pos(E, Pos).
     
@@ -376,19 +380,20 @@ backquote_(X, [[#item{value="dot"}, [#item{value="unquote"}, Form]]], _Env) ->
 backquote_(X, [E], _Env) when is_list(E) ->
     io:format("bqquote L:~p~n", [E]),
     #item{loc=Pos} = X,
-    [Last|Rest] = backquote_elem(E, _Env, []),
-    NewElems = lists:reverse(Rest),
-    NewLast = term(Last, _Env),
-    io:format("backquote_NewElems: ~p~n", [NewElems]),
-    NewParams = lists:map(fun
-                              (Form) ->
-                                  io:format("FORM ~p~n", [Form]),
-                                  term(Form, _Env)
-                         end, NewElems),
-    io:format("backquote_elemed: ~p~n", [NewParams]),
-    R = erl_syntax:list(NewParams, NewLast),
-    %R = form([make_symbol(append) | NewElem], Pos),
-    % R = term_to_ast(E, Pos, _Env, 1),
+    R = bc_item([X | [E]], _Env, []),
+    %%[Last|Rest] = backquote_elem(E, _Env, []),
+    
+    %%NewElems = lists:reverse(Rest),
+    %%NewLast = term(Last, _Env),
+    %%io:format("backquote_NewElems: ~p~n", [NewElems]),
+    %%NewParams = lists:map(fun
+    %%                          (Form) ->
+    %%                              io:format("FORM ~p~n", [Form]),
+    %%                              term(Form, _Env)
+    %%                      end, NewElems),
+    %%io:format("backquote_elemed: ~p~n", [NewParams]),
+    %%R = form([make_symbol(append) | NewElems], Pos),
+    %R = term_to_ast(E, Pos, _Env, 1),
     io:format("quote_ R: ~p~n", [R]),
     R.
 make_symbol(S) ->
@@ -396,24 +401,72 @@ make_symbol(S) ->
 make_symbol(S, Pos) ->
     #item{value=atom_to_list(S), loc=Pos, type=atom}.
 
+%%% `basic -> 'basic (リストでもベクトルでもない任意の式)
+bc_item([#item{value="backquote", loc=Loc}, Form], Env, Acc) when not is_list(Form)->
+    form([ make_symbol(quote, Loc), Form ], Env);
+%%% `,form -> form (ただしformは@や.で始まらないかぎり)
+bc_item([#item{value="backquote"}, [#item{value="unquote"}, [H|Form]]], Env, Acc)
+  when  H#item.value =/= "dot", H#item.value =/="splice" ->
+    form([H|Form], Env);
+%%% `(a b c . atom) --> `(a b c (dot atom))--> (append a b c (quote atom))
+%%% `(a b c . ,form) --> `(a b c (dot (unquote form)))--> (append a b c (quote atom))
+bc_item([#item{value="backquote", loc=Loc}, Xn], Env, Acc) when is_list(Xn) ->
+    io:format("bc_item0: ~p ~p~n", [length(Xn), Xn]),
+    R = lists:map(fun 
+                      %% . ,form -> form
+                      ([#item{value="dot"}, [#item{value="unquote"}, F]])  ->
+                          term(F, Env);
+                      %% . atom -> quote atom 
+                      ([#item{value="dot"}, #item{type=atom} = F])  ->
+                          io:format("dot-atom ~p~n" , [F]),
+                          S = term([make_symbol(quote, Loc), F], Env),
+                          erl_syntax:set_pos(S, Loc);
+                      %% ,@form -> form
+                      ([#item{value="unquote_splice"}, F]) ->
+                          term(F, Env);
+                      %% ,form -> (list form)
+                      ([#item{value="unquote"}, F]) ->
+                          S = erl_syntax:list([term(F, Env)]),
+                          erl_syntax:set_pos(S, Loc);
+                      %% form -> (list `form)
+                      (F) ->
+                          
+                          Lf = [bc_item([make_symbol(backquote, Loc), F], Env, Acc)],
+                          erl_syntax:set_pos(erl_syntax:list(Lf), Loc)
+                  end, Xn),
+    io:format("bc_itemR: ~p ~p~n", [length(Xn), R]),
+    R2 = merl:qquote(Loc, "lists:append(_@r)", [{r, erl_syntax:list(R)}]),
+    %%merl:quote("lists:append(R)", ),
+    io:format("bc_itemR2: ~p~n", [erl_syntax:revert(R2)]),
+    R2.
+
+
+
+% nil -> form(nil)
 backquote_elem([], Env, Acc)  ->
     [[make_symbol(quote), make_symbol('nil')]| Acc];
+% . ,Form -> form(Form)
 backquote_elem([[#item{value="dot"}, [#item{value="unquote"}, Form]]], _Env, Acc) ->
     io:format("dot unquote Form:~p~n", [Form]),
     [Form | Acc];
+% . atom -> (quote atom) -> create_atom(atom)
 backquote_elem(A, Env, Acc) when is_record(A, item) ->
     io:format("A ITEM ~p~n", [A]),
     [[make_symbol(quote), A]|Acc];
+% , Form -> (list Form) -> [form(Form)]
 backquote_elem([#item{value="unquote"}| T], Env, Acc) ->
     [ T | Acc];
+% , Form -> (list Form) -> [form(Form)]
 backquote_elem([[#item{value="unquote"}, H]| T], Env, Acc) ->
     io:format("UNQUOTE ELEM <~p> ~n", [H]),
     NAcc= [ H | Acc],
     backquote_elem(T, Env, NAcc);
+% ,@ Form -> Form -> form(Form)
 backquote_elem([[#item{value="unquote_splice"}, H] | T], Env, Acc) ->
     io:format("UNQUOTE_SPLICE ELEM <~p> ~n", [H]),
     NAcc= [ H | Acc],
     backquote_elem(T, Env, NAcc);
+% Form -> (list `Form) -> [ (`Form) ] -> [ backquote_elem(Form)]
 backquote_elem([H|T]=L, Env, Acc) ->
     io:format("ELEM <~p> ~n", [L]),
     NAcc = [[make_symbol(backquote), H] | Acc],

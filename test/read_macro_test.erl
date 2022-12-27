@@ -4,19 +4,20 @@
 -include_lib("syntax_tools/include/merl.hrl").
 
 quote_test() ->
-    Line = 0,
+    Line = 1,
     {ok, Tokens, _Line} = scan:from_string("(lists:reverse '(1 2 3))", Line),
     {ok, Tree} = parser:parse(Tokens),
     C = transpile:form(Tree, []),
     Expect = merl:quote(Line, "lists:reverse([1,2,3])"),
-    ?assertEqual(Expect, erl_syntax:revert(transpile:locline(C))).
+    ?assertEqual(Expect,
+                 erl_syntax:revert(transpile:locline(C))).
 
 backquote_test() ->
     Line = 0,
     {ok, Tokens, _Line} = scan:from_string("(lists:reverse `(1 2 b))", Line),
     {ok, Tree} = parser:parse(Tokens),
     C = transpile:form(Tree, []),
-    Expect = merl:quote(Line, "lists:reverse([1,2,b])"),
+    Expect = merl:quote(Line, "lists:reverse(lists:append([[1],[2],[b]]))"),
     ?assertEqual(Expect, erl_syntax:revert(transpile:locline(C))).
 
 backquote_atom_test() ->

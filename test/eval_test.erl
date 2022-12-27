@@ -45,7 +45,7 @@ backquote_unquote_splice_variable_test() ->
     {ok, Tree} = parser:parse(Tokens),
     C = transpile:form(Tree, []),
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
-    io:format("------ ~p ~n binding ~p~n", [C, Binding]),
+    io:format("------ ~p ~n binding ~p~n", [erl_syntax:revert(C), Binding]),
     {value, Result, Binding} = erl_eval:expr(erl_syntax:revert(C), Binding),
     ?assertEqual([reverse, [1, 5, 4, 2]], Result).
 
