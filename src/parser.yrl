@@ -38,7 +38,8 @@ sexpression ->
 sexpression ->
     '(' elements '\.' term ')' : 
         io:format("SexpFromElem ~p~n", ['$2']),
-    lists:append('$2' , [[#item{value="dot", type=atom}, '$4']]).
+    lists:append('$2' , [[#item{value="dot", loc=element(2, '$3'),
+                                type=atom}, '$4']]).
 
 elements ->
     term : ['$1'].

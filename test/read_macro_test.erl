@@ -13,7 +13,7 @@ quote_test() ->
                  erl_syntax:revert(transpile:locline(C))).
 
 backquote_test() ->
-    Line = 0,
+    Line = 1,
     {ok, Tokens, _Line} = scan:from_string("(lists:reverse `(1 2 b))", Line),
     {ok, Tree} = parser:parse(Tokens),
     C = transpile:form(Tree, []),
@@ -21,7 +21,7 @@ backquote_test() ->
     ?assertEqual(Expect, erl_syntax:revert(transpile:locline(C))).
 
 backquote_atom_test() ->
-    Line = 0,
+    Line = 1,
     {ok, Tokens, _Line} = scan:from_string("(atom_to_list `b)", Line),
     {ok, Tree} = parser:parse(Tokens),
     C = transpile:form(Tree, []),
@@ -49,7 +49,7 @@ backquote_general_test() ->
     
 
 backquote_unquote_test2() ->
-    Line = 0,
+    Line = 1,
     {ok, Tokens, _Line} = scan:from_string("(lists:reverse `(1 2 ,(+ 1 2)))", Line),
     {ok, Tree} = parser:parse(Tokens),
     C = transpile:form(Tree, []),

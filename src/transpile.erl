@@ -6,10 +6,10 @@
 -export([lst/0]).
 -include("scan.hrl").
 -export([form/2, form_trans/2, term/2, infix_op/4,
-        locline/1]).
+        locline/1,
+        make_symbol/2]).
 -type tree() :: erl_syntax:syntaxTree().
 -type env() :: list().
-
 
 module_function(A, Loc) ->
     {M, F} = A#item.value,
@@ -32,7 +32,6 @@ term_to_ast(A, Loc, Env, Quote) ->
             erl_syntax:set_pos(R, Aloc);
         #item{type=atom, value=Atom, loc=Aloc} when Quote == true ->
             A2 = erl_syntax:atom(Atom),
-            io:format("A2 ~p~n", [A2]),
             S = erl_syntax:atom_name(A2),
             R = erl_syntax:atom(S),
             erl_syntax:set_pos(R, Aloc);
@@ -41,19 +40,19 @@ term_to_ast(A, Loc, Env, Quote) ->
             erl_syntax:set_pos(R, Aloc);
         #item{type=atom, value=Atom, loc=Aloc} when Quote == false; Quote == 0 ->
             A2 = erl_syntax:atom(Atom),
-            io:format("A2 ~p~n", [A2]),
             S = erl_syntax:atom_name(A2),
             io:format("<<<Variable ~ts>>>", [S]),
             R =erl_syntax:variable(S),
             erl_syntax:set_pos(R, Aloc);
         #item{type=atom, value=Atom, loc=Aloc} when Quote > 0 ->
             A2 = erl_syntax:atom(Atom),
-            io:format("A2 ~p~n", [A2]),
             S = erl_syntax:atom_name(A2),
             R = erl_syntax:atom(S),
             erl_syntax:set_pos(R, Aloc);
         Integer when is_integer(Integer) ->
             erl_syntax:set_pos(erl_syntax:integer(Integer), Loc);
+        [[#item{type=atom, value="dot", loc=Aloc}, F]] when is_list(A) ->
+            term_to_ast(F, Aloc, Env, Quote);
         _ when is_list(A), Quote == false ->
             form_trans(A, Env);
         [] when is_list(A) ->
@@ -116,22 +115,19 @@ form(A, E) ->
     .
 
 form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
-    io:format("X: ~p, T: ~p~n", [X, T]),
     R=case Inf=dispatch_infix_op(X) of
           undef ->
             case Spf=dispatch_special(X) of
                 undef ->
                     call_function(XT, T, E);
                 Spf ->
-                    io:format("SPf: ~p~nArgs: ~p~n", [X, T]),
                     R1=Spf(XT, T, E),
-                    io:format("R1: ~p~n", [R1]),
+                    io:format("specialform: ~p~n", [R1]),
                     R1
             end;
           Inf ->
               Op = X,
               Args = T,
-              io:format("Ops: ~p : Loc ~p~n", [Op, Loc]),
               Inf(Op, Loc, Args, E)
       end,
     io:format("form trans : ~p~n", [R]),
@@ -140,7 +136,7 @@ form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
 form_trans([List| T], E) when is_list(List) ->
     io:format("nested ~p~n", [List]),
     form_trans([form_trans(List, E)| T], E);
-form_trans(#item{value=Term, loc=Loc, type=atom}, E) ->
+form_trans(#item{value=Term, loc=Loc, type=atom}, _E) ->
     erl_syntax:set_pos(erl_syntax:variable(Term), Loc).
     
 term_make_atom(Term) ->
@@ -353,15 +349,6 @@ list_(X, L, Env) ->
     Loc = X#item.loc,
     erl_syntax:set_pos(erl_syntax:list(R), Loc).
 
-oquote_(#item{loc=Pos}, [], _) ->
-    erl_syntax:set_pos(erl_syntax:nil(), Pos);
-oquote_(X, L, _Env) when is_list(L), length(L)>1 ->
-    #item{loc=Pos} = X,
-    R =lists:map(fun(E) ->
-                         quote_(X, E, _Env)
-                 end, L),
-    erl_syntax:set_pos(erl_syntax:list(R), Pos)
-    .
 quote_(X, [E], _Env) ->
     io:format("quote ~p ~p~n", [X, E]),
     #item{loc=Pos} = X,
@@ -374,13 +361,12 @@ quote_(X, [E], _Env) ->
 backquote_(X, [E], _Env) when not(is_list(E)) ->
     term_to_ast(E, X#item.loc, _Env, 1)
     ;
-backquote_(X, [[#item{value="dot"}, [#item{value="unquote"}, Form]]], _Env) ->
+backquote_(_X, [[#item{value="dot"}, [#item{value="unquote"}, Form]]], _Env) ->
     io:format("dot unquote Form:~p~n", [Form]),
     form(Form, _Env);
 backquote_(X, [E], _Env) when is_list(E) ->
     io:format("bqquote L:~p~n", [E]),
-    #item{loc=Pos} = X,
-    R = bc_item([X | [E]], _Env, []),
+    R = bc_item([X | [E]], _Env),
     %%[Last|Rest] = backquote_elem(E, _Env, []),
     
     %%NewElems = lists:reverse(Rest),
@@ -396,29 +382,26 @@ backquote_(X, [E], _Env) when is_list(E) ->
     %R = term_to_ast(E, Pos, _Env, 1),
     io:format("quote_ R: ~p~n", [R]),
     R.
-make_symbol(S) ->
-    #item{value=atom_to_list(S), loc=0, type=atom}.
+
 make_symbol(S, Pos) ->
     #item{value=atom_to_list(S), loc=Pos, type=atom}.
 
 %%% `basic -> 'basic (リストでもベクトルでもない任意の式)
-bc_item([#item{value="backquote", loc=Loc}, Form], Env, Acc) when not is_list(Form)->
+bc_item([#item{value="backquote", loc=Loc}, Form], Env) when not is_list(Form)->
     form([ make_symbol(quote, Loc), Form ], Env);
 %%% `,form -> form (ただしformは@や.で始まらないかぎり)
-bc_item([#item{value="backquote"}, [#item{value="unquote"}, [H|Form]]], Env, Acc)
+bc_item([#item{value="backquote"}, [#item{value="unquote"}, [H|Form]]], Env)
   when  H#item.value =/= "dot", H#item.value =/="splice" ->
     form([H|Form], Env);
 %%% `(a b c . atom) --> `(a b c (dot atom))--> (append a b c (quote atom))
 %%% `(a b c . ,form) --> `(a b c (dot (unquote form)))--> (append a b c (quote atom))
-bc_item([#item{value="backquote", loc=Loc}, Xn], Env, Acc) when is_list(Xn) ->
-    io:format("bc_item0: ~p ~p~n", [length(Xn), Xn]),
+bc_item([#item{value="backquote", loc=Loc}, Xn], Env) when is_list(Xn) ->
     R = lists:map(fun 
                       %% . ,form -> form
                       ([#item{value="dot"}, [#item{value="unquote"}, F]])  ->
                           term(F, Env);
                       %% . atom -> quote atom 
                       ([#item{value="dot"}, #item{type=atom} = F])  ->
-                          io:format("dot-atom ~p~n" , [F]),
                           S = term([make_symbol(quote, Loc), F], Env),
                           erl_syntax:set_pos(S, Loc);
                       %% ,@form -> form
@@ -430,56 +413,12 @@ bc_item([#item{value="backquote", loc=Loc}, Xn], Env, Acc) when is_list(Xn) ->
                           erl_syntax:set_pos(S, Loc);
                       %% form -> (list `form)
                       (F) ->
-                          
-                          Lf = [bc_item([make_symbol(backquote, Loc), F], Env, Acc)],
+                          Lf = [bc_item([make_symbol(backquote, Loc), F], Env)],
                           erl_syntax:set_pos(erl_syntax:list(Lf), Loc)
                   end, Xn),
-    io:format("bc_itemR: ~p ~p~n", [length(Xn), R]),
-    R2 = merl:qquote(Loc, "lists:append(_@r)", [{r, erl_syntax:list(R)}]),
-    %%merl:quote("lists:append(R)", ),
-    io:format("bc_itemR2: ~p~n", [erl_syntax:revert(R2)]),
+    Args = erl_syntax:set_pos(erl_syntax:list(R), Loc),
+    R2 = merl:qquote(Loc, "lists:append(_@r)", [{r, Args}]),
     R2.
-
-
-
-% nil -> form(nil)
-backquote_elem([], Env, Acc)  ->
-    [[make_symbol(quote), make_symbol('nil')]| Acc];
-% . ,Form -> form(Form)
-backquote_elem([[#item{value="dot"}, [#item{value="unquote"}, Form]]], _Env, Acc) ->
-    io:format("dot unquote Form:~p~n", [Form]),
-    [Form | Acc];
-% . atom -> (quote atom) -> create_atom(atom)
-backquote_elem(A, Env, Acc) when is_record(A, item) ->
-    io:format("A ITEM ~p~n", [A]),
-    [[make_symbol(quote), A]|Acc];
-% , Form -> (list Form) -> [form(Form)]
-backquote_elem([#item{value="unquote"}| T], Env, Acc) ->
-    [ T | Acc];
-% , Form -> (list Form) -> [form(Form)]
-backquote_elem([[#item{value="unquote"}, H]| T], Env, Acc) ->
-    io:format("UNQUOTE ELEM <~p> ~n", [H]),
-    NAcc= [ H | Acc],
-    backquote_elem(T, Env, NAcc);
-% ,@ Form -> Form -> form(Form)
-backquote_elem([[#item{value="unquote_splice"}, H] | T], Env, Acc) ->
-    io:format("UNQUOTE_SPLICE ELEM <~p> ~n", [H]),
-    NAcc= [ H | Acc],
-    backquote_elem(T, Env, NAcc);
-% Form -> (list `Form) -> [ (`Form) ] -> [ backquote_elem(Form)]
-backquote_elem([H|T]=L, Env, Acc) ->
-    io:format("ELEM <~p> ~n", [L]),
-    NAcc = [[make_symbol(backquote), H] | Acc],
-    backquote_elem(T, Env, NAcc).
-
-
-obackquote_(X, [E], _Env) when is_list(E) ->
-    io:format("bqquote X:~p L:~p~n", [X, E]),
-    #item{loc=Pos} = X,
-    R = term_to_ast(E, Pos, _Env, 1),
-    io:format("quote_ R: ~p~n", [R]),
-    R.
-
     
 unquote_(X, _L, _Env) ->    
     X.
