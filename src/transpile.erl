@@ -43,7 +43,7 @@ term_to_ast(A, Loc, Env, Quote) ->
         #item{type=atom, value=Atom, loc=Aloc} when Quote == false; Quote == 0 ->
             A2 = erl_syntax:atom(Atom),
             S = erl_syntax:atom_name(A2),
-            io:format("<<<Variable ~ts>>>", [S]),
+            %%io:format("<<<Variable ~ts>>>", [S]),
             R =erl_syntax:variable(S),
             erl_syntax:set_pos(R, Aloc);
         #item{type=atom, value=Atom, loc=Aloc} when Quote > 0 ->
@@ -124,7 +124,7 @@ form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
                     call_function(XT, T, E);
                 Spf ->
                     R1=Spf(XT, T, E),
-                    io:format("specialform: ~p~n", [R1]),
+                    %%io:format("specialform: ~p~n", [R1]),
                     R1
             end;
           Inf ->
@@ -132,11 +132,11 @@ form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
               Args = T,
               Inf(Op, Loc, Args, E)
       end,
-    io:format("form trans : ~p~n", [R]),
+    %%io:format("form trans : ~p~n", [R]),
     R
     ;
 form_trans([List| T], E) when is_list(List) ->
-    io:format("nested ~p~n", [List]),
+    %%io:format("nested ~p~n", [List]),
     form_trans([form_trans(List, E)| T], E);
 form_trans(#item{value=Term, loc=Loc, type=atom}, _E) ->
     erl_syntax:set_pos(erl_syntax:variable(Term), Loc).
@@ -165,12 +165,12 @@ module_(X, L, _E) ->
     erl_syntax:set_pos(E, Loc).
 match_op(#item{value=_X, loc=Loc}, L, E) ->
     [Left, Right] = L,
-    io:format("Match: ~p ~p~n", [Left, Right]),
-    LeftT = term(Left, Loc, E),
-    RightT= term(Right, Loc, E),
-    io:format("MatchT: ~p ~p~n", [LeftT, RightT]),
+    %%io:format("Match: ~p ~p~n", [Left, Right]),
+    %%LeftT = term(Left, Loc, E),
+    %%RightT= term(Right, Loc, E),
+    %%io:format("MatchT: ~p ~p~n", [LeftT, RightT]),
     Me = erl_syntax:match_expr(term(Left, Loc, E), term(Right, Loc, E)),
-    io:format("Match2: ~p~n", [Me]),
+    %%io:format("Match2: ~p~n", [Me]),
     erl_syntax:set_pos(Me, Loc).
 
 anary_op(Op, Left, _E) ->
@@ -178,14 +178,14 @@ anary_op(Op, Left, _E) ->
     erl_syntax:copy_pos(Op, Nexp).
 
 infix_op(Op, Loc, [Left|Right], E) ->
-    io:format("TreeInfix~n", []),
+    %%io:format("TreeInfix~n", []),
     OpType = erl_syntax:set_pos(erl_syntax:operator(Op), Loc),
     Xp =infix_op_do(OpType, [term(Left, Loc, E) |Right], E),
-    io:format("TreeInfix ~p~nLoc ~p~n", [Xp, Loc]),
+    %%io:format("TreeInfix ~p~nLoc ~p~n", [Xp, Loc]),
     erl_syntax:set_pos(Xp, Loc).
 
 infix_op_do(Op, [Left|T], E) ->
-    io:format("infix L: ~p, R: ~p~n", [Left, T]),
+    %%io:format("infix L: ~p, R: ~p~n", [Left, T]),
     Pos = erl_syntax:get_pos(Left),
     case T of
         [] -> 
@@ -210,18 +210,18 @@ infix_op_do(Op, [Left|T], E) ->
 
 
 cons_(C, L, E) ->
-    io:format("cons: ~p~n", [L]),
+    %%io:format("cons: ~p~n", [L]),
     [Head|Tail] = L,
     #item{loc=Loc} = C,
     case Tail of
         [] -> Head;
         [X] ->
             HHead = term(Head, Loc, E),
-            io:format("HHead: ~p~n", [HHead]),
+            %%io:format("HHead: ~p~n", [HHead]),
             TTail0 = term(X, Loc, E),
 %            TTail = erl_syntax:set_pos(erl_syntax:cons(TTail0, erl_syntax:nil()), Loc),
             TTail = TTail0,
-            io:format("TTail: ~p C: ~p~n", [TTail, C]),
+            %%io:format("TTail: ~p C: ~p~n", [TTail, C]),
             ?MQP(Loc, "[_@HHead|_@TTail]", [{'HHead', HHead}, {'TTail', TTail}])
     end.
 
@@ -312,16 +312,16 @@ locline(F) ->
                                locconv(E)
                        end, F).
 
-call_function(Fun=#item{value=X, loc=Loc}, T, E) ->
-    io:format("call X ~p~nT ~p~nFun ~p~n", [X, T, Fun]),
+call_function(Fun=#item{value=_X, loc=Loc}, T, E) ->
+    %%io:format("call X ~p~nT ~p~nFun ~p~n", [X, T, Fun]),
     FHead = lists:map(fun(Elem) ->
                               term(Elem, E)
                       end, T),
-    io:format("call X2 ~p~nT ~p~n", [term(Fun,E, Loc), FHead]),
+    %%io:format("call X2 ~p~nT ~p~n", [term(Fun,E, Loc), FHead]),
     %FName = erl_syntax:set_pos(erl_syntax:atom(X), Loc),
     %FName = term(Fun, E, Loc),
     {M, F} = getmodfun(Fun),
-    io:format("MQP: ~p : ~p : arg ~p~n", [M, F, FHead]),
+    %%io:format("MQP: ~p : ~p : arg ~p~n", [M, F, FHead]),
     case M of
         undef ->
             io:format("MQ: ~p : arg ~p~n", [F, FHead]),
@@ -355,16 +355,16 @@ list_(X, L, Env) ->
     erl_syntax:set_pos(erl_syntax:list(R), Loc).
 
 quote_(X, [E], _Env) ->
-    io:format("quote ~p ~p~n", [X, E]),
+    %%io:format("quote ~p ~p~n", [X, E]),
     #item{loc=Pos} = X,
     R = term_to_ast(E, Pos, _Env, true),
-    io:format("quote_ R: ~p~n", [R]),
+    %%io:format("quote_ R: ~p~n", [R]),
     R.
     
 backquote_(X, [E], _Env)  -> 
-    io:format("bqquote L:~p~n", [E]),
+    %%io:format("bqquote L:~p~n", [E]),
     R = bc_item([X | [E]], _Env),
-    io:format("quote_ R: ~p~n", [R]),
+    %%io:format("quote_ R: ~p~n", [R]),
     R.
 
 make_symbol(S, Pos) ->
@@ -380,7 +380,7 @@ bc_item([#item{value="backquote"}, [#item{value="unquote"}, [H|Form]]], Env)
 %%% `(a b c . atom) --> `(a b c (dot atom))--> (append a b c (quote atom))
 %%% `(a b c . ,form) --> `(a b c (dot (unquote form)))--> (append a b c (quote atom))
 bc_item([#item{value="backquote", loc=Loc}, Xn], Env) when is_list(Xn) ->
-    io:format("bc_item=LIST <~p>~n", [Xn]),
+    %%io:format("bc_item=LIST <~p>~n", [Xn]),
     R = lists:map(fun 
                       %% . ,form -> form
                       ([#item{value="dot"}, [#item{value="unquote"}, F]])  ->
@@ -392,7 +392,6 @@ bc_item([#item{value="backquote", loc=Loc}, Xn], Env) when is_list(Xn) ->
                       %% ,@form -> form
                       ([#item{value="unquote_splice"}, F]) ->
                           M=term(F, Env),
-                          io:format("MMM ~p~n", [M]),
                           M;
                       %% ,form -> (list form)
                       ([#item{value="unquote"}, F]) ->
