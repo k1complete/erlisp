@@ -14,8 +14,10 @@
 module_function(A, Loc) ->
     {M, F} = A#item.value,
     erl_syntax:set_pos(erl_syntax:module_qualifier(
-                         erl_syntax:set_pos(erl_syntax:atom(M), Loc), 
-                         erl_syntax:set_pos(erl_syntax:atom(F), Loc)), 
+                         erl_syntax:atom(M),
+                         erl_syntax:atom(F)),
+%%                         erl_syntax:set_pos(erl_syntax:atom(M), Loc), 
+%%                         erl_syntax:set_pos(erl_syntax:atom(F), Loc)), 
                        Loc).
 
 term(A, Env) ->
@@ -293,7 +295,10 @@ defun_(X, L, E) ->
             MQ
     end.
 
-locconv(E) ->
+locconv(ES) ->
+    E = erl_syntax_lib:map_subtrees(fun(E2) ->
+                                           locconv(E2)
+                                   end, ES),
     Loc = case erl_syntax:get_pos(E) of
               undefined -> 0;
               X -> X
@@ -355,31 +360,10 @@ quote_(X, [E], _Env) ->
     R = term_to_ast(E, Pos, _Env, true),
     io:format("quote_ R: ~p~n", [R]),
     R.
-% dot
     
-% backquote
-backquote_(X, [E], _Env) when not(is_list(E)) ->
-    term_to_ast(E, X#item.loc, _Env, 1)
-    ;
-backquote_(_X, [[#item{value="dot"}, [#item{value="unquote"}, Form]]], _Env) ->
-    io:format("dot unquote Form:~p~n", [Form]),
-    form(Form, _Env);
-backquote_(X, [E], _Env) when is_list(E) ->
+backquote_(X, [E], _Env)  -> 
     io:format("bqquote L:~p~n", [E]),
     R = bc_item([X | [E]], _Env),
-    %%[Last|Rest] = backquote_elem(E, _Env, []),
-    
-    %%NewElems = lists:reverse(Rest),
-    %%NewLast = term(Last, _Env),
-    %%io:format("backquote_NewElems: ~p~n", [NewElems]),
-    %%NewParams = lists:map(fun
-    %%                          (Form) ->
-    %%                              io:format("FORM ~p~n", [Form]),
-    %%                              term(Form, _Env)
-    %%                      end, NewElems),
-    %%io:format("backquote_elemed: ~p~n", [NewParams]),
-    %%R = form([make_symbol(append) | NewElems], Pos),
-    %R = term_to_ast(E, Pos, _Env, 1),
     io:format("quote_ R: ~p~n", [R]),
     R.
 
@@ -396,6 +380,7 @@ bc_item([#item{value="backquote"}, [#item{value="unquote"}, [H|Form]]], Env)
 %%% `(a b c . atom) --> `(a b c (dot atom))--> (append a b c (quote atom))
 %%% `(a b c . ,form) --> `(a b c (dot (unquote form)))--> (append a b c (quote atom))
 bc_item([#item{value="backquote", loc=Loc}, Xn], Env) when is_list(Xn) ->
+    io:format("bc_item=LIST <~p>~n", [Xn]),
     R = lists:map(fun 
                       %% . ,form -> form
                       ([#item{value="dot"}, [#item{value="unquote"}, F]])  ->
@@ -406,7 +391,9 @@ bc_item([#item{value="backquote", loc=Loc}, Xn], Env) when is_list(Xn) ->
                           erl_syntax:set_pos(S, Loc);
                       %% ,@form -> form
                       ([#item{value="unquote_splice"}, F]) ->
-                          term(F, Env);
+                          M=term(F, Env),
+                          io:format("MMM ~p~n", [M]),
+                          M;
                       %% ,form -> (list form)
                       ([#item{value="unquote"}, F]) ->
                           S = erl_syntax:list([term(F, Env)]),

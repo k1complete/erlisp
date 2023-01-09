@@ -1,5 +1,5 @@
 -module(tiny_io_server).
--export([start_link/1, init/1, loop/1, until_newline/3, until_enough/3]).
+-export([start_link/1, init/1, loop/1, until_newline/3, until_enough/3, shutdown/1]).
 
 -define(CHARS_PER_REC, 10).
 
@@ -161,7 +161,7 @@ get_loop(M,F,A,T,C, LookAhead) ->
             case catch apply(M,F,[C,eof|A]) of
                 {done, List, Rest} ->
                     {done, List, Rest};
-                Errors ->
+                _Errors ->
                     % io:format(standard_error, "error ~p~n", [Errors]),
                     {error, {eof, hd(A)}}
             end;
@@ -226,18 +226,3 @@ my_split(_,[],Acc) ->
 my_split(N,[H|T],Acc) ->
     my_split(N-1,T,[H|Acc]).
 
-split_data([],_,_) ->
-    [];
-split_data(Chars, Row, Col) ->
-    {This,Left} = my_split(?CHARS_PER_REC - Col, Chars, []),
-    [ {Row, Col, This} | split_data(Left, Row + 1, 0) ].
-
-apply_update(Table, {Row, Col, List}) ->     
-    case ets:lookup(Table,Row) of
-	[] ->
-	    ets:insert(Table,{Row, lists:duplicate(Col,0) ++ List});
-	[{Row, OldData}] ->
-	    {Part1,_} = my_split(Col,OldData,[]),
-	    {_,Part2} = my_split(Col+length(List),OldData,[]),
-	    ets:insert(Table,{Row, Part1 ++ List ++ Part2})
-    end.

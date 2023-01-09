@@ -9,8 +9,8 @@
 
 -type tree() :: erl_syntax:sytaxTree().
 -type env() :: map().
--type binding() :: map().
--type reason() :: atom() | {atom(), any()}.
+%%-type binding() :: map().
+%%-type reason() :: atom() | {atom(), any()}.
 
 
 -spec list_match(term(), term(), any(), env()) -> env().
@@ -52,7 +52,7 @@ value_from_env(Body, Env) ->
     end.
 -spec body_value(tree(), env()) -> tree().
 body_value(Body, Env) ->
-    L = erl_syntax_lib:map_subtrees(
+    _L = erl_syntax_lib:map_subtrees(
           fun(Tree) ->
                   case erl_syntax:type(Tree) of
                       variable ->
@@ -80,7 +80,7 @@ do_eval_match(P, B, Arguments, Env) ->
             end;
         list ->
             Ph = erl_syntax:list_head(P),
-            Pt = erl_syntax:list_head(P),
+            _Pt = erl_syntax:list_head(P),
             case erl_syntax:type(Ph) of
                 atom ->
                     case erl_syntax:atom_literal(Ph) of

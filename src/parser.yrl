@@ -2,13 +2,18 @@
 Nonterminals
 
 expressions expression sexpression elements literal
-term hterm atom asymbol  lines.
+term asymbol  lines.
 
 Terminals
 symbol module_function
 integer float string 
 underscore
-'(' ')' ',' ',@' '\'' '#(' '\.'.
+'(' ')' 
+'\'' 
+'\.'.
+%% ',' 
+%%'#(' 
+%% ',@' 
 %% variable 
 Rootsymbol lines.
 Endsymbol '$end'.
@@ -64,16 +69,6 @@ term ->
         A=[setline("quote", '$1'), '$2'],
         io:format("Term Quote ~p~n", [A]),
         A.
-
-hterm ->
-    asymbol : 
-        io:format("HTerm ~p~n", ['$1']), '$1'.
-hterm ->
-    literal : 
-        io:format("HTerm ~p~n", ['$1']), '$1'.
-hterm ->
-    sexpression : 
-        io:format("HTerm ~p~n", ['$1']), '$1'.
 
 
 asymbol ->

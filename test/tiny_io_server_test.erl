@@ -12,8 +12,8 @@ slist_test() ->
 quote_test() ->
     ?assertEqual({ok, [{'(',{0,1}},
                        {symbol, {0,2}, "q"},
-                       {'(',0},
-                       {symbol, 0, "quote"},
+                       {'(',{0,4}},
+                       {symbol, {0,4}, "quote"},
                        {symbol, {0,5}, "b"},
                        {')',0},
                        {symbol, {0,7}, "c"},
@@ -22,20 +22,20 @@ quote_test() ->
 backquote_test() ->
     ?assertEqual({ok, [{'(',{0,1}},
                        {symbol, {0,2}, "q"},
-                       {'(',0},
-                       {symbol, 0, "backquote"},
+                       {'(',{0,4}},
+                       {symbol, {0,4}, "backquote"},
                        {symbol, {0,5}, "b"},
                        {')',0},
                        {symbol, {0,7}, "c"},
                        {')', {0,8}}], 0},
                  scan:from_string("(q `b c)", 0)).
 backquote_list_test() ->
-    ?assertEqual({ok, [{'(',0},
-                       {symbol,0,"backquote"},
+    ?assertEqual({ok, [{'(',{0,1}},
+                       {symbol,{0,1},"backquote"},
                        {'(',{0,2}},
                        {symbol,{0,3},"q"},
-                       {'(',0},
-                       {symbol,0,"backquote"},
+                       {'(',{0,5}},
+                       {symbol,{0,5},"backquote"},
                        {symbol,{0,6},"b"},
                        {')',0},
                        {symbol,{0,8},"c"},
@@ -45,8 +45,8 @@ backquote_list_test() ->
 unquote_test() ->
     ?assertEqual({ok, [{'(',{0,1}},
                        {symbol, {0,2}, "q"},
-                       {'(',0},
-                       {symbol, 0, "unquote"},
+                       {'(', {0,4}},
+                       {symbol, {0,4}, "unquote"},
                        {symbol, {0,5}, "b"},
                        {')',0},
                        {symbol, {0,7}, "c"},
@@ -54,12 +54,12 @@ unquote_test() ->
                  scan:from_string("(q ,b c)", 0)),
     ?assertEqual({ok,[{'(',{0,1}},
                       {symbol,{0,2},"a"},
-                      {'(',0},
-                      {symbol,0,"backquote"},
+                      {'(',{0,4}},
+                      {symbol,{0,4},"backquote"},
                       {'(',{0,5}},
                       {symbol,{0,6},"q"},
-                      {'(',0},
-                      {symbol,0,"unquote"},
+                      {'(',{0,8}},
+                      {symbol,{0,8},"unquote"},
                       {symbol,{0,9},"b"},
                       {')',0},
                       {symbol,{0,11},"c"},
@@ -69,6 +69,5 @@ unquote_test() ->
                      0},
                  scan:from_string("(a `(q ,b c))", 0)).
 
-
-
+    
     

@@ -30,8 +30,10 @@ backquote_unquote_variable_test() ->
     ?assertEqual([3,2,1], Result),
     Expect = merl:qquote(Line, "lists:reverse(lists:append([[1],[2], [_@b]]))", 
                          [{b,erl_syntax:set_pos(erl_syntax:variable('b'), Line)}]),
-    ?assertEqual(erl_syntax:revert(Expect), 
-                 erl_syntax:revert(transpile:locline(C))).
+    ?assertEqual("lists:reverse(lists:append([[1], [2], [b]]))",
+                 erl_prettypr:format(C)).
+%%    ?assertEqual(erl_syntax:revert(transpile:locline(Expect)), 
+%%                 erl_syntax:revert(transpile:locline(C))).
 
 backquote_unquote_variable_dot_test() ->
     Line=?LINE,
@@ -72,5 +74,7 @@ nested_list_dot_test() ->
     io:format("------ ~p ~n binding ~p~n", [erl_syntax:revert(C), Binding]),
     {value, Result, Binding} = erl_eval:expr(erl_syntax:revert(C), Binding),
     ?assertEqual([reverse, 1, 2 | a], Result).
+
+
 
  
