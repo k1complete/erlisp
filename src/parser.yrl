@@ -23,7 +23,7 @@ lines ->
         '$1'.
 expressions ->
     expression : 
-        io:format("ExpOK ~p~n", ['$1']),
+        %% io:format("ExpOK ~p~n", ['$1']),
         '$1'.
 expressions ->
     expressions expression : 
@@ -31,20 +31,20 @@ expressions ->
 
 expression ->
     term : 
-        io:format("Exp0 ~p~n", ['$1']), 
+        %% io:format("Exp0 ~p~n", ['$1']), 
         '$1'.
 
 sexpression ->
     '(' ')' : nil.
 sexpression ->
     '(' elements ')' : 
-        io:format("SexpFromElem ~p~n", ['$2']),
+        %% io:format("SexpFromElem ~p~n", ['$2']),
         '$2'.
 sexpression ->
     '(' elements '\.' term ')' : 
-        io:format("SexpFromElem ~p~n", ['$2']),
-    lists:append('$2' , [[#item{value="dot", loc=element(2, '$3'),
-                                type=atom}, '$4']]).
+        %% io:format("SexpFromElem ~p~n", ['$2']),
+        lists:append('$2' , [[#item{value="dot", loc=element(2, '$3'),
+                                    type=atom}, '$4']]).
 
 elements ->
     term : ['$1'].
@@ -53,19 +53,22 @@ elements ->
 
 term ->
     asymbol : 
-        io:format("Term ~p~n", ['$1']), '$1'.
+        %%io:format("Term ~p~n", ['$1']), 
+        '$1'.
 term ->
     literal : 
-        io:format("Term ~p~n", ['$1']), '$1'.
+        %% io:format("Term ~p~n", ['$1']), 
+        '$1'.
 term ->
     string : 
-        io:format("Term ~p~n", ['$1']),'$1'.
+        %%io:format("Term ~p~n", ['$1']),
+        '$1'.
 term ->
     sexpression : 
-        io:format("TermFromSexp ~p~n", ['$1']),'$1'.
+        %%io:format("TermFromSexp ~p~n", ['$1']),
+        '$1'.
 term ->
     '\'' term : 
-        io:format("OK ~p~n", ['$1']),
         A=[setline("quote", '$1'), '$2'],
         io:format("Term Quote ~p~n", [A]),
         A.

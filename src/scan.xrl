@@ -46,7 +46,7 @@ Rules.
 {QString} :
   [_|String] = lists:droplast(TokenChars),
   {token, {string, ?LC(TokenLine, TokenLen), String}}.
-{WhiteSpace} : 
+{WhiteSpace} :
   col(TokenLen),
   skip_token.
 {LineFeed} :
@@ -59,12 +59,13 @@ Erlang code.
 -include_lib("scan.hrl").
 -define(LC(TokenLine,TokenLen), {TokenLine, col(TokenLen)}).
 %%-export([tokenizer/2]).
-%%-export([file/1]).
+-export([file/2]).
 %%-export([read_balance/4]).
 %%-export([read/3]).
 %%-export([read/6]).
-%%-export([reads/4]).
+-export([reads/5]).
 -export([from_string/2]).
+-export([from_string/1]).
 %%-export([replace/5]).
 -export([read/5]).
 -export([replace/5]).
@@ -83,59 +84,69 @@ col(TokenLen) ->
     put(col, Col).
 
     
-calclevel(IO, Prompt0, Tokens, GLevel) ->
-    do_calclevel(IO, Prompt0, Tokens, {[], GLevel}).
+calclevel(IO, Prompt0, Tokens, GLevel, Line) ->
+    do_calclevel(IO, Prompt0, Tokens, {[], GLevel}, Line).
 
-do_calclevel(_IO, _Prompt0, [], {Acc, PreLevel}) ->
-    {Acc, PreLevel, []};
-do_calclevel(IO, Prompt0, [{'(', _Loc} =T | Tokens], {Acc, PreLevel}) ->
-    do_calclevel(IO, Prompt0, Tokens, {Acc ++ [T], PreLevel+1});
-do_calclevel(_IO, _Prompt0, [{')', _Loc} =T | Tokens], {Acc, PrevLevel}) when PrevLevel =< 1 ->
-    {Acc ++ [T], PrevLevel-1, Tokens};
-do_calclevel(IO, Prompt0, [{')', _Loc} =T | Tokens], {Acc, PreLevel}) ->
-    do_calclevel(IO, Prompt0, Tokens, {Acc ++ [T], PreLevel-1});
-do_calclevel(IO, Prompt0, [{read_macro, Loc, MChar}], {Acc, PreLevel}) ->
+do_calclevel(_IO, _Prompt0, [], {Acc, PreLevel}, Line) ->
+    {Acc, PreLevel, [], Line};
+do_calclevel(IO, Prompt0, [{'(', _Loc} =T | Tokens], {Acc, PreLevel}, Line) ->
+    do_calclevel(IO, Prompt0, Tokens, {Acc ++ [T], PreLevel+1}, Line);
+do_calclevel(_IO, _Prompt0, [{')', _Loc} =T | Tokens], {Acc, PrevLevel}, Line) when PrevLevel =< 1 ->
+    {Acc ++ [T], PrevLevel-1, Tokens, Line};
+do_calclevel(IO, Prompt0, [{')', _Loc} =T | Tokens], {Acc, PreLevel}, Line) ->
+    do_calclevel(IO, Prompt0, Tokens, {Acc ++ [T], PreLevel-1}, Line);
+do_calclevel(IO, Prompt0, [{read_macro, Loc, MChar}], {Acc, PreLevel}, _Line) ->
     RM = #{quote => {scan, replace},
            backquote => {scan, replace},
            unquote => {scan, replace},
            unquote_splice => {scan, replace}
           },
     {MM, MF} = maps:get(MChar, RM, {scan, not_implemented}),
-    {ok, NewTokens, _NewLoc, RestTokens} = apply(MM, MF, [{IO, Prompt0}, scan, read, 
+    {ok, NewTokens, NewLoc, RestTokens} = apply(MM, MF, [{IO, Prompt0}, scan, read, 
                                                          Loc, MChar]),
-    do_calclevel(IO, Prompt0, RestTokens, {Acc ++ NewTokens, PreLevel});
-do_calclevel(IO, Prompt0, [{'\n', _Loc} | Tokens], {Acc, PreLevel}) ->
-    do_calclevel(IO, Prompt0, Tokens, {Acc, PreLevel});
-do_calclevel(_IO, _Prompt0, [T | Tokens], {Acc, 0}) ->
-    {Acc++[T], 0, Tokens};
-do_calclevel(IO, Prompt0, [T | Tokens], {Acc, PreLevel}) ->
-    do_calclevel(IO, Prompt0, Tokens, {Acc ++ [T], PreLevel}).
+    do_calclevel(IO, Prompt0, RestTokens, {Acc ++ NewTokens, PreLevel}, NewLoc);
+do_calclevel(IO, Prompt0, [{'\n', _Loc} | Tokens], {Acc, PreLevel}, Line) ->
+    do_calclevel(IO, Prompt0, Tokens, {Acc, PreLevel}, Line);
+do_calclevel(_IO, _Prompt0, [T | Tokens], {Acc, 0}, Line) ->
+    {Acc++[T], 0, Tokens, Line};
+do_calclevel(IO, Prompt0, [T | Tokens], {Acc, PreLevel}, Line) ->
+    do_calclevel(IO, Prompt0, Tokens, {Acc ++ [T], PreLevel}, Line).
 loctoline({Line, _Col}) ->
     Line;
 loctoline(Line) ->
     Line.
     
 replace({IO, Prompt0}, _M, _F, Loc, MChar) ->
-    Ret = read(IO, Prompt0, loctoline(Loc), [], 0),
+    %Ret = read(IO, Prompt0, loctoline(Loc), [], 0),
+    Ret = read(IO, "", loctoline(Loc), [], 0),
+    io:format("replace-read ~p~n", [Ret]),
     {ok, Tokens, NextLine, Rest} = Ret,
     NewTokens = [{'(', Loc}, 
                  {symbol, Loc, atom_to_list(MChar)} | 
-                 Tokens ++ [{')', NextLine}]],
+                 Tokens ++ [{')', Loc}]],
     {ok, NewTokens, NextLine, Rest}.
 
+make_prompt([], _Line, _PrevTokens) ->
+    "";
+make_prompt(Prompt, Line, []) ->
+    io_lib:format(Prompt, [loctoline(Line)]);
+make_prompt(_Prompt, _Line, PrevTokens) ->
+    "".
+
 read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
-    Prompt = io_lib:format("~B~s", [loctoline(Line), Prompt0]),
+    Prompt = make_prompt(Prompt0, Line, PrevTokens),
     case io:request(IO, {get_until, unicode, Prompt, scan, tokens, [Line]}) of
         {ok, NewTokens, NextLine} ->
-            {NNewTokens, NLevel, Rest} = calclevel(IO, Prompt0, NewTokens, PrevLevel),
+            {NNewTokens, NLevel, Rest, NewLine} = calclevel(IO, Prompt0, NewTokens, PrevLevel, NextLine),
             Tokens = PrevTokens ++ NNewTokens,
             case {Rest, NLevel} of
                 {[], NLevel} when NLevel > 0 -> 
-                    read(IO, Prompt0, NextLine, Tokens, NLevel);
+                    read(IO, Prompt0, NewLine, Tokens, NLevel);
                 {Rest, 0} ->
-                    {ok, Tokens, NextLine, Rest};
+                    {ok, Tokens, NewLine, Rest};
                 _  ->
-                    {ok, Tokens, NextLine, Rest} 
+                    io:format("readRet ~p~n", [{ok, Tokens, NewLine, Rest}]),
+                    {ok, Tokens, NewLine, Rest} 
             end;
         {eof, NextLine} ->
             {ok, PrevTokens, NextLine, []};
@@ -143,16 +154,24 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
             io:format("Error! ~p~n",[{Error, PrevTokens, PrevLevel}]),
             Error
     end.
-                    
+from_string(String) ->
+    from_string(String, 0).
 
 from_string(String, Line) ->
     IO = tiny_io_server:start_link(String),
-%    {ok, Acc, NewLine} = reads(IO, "> ", Line, ""),
+    {ok, Acc , NewLine, _Rest} =  read(IO, [], Line, [], 0),
+    {ok, Acc, NewLine}.
 
-    {ok, Acc , NewLine, _Rest} =  read(IO, "> ", Line, [], 0),
-    NAcc = lists:filter(fun({'\n', _}) ->
-                         false;
-                    (_)  ->
-                         true
-                 end, Acc),
-    {ok, NAcc, NewLine}.
+reads(IO, File, Line, PrevTokens, Acc) ->
+    case read(IO, [], Line, PrevTokens, 0) of
+        {ok, [], _, RestTokens}  ->
+            io:format("ReadsRET: ~p~n", [{Acc, RestTokens}]),
+            {ok, Acc++RestTokens};
+        {ok, Tokens, NextLine, RestTokens} ->
+            io:format("Reads: ~p~n", [Tokens]),
+            R = reads(IO, File, NextLine+1, RestTokens, Acc ++ Tokens),
+            {ok, element(2, R)}
+    end.
+file(File, _Option) ->
+    {ok, IO} = file:open(File, "r"),
+    {ok, Acc} = reads(IO, File, 1, [], []).

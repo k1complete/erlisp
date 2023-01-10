@@ -132,7 +132,6 @@ form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
               Args = T,
               Inf(Op, Loc, Args, E)
       end,
-    %%io:format("form trans : ~p~n", [R]),
     R
     ;
 form_trans([List| T], E) when is_list(List) ->
