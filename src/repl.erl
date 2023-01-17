@@ -9,6 +9,7 @@ repl(IN, _OUT, Line, Env) ->
     {ok, Forms}  = parser:parse(Tokens),
     Exp = transpile:form(Forms, Env),
     {value, Result, NextEnv} = erl_eval:expr(erl_syntax:revert(Exp), Env),
-    io:format("~p~n", [Result]),
+    
+    io:format("~s~n", [pp:format(Result, 60)]),
     repl(IN, _OUT, NextLine, NextEnv).
     
