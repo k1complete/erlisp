@@ -24,10 +24,10 @@ lines ->
 expressions ->
     expression : 
         %% io:format("ExpOK ~p~n", ['$1']),
-        '$1'.
+        ['$1'].
 expressions ->
     expressions expression : 
-        lists:append('$1' , ['$2']).
+        lists:append('$1', ['$2']).
 
 expression ->
     term : 

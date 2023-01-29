@@ -29,6 +29,8 @@ term_to_ast(A, Loc, Env, Quote) ->
     case A of
         #item{type=module_function} ->
             module_function(A, Loc);
+        #item{type=string, value=V} ->
+            erl_syntax:string(V);
         #item{type=atom, value="nil", loc=Aloc} ->
             R = erl_syntax:nil(),
             erl_syntax:set_pos(R, Aloc);
@@ -53,6 +55,8 @@ term_to_ast(A, Loc, Env, Quote) ->
             erl_syntax:set_pos(R, Aloc);
         Integer when is_integer(Integer) ->
             erl_syntax:set_pos(erl_syntax:integer(Integer), Loc);
+        Float when is_float(Float) ->
+            erl_syntax:set_pos(erl_syntax:float(Float), Loc);
         [[#item{type=atom, value="dot", loc=Aloc}, F]] when is_list(A) ->
             term_to_ast(F, Aloc, Env, Quote);
         _ when is_list(A), Quote == false ->
@@ -99,6 +103,8 @@ dispatch_special(A) ->
           "quote" => fun quote_/3,
           "unquote" => fun unquote_/3,
           "backquote" => fun backquote_/3,
+          "tuple" => fun tuple_/3,
+          "binary" => fun binary_/3,
           "defun" => fun defun_/3
          },
     maps:get(A, L, undef).
@@ -112,7 +118,7 @@ expand_macro(A, _E) ->
 form(A, E) ->
     B = expand_macro(A, E),
     R = form_trans(B, E),
-    io:format("formed ~p~n", [R]),
+    %% io:format("formed ~p~n", [R]),
     R
     .
 
@@ -229,6 +235,21 @@ is_when(#item{type=atom, value="when"}) ->
 is_when(_) ->
     false.
 
+guard_list(WhenClause, _Tail, _E) when not is_list(WhenClause) ->
+    {[], WhenClause};
+guard_list(WhenClause, Tail, E) ->
+    {Guard, NBodyList} = case is_when(hd(WhenClause)) of
+                             true ->
+                                 io:format("Guard: ~p~n", [tl(WhenClause)]),
+                                 [WhenGuard | _] = tl(WhenClause),
+                                 io:format("Body: ~p~n", [Tail]),
+                                 {form(WhenGuard, E), Tail};
+                             false ->
+                                 {[], [WhenClause | Tail]}
+                         end,
+    {Guard, NBodyList}.
+
+
 -spec clause_(list(), env()) -> tree().
 clause_(L, E) ->
     [Args, When| Tail] = L,
@@ -238,17 +259,13 @@ clause_(L, E) ->
                               R
                       end, Args),
     io:format("WArg: ~p~n", [When]),
-    io:format("When: ~p~n", [(hd(When))#item.value]),
-    {Guard, NBodyList} = case is_when(hd(When)) of
-                             true ->
-                                 io:format("Guard: ~p~n", [tl(When)]),
-                                 [WhenGuard | _] = tl(When),
-                                 io:format("Body: ~p~n", [Tail]),
-                                 {form(WhenGuard, E), Tail};
-                             false ->
-                                 {[], [When | Tail]}
-                         end,
-    Body = lists:map(fun(Elem) -> form(Elem, E) end, NBodyList),
+    {Guard, NBodyList} = guard_list(When, Tail, E),
+    Body = case is_list(NBodyList) of
+               true ->
+                   lists:map(fun(Elem) -> form(Elem, E) end, NBodyList);
+               false ->
+                   term(NBodyList, E)
+           end,
     io:format("Arg: ~p~nG: ~p~nB: ~p~n", [PArgs, Guard, Body]),
     Loc = erl_syntax:get_pos(hd(PArgs)),
     S=?MQP(Loc, "(_@PArgs) when _@__Guard -> _@Body",
@@ -312,7 +329,7 @@ locline(F) ->
                        end, F).
 
 call_function(Fun=#item{value=_X, loc=Loc}, T, E) ->
-    %%io:format("call X ~p~nT ~p~nFun ~p~n", [X, T, Fun]),
+    io:format("call X ~p~nT ~p~nFun ~p~n", [_X, T, Fun]),
     FHead = lists:map(fun(Elem) ->
                               term(Elem, E)
                       end, T),
@@ -323,7 +340,7 @@ call_function(Fun=#item{value=_X, loc=Loc}, T, E) ->
     %%io:format("MQP: ~p : ~p : arg ~p~n", [M, F, FHead]),
     case M of
         undef ->
-            io:format("MQ: ~p : arg ~p~n", [F, FHead]),
+            %% io:format("MQ: ~p : arg ~p~n", [F, FHead]),
             ?MQP(Loc, "'@F'(_@FHead)", 
                 [{'F', F},
                  {'FHead', FHead}]);
@@ -407,6 +424,18 @@ bc_item([#item{value="backquote", loc=Loc}, Xn], Env) when is_list(Xn) ->
     
 unquote_(X, _L, _Env) ->    
     X.
+
+tuple_(#item{loc=Loc}, L, Env) ->
+    LForm = lists:map(fun(E) ->
+                              term(E, Env)
+                      end, L),
+    erl_syntax:set_pos(erl_syntax:tuple(LForm), Loc).
+
+binary_(#item{loc=Loc}, L, Env) ->
+    LForm = lists:map(fun(E) ->
+                              erl_syntax:binary_field(term(E, Env))
+                      end, L),
+    erl_syntax:set_pos(erl_syntax:binary(LForm), Loc).
 
 lst() ->
     E = [],

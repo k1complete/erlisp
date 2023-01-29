@@ -13,7 +13,7 @@ little_letters_variable_test() ->
     Line=?LINE,
     {ok, Tokens, _Line} = scan:from_string("(lists:reverse (list 1 2 b))", Line),
     {ok, Tree} = parser:parse(Tokens),
-    C = transpile:form(Tree, []),
+    C = transpile:form(hd(Tree), []),
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     io:format("------ ~p ~n binding ~p~n", [C, Binding]),
     {value, Result, Binding} = erl_eval:expr(erl_syntax:revert(C), Binding),
@@ -23,7 +23,7 @@ backquote_unquote_variable_test() ->
     Line=?LINE,
     {ok, Tokens, _Line} = scan:from_string("(lists:reverse `(1 2 ,b))", Line),
     {ok, Tree} = parser:parse(Tokens),
-    C = transpile:form(Tree, []),
+    C = transpile:form(hd(Tree), []),
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     io:format("------ ~p ~n binding ~p~n", [C, Binding]),
     {value, Result, Binding} = erl_eval:expr(erl_syntax:revert(C), Binding),
@@ -38,7 +38,7 @@ backquote_unquote_variable_test() ->
 backquote_unquote_variable_dot_test() ->
     Line=?LINE,
     {ok, Tokens, _Line} = scan:from_string("`(reverse (1 2 . ,b))", Line),
-    {ok, Tree} = parser:parse(Tokens),
+    {ok, [Tree]} = parser:parse(Tokens),
     C = transpile:form(Tree, []),
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     io:format("------ ~p ~n binding ~p~n", [C, Binding]),
@@ -48,7 +48,7 @@ backquote_unquote_variable_dot_test() ->
 backquote_unquote_splice_variable_test() ->
     Line=?LINE,
     {ok, Tokens, _Line} = scan:from_string("`(reverse (1 ,@(lists:reverse '(4 5)) 2))", Line),
-    {ok, Tree} = parser:parse(Tokens),
+    {ok, [Tree]} = parser:parse(Tokens),
     C = transpile:form(Tree, []),
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     io:format("------ ~p ~n binding ~p~n", [erl_syntax:revert(C), Binding]),
@@ -58,7 +58,7 @@ backquote_unquote_splice_variable_test() ->
 list_dot_test() ->
     Line=?LINE,
     {ok, Tokens, _Line} = scan:from_string("'(reverse . 1)", Line),
-    {ok, Tree} = parser:parse(Tokens),
+    {ok, [Tree]} = parser:parse(Tokens),
     C = transpile:form(Tree, []),
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     io:format("------ ~p ~n binding ~p~n", [erl_syntax:revert(C), Binding]),
@@ -68,13 +68,27 @@ list_dot_test() ->
 nested_list_dot_test() ->
     Line=?LINE,
     {ok, Tokens, _Line} = scan:from_string("'(reverse . (1 2 . a))", Line),
-    {ok, Tree} = parser:parse(Tokens),
+    {ok, [Tree]} = parser:parse(Tokens),
     C = transpile:form(Tree, []),
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     io:format("------ ~p ~n binding ~p~n", [erl_syntax:revert(C), Binding]),
     {value, Result, Binding} = erl_eval:expr(erl_syntax:revert(C), Binding),
     ?assertEqual([reverse, 1, 2 | a], Result).
 
+defun_test() ->
+    Line=?LINE,
+    Cmd = ["(module c)",
+           "(export (add 2))",
+           "(defun add (a b)",
+           "  (match c (+ a b))",
+           "  (* c c))"
+          ],
+    {ok, Tokens, _Line} = scan:from_string(lists:flatten(Cmd), Line),
+    {ok, Tree} = parser:parse(Tokens),
+    C = lists:map(fun(E) -> transpile:form(E, []) end, Tree),
+    Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
+    {ok, Binary} = merl:compile_and_load(C, [debug_info]),
+    Result = apply(c, add, [2, 3]),
+    ?assertEqual(25, Result).
 
 
- 

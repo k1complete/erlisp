@@ -37,6 +37,8 @@ pptr(#item{type=string, value=V}=S, L, R, Direction) ->
     S#item{value=ppliteral("\""++escape(V)++"\"", L, R, Direction)};
 pptr(V, L, R, Direction) when is_integer(V)  ->
     #item{value=ppliteral(integer_to_list(V), L, R, Direction), type=integer};
+pptr(V, L, R, Direction) when is_float(V)  ->
+    #item{value=ppliteral(float_to_list(V), L, R, Direction), type=float};
 pptr([S], {LLevel, LChar}, {RLevel, RChar}, _Direction) ->
     Head = pptr(S, {LLevel+1, LChar}, {0, RChar}, 1),
     pptr(Head, {0, LChar}, {RLevel+1, RChar}, -1);
@@ -52,7 +54,7 @@ pptr(S, {LLevel, LChar}, {RLevel, RChar}, _Direction) when is_list(S) ->
 form(S) ->
     S1 = pp:erl_to_ast(S),
     S2 = pptr(S1, {0, "("}, {0, ")"}, 0),
-    S3 = pp:ppsexp(S2).
+    pp:ppsexp(S2).
 
 format(S, Column) ->
     prettypr:format(form(S), Column).
@@ -75,16 +77,24 @@ ppsexp(#item{type=atom, value=V}) ->
     prettypr:text(V);
 ppsexp(#item{type=string, value=V}) ->    
     prettypr:text(V);
+ppsexp(#item{type=float, value=V}) ->    
+    prettypr:text(V);
 ppsexp(#item{type=integer, value=V}) ->    
+    prettypr:text(V);
+ppsexp(#item{type=_, value=V}) ->    
     prettypr:text(V).
 
 escape(S) ->
     string:replace(S, "\"", "\\\"", all).
 
 erl_to_ast(T) when is_list(T) ->
-    S = try lists:all(fun(E) when is_integer(E) andalso E =< 1114111 andalso E >= 10 -> true;
-                     (E)  -> false
-                  end, T)
+    S = try lists:all(fun(E) when is_integer(E) andalso 
+                                  E =< 1114111 andalso 
+                                  E >= 10 -> 
+                              true;
+                         (_)  -> 
+                              false
+                      end, T)
     catch _ ->
             false
     end,
@@ -96,8 +106,20 @@ erl_to_ast(T) when is_list(T) ->
                               erl_to_ast(E)
                       end, T)
     end;
+erl_to_ast(T) when is_tuple(T) ->
+    TList = lists:map(fun(E) -> 
+                              erl_to_ast(E) 
+                      end, tuple_to_list(T)),
+    [#item{type=atom, value="tuple"} | TList];
+erl_to_ast(T) when is_binary(T) ->
+    TList = binary_to_list(T),
+    [#item{type=atom, value="binary"} | TList];
 erl_to_ast(T) when is_integer(T) ->
     T;
+erl_to_ast(T) when is_float(T) ->
+    T;
+erl_to_ast(T) when is_pid(T) ->
+    [#item{type=atom, value="pid"}, #item{type=string, value=pid_to_list(T)}];
 erl_to_ast(T) when is_atom(T) ->
     #item{type=atom, value=io_lib:format("~p", [T])}.
     

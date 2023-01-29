@@ -69,6 +69,7 @@ Erlang code.
 %%-export([replace/5]).
 -export([read/5]).
 -export([replace/5]).
+-export([remove_nl/1]).
 
 col(reset) ->
     put(col, 1),
@@ -157,10 +158,27 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
 from_string(String) ->
     from_string(String, 0).
 
+from_string_rest(IO, Line, Rest, Acc) ->
+    case read(IO, [], Line, Rest, 0) of
+        {ok, Acc2, NewLine, []} ->
+            {ok, Acc ++ Acc2, NewLine};
+        {ok, Acc2, NewLine, Rest2} ->
+            from_string_rest(IO, Line, Rest2, Acc++Acc2);
+        _ ->
+            {ok, Acc, Line}
+    end.
+
+remove_nl(Tokens) ->    
+    lists:filter(fun({'\n', _}) -> 
+                         false;
+                    (_) -> true 
+                 end, Tokens).
+
 from_string(String, Line) ->
     IO = tiny_io_server:start_link(String),
-    {ok, Acc , NewLine, _Rest} =  read(IO, [], Line, [], 0),
-    {ok, Acc, NewLine}.
+    {ok, Acc , NewLine} = from_string_rest(IO, Line, [], []),
+    {ok, remove_nl(Acc), NewLine}.
+            
 
 reads(IO, File, Line, PrevTokens, Acc) ->
     case read(IO, [], Line, PrevTokens, 0) of
