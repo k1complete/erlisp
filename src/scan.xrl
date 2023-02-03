@@ -139,17 +139,24 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
     case io:request(IO, {get_until, unicode, Prompt, scan, tokens, [Line]}) of
         {ok, NewTokens, NextLine} ->
             {NNewTokens, NLevel, Rest, NewLine} = calclevel(IO, Prompt0, NewTokens, PrevLevel, NextLine),
+            io:format("TokenCalcd Prev ~p NN ~p NT ~p~n", [PrevTokens, NNewTokens, NewTokens]),
             Tokens = PrevTokens ++ NNewTokens,
             case {Rest, NLevel} of
                 {[], NLevel} when NLevel > 0 -> 
-                    read(IO, Prompt0, NewLine, Tokens, NLevel);
+                    io:format("Readmore ~p ~p~n", [NLevel, Rest]),
+                    read(IO, Prompt0, NewLine, Tokens++Rest, NLevel);
                 {Rest, 0} ->
+                    io:format("Token ~p Rest ~p~n", [Tokens, Rest]),
                     {ok, Tokens, NewLine, Rest};
                 _  ->
                     io:format("readRet ~p~n", [{ok, Tokens, NewLine, Rest}]),
                     {ok, Tokens, NewLine, Rest} 
             end;
         {eof, NextLine} ->
+            
+%%            {ok, NNewTokens, NextLine, []};
+            io:format("PrevTokens ~p~n", [PrevTokens]),
+            
             {ok, PrevTokens, NextLine, []};
         Error ->
             io:format("Error! ~p~n",[{Error, PrevTokens, PrevLevel}]),

@@ -7,7 +7,7 @@
 -include("scan.hrl").
 -export([form/2, form_trans/2, term/2, infix_op/4,
         locline/1,
-        make_symbol/2]).
+        expand_macro/2]).
 -type tree() :: erl_syntax:syntaxTree().
 -type env() :: list().
 
@@ -102,23 +102,78 @@ dispatch_special(A) ->
           "list" => fun list_/3,
           "quote" => fun quote_/3,
           "unquote" => fun unquote_/3,
-          "backquote" => fun backquote_/3,
           "tuple" => fun tuple_/3,
           "binary" => fun binary_/3,
+          "require" => fun require_/3,
           "defun" => fun defun_/3
          },
     maps:get(A, L, undef).
 
-expand_macro(A, _E) ->
-    A.
 
 -type sexp() :: list().
+
+forms(A, E) ->
+    lists:map(fun(Elem) ->
+                      form(Elem, E)
+              end, A).
+
+walk(F, Env, Fun) when is_list(F) ->
+    io:format("ww ~p~n", [F]),
+    [H|T] = F,
+    Arity = length(T),
+    case H of
+        #item{type=atom, value=V} ->
+            case maps:get({V, Arity},  Env, undefined)  of
+                {M, Macro} ->
+                    io:format("call: ~p~n", [F]),
+                    Fun(M, Macro, tl(F));
+                undefined ->
+                    [H | lists:map(fun (E) -> 
+                                           walk(E, Env, Fun)
+                                   end, T)]
+            end;
+        #item{type=module_function, value={Module, Function}} ->
+            case maps:get({Module, Function, Arity},  Env, undefined)  of
+                {M, Macro} ->
+                    io:format("call: ~p~n", [F]),
+                    Fun(M, Macro, T);
+                undefined ->
+                    [H | lists:map(fun (E) -> 
+                                           walk(E, Env, Fun)
+                                   end, T)]
+            end;
+        _ ->
+            lists:map(fun (E) -> 
+                              walk(E, Env, Fun)
+                      end, F)
+    end;
+walk(F, Env, Fun) -> 
+    F.
+
+expand_macro(A, E) ->
+    R2 = proplists:get_value(require, E, require),
+    In = #{{"backquote",  1} => {yal_macro, 'MACRO_backquote'}},
+    Out = case ets:whereis(R2) of
+              undefined ->
+                  maps:new();
+              Tid ->
+                  maps:from_list(ets:tab2list(Tid))
+          end,
+    Env = maps:merge(In, Out),
+    %Env = In,
+    io:format("Map ~p~n", [Env]),
+    walk(A, Env, fun(Module, Function, Arguments) -> 
+                         R = apply(Module, Function, Arguments),
+                         io:format("result ~p~n", [R]),
+                         R
+                 end).
+
 
 -spec form(sexp(), any()) -> tree().
 form(A, E) ->
     B = expand_macro(A, E),
+    io:format("form-E ~p~n", [E]),
     R = form_trans(B, E),
-    %% io:format("formed ~p~n", [R]),
     R
     .
 
@@ -331,7 +386,10 @@ locline(F) ->
 call_function(Fun=#item{value=_X, loc=Loc}, T, E) ->
     io:format("call X ~p~nT ~p~nFun ~p~n", [_X, T, Fun]),
     FHead = lists:map(fun(Elem) ->
-                              term(Elem, E)
+                              io:format("Term ~p~n", [Elem]),
+                              A=term(Elem, E),
+                              io:format("TermAfter ~p~n", [A]),
+                              A
                       end, T),
     %%io:format("call X2 ~p~nT ~p~n", [term(Fun,E, Loc), FHead]),
     %FName = erl_syntax:set_pos(erl_syntax:atom(X), Loc),
@@ -365,7 +423,10 @@ getmodfun(#item{type=Type, value=X, loc=Loc}) ->
     
 list_(X, L, Env) ->
     R = lists:map(fun(Elem) ->
-                          term(Elem, Env)
+                          io:format("List Term ~p~n", [Elem]),
+                          A=term(Elem, Env),
+                          io:format("List TermAfter ~p~n", [A]),
+                          A
                   end, L),
     Loc = X#item.loc,
     erl_syntax:set_pos(erl_syntax:list(R), Loc).
@@ -377,51 +438,12 @@ quote_(X, [E], _Env) ->
     %%io:format("quote_ R: ~p~n", [R]),
     R.
     
-backquote_(X, [E], _Env)  -> 
-    %%io:format("bqquote L:~p~n", [E]),
-    R = bc_item([X | [E]], _Env),
-    %%io:format("quote_ R: ~p~n", [R]),
-    R.
+%backquote_(X, [E], _Env)  -> 
+%    %%io:format("bqquote L:~p~n", [E]),
+%    R = bc_item([X | [E]], _Env),
+%    %%io:format("quote_ R: ~p~n", [R]),
+%    R.
 
-make_symbol(S, Pos) ->
-    #item{value=atom_to_list(S), loc=Pos, type=atom}.
-
-%%% `basic -> 'basic (リストでもベクトルでもない任意の式)
-bc_item([#item{value="backquote", loc=Loc}, Form], Env) when not is_list(Form)->
-    form([ make_symbol(quote, Loc), Form ], Env);
-%%% `,form -> form (ただしformは@や.で始まらないかぎり)
-bc_item([#item{value="backquote"}, [#item{value="unquote"}, [H|Form]]], Env)
-  when  H#item.value =/= "dot", H#item.value =/="splice" ->
-    form([H|Form], Env);
-%%% `(a b c . atom) --> `(a b c (dot atom))--> (append a b c (quote atom))
-%%% `(a b c . ,form) --> `(a b c (dot (unquote form)))--> (append a b c (quote atom))
-bc_item([#item{value="backquote", loc=Loc}, Xn], Env) when is_list(Xn) ->
-    %%io:format("bc_item=LIST <~p>~n", [Xn]),
-    R = lists:map(fun 
-                      %% . ,form -> form
-                      ([#item{value="dot"}, [#item{value="unquote"}, F]])  ->
-                          term(F, Env);
-                      %% . atom -> quote atom 
-                      ([#item{value="dot"}, #item{type=atom} = F])  ->
-                          S = term([make_symbol(quote, Loc), F], Env),
-                          erl_syntax:set_pos(S, Loc);
-                      %% ,@form -> form
-                      ([#item{value="unquote_splice"}, F]) ->
-                          M=term(F, Env),
-                          M;
-                      %% ,form -> (list form)
-                      ([#item{value="unquote"}, F]) ->
-                          S = erl_syntax:list([term(F, Env)]),
-                          erl_syntax:set_pos(S, Loc);
-                      %% form -> (list `form)
-                      (F) ->
-                          Lf = [bc_item([make_symbol(backquote, Loc), F], Env)],
-                          erl_syntax:set_pos(erl_syntax:list(Lf), Loc)
-                  end, Xn),
-    Args = erl_syntax:set_pos(erl_syntax:list(R), Loc),
-    R2 = merl:qquote(Loc, "lists:append(_@r)", [{r, Args}]),
-    R2.
-    
 unquote_(X, _L, _Env) ->    
     X.
 
@@ -436,6 +458,15 @@ binary_(#item{loc=Loc}, L, Env) ->
                               erl_syntax:binary_field(term(E, Env))
                       end, L),
     erl_syntax:set_pos(erl_syntax:binary(LForm), Loc).
+
+require_(#item{loc=Loc}, L, Env) ->
+    Mod = form(hd(L), Env),
+    {value, Ret, Env} = erl_eval:expr(erl_syntax:revert(Mod), Env),
+    R = proplists:get_value(require, Env, require),
+    Macros = yal_util:required_macros_from_ets(R, Ret),
+    ets:insert(R, Macros),
+    erl_syntax:nil().
+
 
 lst() ->
     E = [],
