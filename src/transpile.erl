@@ -162,17 +162,19 @@ expand_macro(A, E) ->
     Env = maps:merge(In, Out),
     %Env = In,
     io:format("Map ~p~n", [Env]),
-    walk(A, Env, fun(Module, Function, Arguments) -> 
-                         R = apply(Module, Function, Arguments),
-                         io:format("result ~p~n", [R]),
-                         R
-                 end).
+    Result = walk(A, Env, fun(Module, Function, Arguments) -> 
+                                  R = apply(Module, Function, Arguments),
+                                  io:format("result ~p~n", [R]),
+                                  R
+                          end),
+    io:format("Expanded ~p~n", [Result]),
+    Result.
 
 
 -spec form(sexp(), any()) -> tree().
 form(A, E) ->
     B = expand_macro(A, E),
-    io:format("form-E ~p~n", [E]),
+    io:format("form-E ~p ~nFrom ~p ~n To ~p~n", [E, A, B]),
     R = form_trans(B, E),
     R
     .
@@ -387,7 +389,10 @@ call_function(Fun=#item{value=_X, loc=Loc}, T, E) ->
     io:format("call X ~p~nT ~p~nFun ~p~n", [_X, T, Fun]),
     FHead = lists:map(fun(Elem) ->
                               io:format("Term ~p~n", [Elem]),
-                              A=term(Elem, E),
+%                              A = lists:map(fun(Arg) ->
+%                                                    term(Arg, E)
+%                                            end, Elem),
+                              A = term(Elem, E),
                               io:format("TermAfter ~p~n", [A]),
                               A
                       end, T),

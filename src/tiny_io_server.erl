@@ -1,5 +1,5 @@
 -module(tiny_io_server).
--export([start_link/1, init/1, loop/1, until_newline/3, until_enough/3, shutdown/1]).
+-export([start_link/1, init/1, loop/1, until_newline/3, until_enough/3, stop/1]).
 
 -define(CHARS_PER_REC, 10).
 
@@ -16,6 +16,10 @@ init(String) ->
     {ok, Fd} = file:open(String, [read, ram]),
     ?MODULE:loop(#state{fd = Fd, mode=list}).
 
+stop(Pid) ->
+    unlink(Pid),
+    Pid ! stop.
+
 loop(State) ->
     receive
 	{io_request, From, ReplyAs, Request} ->
@@ -30,11 +34,16 @@ loop(State) ->
 		    reply(From, ReplyAs, Reply),
 		    exit(Reply)
 	    end;
+	stop ->
+            io:format(standard_error, "terminated!!!!", []),
+            file:close(State#state.fd),
+            exit(normal);
 	%% Private message
 	{From, rewind} ->
 	    From ! {self(), ok},
             ram_file:seek_posision(State#state.fd, 0);
 	_Unknown ->
+            io:format(standard_error, "Recieved!!!! ~p~n", [_Unknown]),
 	    ?MODULE:loop(State)
     end.
 
@@ -76,8 +85,8 @@ multi_request([_|_], Error) ->
 multi_request([], Result) ->
     Result.
 
-shutdown(State) ->
-    file:close(State#state.fd).
+%shutdown(State) ->
+%    file:close(State#state.fd).
 
 setopts(Opts0,State) ->
     Opts = proplists:unfold(

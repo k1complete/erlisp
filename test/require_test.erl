@@ -17,6 +17,6 @@ require_test() ->
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     io:format("---~p~n--- ~p ~n binding ~p~n", [Tree, C, Binding]),
     
-    {value, Result, Binding} = erl_eval:expr_list(C, Binding),
-    ?assertEqual([1], Result).
+    {value, Result, Binding}  = erl_eval:exprs(C, Binding),
+    ?assertEqual(a, Result).
 
