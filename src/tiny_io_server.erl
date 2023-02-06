@@ -35,7 +35,7 @@ loop(State) ->
 		    exit(Reply)
 	    end;
 	stop ->
-            io:format(standard_error, "terminated!!!!", []),
+            %%io:format(standard_error, "terminated!!!!", []),
             file:close(State#state.fd),
             exit(normal);
 	%% Private message

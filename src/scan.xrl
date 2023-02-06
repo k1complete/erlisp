@@ -141,8 +141,7 @@ make_prompt(Prompt, Line, []) ->
 make_prompt(_Prompt, _Line, PrevTokens) ->
     "".
 
-read(IO, Prompt0, Line, PrevTokens, PrevLevel) when length(PrevTokens) > 0 andalso PrevLevel == 0 ->
-    io:format("CalcLevel PreVTokens  ~p ~n PrevLevel ~p~n", [PrevTokens, PrevLevel]),
+adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line) ->
     {NNewTokens, NLevel, Rest, NewLine} = calclevel(IO, Prompt0, PrevTokens, PrevLevel, Line),
     Tokens = NNewTokens,
     case {Rest, NLevel} of
@@ -155,7 +154,11 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) when length(PrevTokens) > 0 andal
         _  ->
             io:format("readRet ~p~n", [{ok, Tokens, NewLine, Rest}]),
             {ok, Tokens, NewLine, Rest} 
-    end;
+    end.
+
+read(IO, Prompt0, Line, PrevTokens, PrevLevel) when length(PrevTokens) > 0 andalso PrevLevel == 0 ->
+    io:format("CalcLevel PreVTokens  ~p ~n PrevLevel ~p~n", [PrevTokens, PrevLevel]),
+    adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line);
 read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
     Prompt = make_prompt(Prompt0, Line, PrevTokens),
     case io:request(IO, {get_until, unicode, Prompt, scan, tokens, [Line]}) of
@@ -163,30 +166,9 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
             io:format("TokenCalcd L ~p Prev ~p ~nNT ~p~n", 
                       [PrevLevel, 
                        PrevTokens, NewTokens]),
-            io:format("precalc ~p ~n", 
-                      [PrevTokens++ NewTokens]),
-            {NNewTokens, NLevel, Rest, NewLine} = calclevel(IO, Prompt0, PrevTokens++NewTokens, 
-                                                            PrevLevel, NextLine),
-            io:format("TokenCalcd Prev ~p ~nNN ~p ~nNT ~p~n Rest ~p ~n", 
-                      [PrevTokens, NNewTokens, NewTokens, Rest]),
-       %     Tokens = PrevTokens ++ NNewTokens,
-            Tokens = NNewTokens,
-            case {Rest, NLevel} of
-                {[], NLevel} when NLevel > 0 -> 
-                    io:format("Readmore ~p ~nToken ~p Rest ~p~n", [NLevel, Tokens, Rest]),
-                    read(IO, Prompt0, NewLine, Tokens++Rest, NLevel);
-                {Rest, NLevel} when NLevel =< 0 ->
-                    io:format("Token ~p Rest ~p~n", [Tokens, Rest]),
-                    {ok, Tokens, NewLine, Rest};
-                _  ->
-                    io:format("readRet ~p~n", [{ok, Tokens, NewLine, Rest}]),
-                    {ok, Tokens, NewLine, Rest} 
-            end;
+            adjust_level(IO, Prompt0, PrevTokens++NewTokens, PrevLevel, NextLine);
         {eof, NextLine} ->
-            
-%%            {ok, NNewTokens, NextLine, []};
             io:format("PrevTokens ~p~n", [PrevTokens]),
-            
             {ok, PrevTokens, NextLine, []};
         Error ->
             io:format("Error! ~p~n",[{Error, PrevTokens, PrevLevel}]),
@@ -213,11 +195,11 @@ remove_nl(Tokens) ->
                  end, Tokens).
 
 from_string(String, Line) ->
-    io:format(standard_error, "~p~n", [length(erlang:processes())]),
+%%    io:format(standard_error, "~p~n", [length(erlang:processes())]),
     IO = tiny_io_server:start_link(String),
     {ok, Acc , NewLine} = from_string_rest(IO, Line, [], []),
     tiny_io_server:stop(IO),
-    io:format(standard_error, "~p~n", [length(erlang:processes())]),
+%%    io:format(standard_error, "~p~n", [length(erlang:processes())]),
     {ok, remove_nl(Acc), NewLine}.
             
 
