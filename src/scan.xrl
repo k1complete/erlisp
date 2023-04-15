@@ -16,48 +16,45 @@ LineFeed = \n
 Rules.
 %tokenrules
 {Digits} :
-  {token, {integer, ?LC(TokenLine, TokenLen), list_to_integer(TokenChars)}}.
+  {token, {integer, TokenLoc, list_to_integer(TokenChars)}}.
 {Digits}\.{Digits}((E|e)(\+|\-)?{Digits})? :
-  {token, {float, ?LC(TokenLine, TokenLen), list_to_float(TokenChars)}}.
+  {token, {float, TokenLoc, list_to_float(TokenChars)}}.
 {Variables} : 
-  {token, {symbol, ?LC(TokenLine, TokenLen), TokenChars}}.
+  {token, {symbol, TokenLoc, TokenChars}}.
 {Op} : 
-  {token, {symbol, ?LC(TokenLine, TokenLen), TokenChars}}.
+  {token, {symbol, TokenLoc, TokenChars}}.
 {Symbols} : 
-  {token, {symbol, ?LC(TokenLine, TokenLen), TokenChars}}.
+  {token, {symbol, TokenLoc, TokenChars}}.
 {Symbols}:{Symbols} : 
-  {token, {module_function, ?LC(TokenLine, TokenLen), TokenChars}}.
+  {token, {module_function, TokenLoc, TokenChars}}.
 \( :
-  {token, {'(', ?LC(TokenLine, TokenLen)}}.
+  {token, {'(', TokenLoc}}.
 \) :
-  {token, {')', ?LC(TokenLine, TokenLen)}}.
+  {token, {')', TokenLoc}}.
 \. : 
-  {token, {'.', ?LC(TokenLine, TokenLen)}}.
+  {token, {'.', TokenLoc}}.
 \,\@ :
-  {end_token, {read_macro, ?LC(TokenLine, TokenLen), 'unquote_splice'}}.
+  {end_token, {read_macro, TokenLoc, 'unquote_splice'}}.
 \, :
-  {end_token, {read_macro, ?LC(TokenLine, TokenLen), 'unquote'}}.
+  {end_token, {read_macro, TokenLoc, 'unquote'}}.
 \' :
-  {end_token, {read_macro, ?LC(TokenLine, TokenLen), 'quote'}}.
+  {end_token, {read_macro, TokenLoc, 'quote'}}.
 \` :
-  {end_token, {read_macro, ?LC(TokenLine, TokenLen), 'backquote'}}.
+  {end_token, {read_macro, TokenLoc, 'backquote'}}.
 \#\( :
-  {token, {'#(', ?LC(TokenLine, TokenLen)}}.
+  {token, {'#(', TokenLoc}}.
 {QString} :
   [_|String] = lists:droplast(TokenChars),
-  {token, {string, ?LC(TokenLine, TokenLen), String}}.
+  {token, {string, TokenLoc, String}}.
 {WhiteSpace} :
-  col(TokenLen),
   skip_token.
 {LineFeed} :
-  col(reset),
-  {end_token, {'\n', ?LC(TokenLine, TokenLen)}}.
+  {end_token, {'\n', TokenLoc}}.
   %%skip_token.
 
 Erlang code.
 
 -include_lib("scan.hrl").
--define(LC(TokenLine,TokenLen), {TokenLine, col(TokenLen)}).
 %%-export([tokenizer/2]).
 -export([file/2]).
 %%-export([read_balance/4]).
@@ -71,20 +68,7 @@ Erlang code.
 -export([replace/5]).
 -export([remove_nl/1]).
 
-col(reset) ->
-    put(col, 1),
-    1;
-col(TokenLen) ->
-    Col = case get(col) of
-              undefined -> 
-                  put(col, 1),
-                  put(col, TokenLen),
-                  1+TokenLen;
-              V -> V + TokenLen
-          end,
-    put(col, Col).
-
-    
+  
 calclevel(IO, Prompt0, Tokens, GLevel, Line) ->
 %%    io:format("calclevel [~p]~n", [Tokens]),
     R=do_calclevel(IO, Prompt0, Tokens, {[], GLevel}, Line),
@@ -124,21 +108,36 @@ loctoline({Line, _Col}) ->
 loctoline(Line) ->
     Line.
     
-replace({IO, Prompt0}, _M, _F, Loc, MChar) ->
+replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
     %Ret = read(IO, Prompt0, loctoline(Loc), [], 0),
     Ret = read(IO, "", loctoline(Loc), [], 0),
     io:format("replace-2read ~p~n", [Ret]),
     {ok, Tokens, NextLine, Rest} = Ret,
+    {_L, ACol} = Loc,
+    N2Tokens = lists:map(fun({T, {L, C}, V}) ->
+                                 {T, {L, C+ACol}, V};
+                            ({T, {L, C}}) ->
+                                 {T, {L, C+ACol}};
+                            (T) ->
+                                 T
+                         end, Tokens),
+    N2Rest = lists:map(fun({T, {L, C}, V}) ->
+                                 {T, {L, C+ACol}, V};
+                          ({T, {L, C}}) ->
+                                 {T, {L, C+ACol}};
+                          (T) ->
+                               T
+                         end, Rest),
     NewTokens = [{'(', Loc}, 
                  {symbol, Loc, atom_to_list(MChar)} | 
-                 Tokens ++ [{')', Loc}]],
-    {ok, NewTokens, NextLine, Rest}.
+                 N2Tokens ++ [{')', Loc}]],
+    {ok, NewTokens, NextLine, N2Rest}.
 
 make_prompt([], _Line, _PrevTokens) ->
     "";
 make_prompt(Prompt, Line, []) ->
     io_lib:format(Prompt, [loctoline(Line)]);
-make_prompt(_Prompt, _Line, PrevTokens) ->
+make_prompt(_Prompt, _Line, _PrevTokens) ->
     "".
 
 adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line) ->
@@ -182,7 +181,7 @@ from_string_rest(IO, Line, Rest, Acc) ->
         {ok, Acc2, NewLine, []} ->
             io:format("from_string_rest ~p -> ~n ~p~n", [Rest, Acc2]),
             {ok, Acc ++ Acc2, NewLine};
-        {ok, Acc2, NewLine, Rest2} ->
+        {ok, Acc2, _NewLine, Rest2} ->
             from_string_rest(IO, Line, Rest2, Acc++Acc2);
         _ ->
             {ok, Acc, Line}

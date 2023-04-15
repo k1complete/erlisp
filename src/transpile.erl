@@ -199,9 +199,10 @@ form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
     ;
 form_trans([List| T], E) when is_list(List) ->
     %%io:format("nested ~p~n", [List]),
-    form_trans([form_trans(List, E)| T], E);
-form_trans(#item{value=Term, loc=Loc, type=atom}, _E) ->
-    erl_syntax:set_pos(erl_syntax:variable(Term), Loc).
+    form_trans([form_trans(List, E)| T], E).
+
+%%form_trans(#item{value=Term, loc=Loc, type=atom}, _E) ->
+%%    erl_syntax:set_pos(erl_syntax:variable(Term), Loc).
     
 term_make_atom(Term) ->
     erl_syntax:set_pos(erl_syntax:atom(Term#item.value), Term#item.loc).
@@ -358,6 +359,8 @@ defun_(X, L, E) ->
             Body = lists:map(fun(A) -> form(A, E) end, Rest),
             io:format("simpleArgs ~p ~n", [Args]),
             ArgList = lists:map(fun(A) -> term(A, E) end, Args),
+            %%  Register argument into environment.
+            %%  replace body from environment(argment)
             FunName = erl_syntax:atom(Name#item.value),
             io:format("MO: ~p ~p~n", [Line, FunName]),
             MQ=?MQP(Line, "'@name'(_@@args) -> _@@body.", 
@@ -367,6 +370,19 @@ defun_(X, L, E) ->
             io:format("MQ2: ~p~n", [MQ]),
             MQ
     end.
+%%
+%% (let ((a b) (b c))
+%%   (bodies1)
+%%   (bodies2))
+%% (let (((tuple a b) (when a b) b) (b c))
+%%   (bodies1)
+%%   (bodies2))
+%%  list((pattern guard value)) = ArgumentsList 
+%%  fun (list(pattern)) -> bodies end(list(value))
+%% 
+
+
+
 
 locconv(ES) ->
     E = erl_syntax_lib:map_subtrees(fun(E2) ->
@@ -463,6 +479,7 @@ binary_(#item{loc=Loc}, L, Env) ->
                               erl_syntax:binary_field(term(E, Env))
                       end, L),
     erl_syntax:set_pos(erl_syntax:binary(LForm), Loc).
+
 
 require_(#item{loc=Loc}, L, Env) ->
     Mod = form(hd(L), Env),

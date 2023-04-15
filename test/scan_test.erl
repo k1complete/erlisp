@@ -110,8 +110,8 @@ multi_line_test() ->
     ?assertEqual([{'(',{Line,1}},
                       {symbol,{Line,2},"+"},
                       {integer,{Line,4},1},
-                      {integer,{Line+1,2},1},
-                      {')',{Line+1,3}}],
+                      {integer,{Line+1,1},1},
+                      {')',{Line+1,2}}],
             R),
     ?assertEqual(NextLoc, Line+1).
     
