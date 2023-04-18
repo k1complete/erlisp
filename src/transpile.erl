@@ -105,7 +105,8 @@ dispatch_special(A) ->
           "tuple" => fun tuple_/3,
           "binary" => fun binary_/3,
           "require" => fun require_/3,
-          "defun" => fun defun_/3
+          "defun" => fun defun_/3,
+          "let" => fun let_/3
          },
     maps:get(A, L, undef).
 
@@ -370,6 +371,10 @@ defun_(X, L, E) ->
             io:format("MQ2: ~p~n", [MQ]),
             MQ
     end.
+
+pattern(Term, Env) ->
+    term(Term, Env).
+
 %%
 %% (let ((a b) (b c))
 %%   (bodies1)
@@ -379,7 +384,34 @@ defun_(X, L, E) ->
 %%   (bodies2))
 %%  list((pattern guard value)) = ArgumentsList 
 %%  fun (list(pattern)) -> bodies end(list(value))
-%% 
+%%  compile to 
+%%  
+let_(X, L, E) ->
+    io:format("let_ : ~p~n", [X]),
+    Loc = X#item.loc,
+    [Args | Rest] = L,
+    io:format("Args | Rest =~n  ~p~n ~p ~n", [Args, Rest]),
+    {Patterns, RArgs} = lists:foldl(fun(Arg, {P, A}) ->
+                                    case Arg of
+                                        [[_Pattern | _] = Match, Value] ->
+                                            {P ++ [pattern(Match, E)], 
+                                             A ++ [term(Value, E)]};
+                                        [#item{type = atom} = Param, Value] ->
+                                            {P ++ [term(Param, E)], 
+                                             A ++ [term(Value, E)]}
+                                    end
+                              end, {[], []}, Args),
+    Body = lists:map(fun(A) -> form(A, E) end, Rest),
+    io:format("simpleArgs ~p ~n", [Args]),
+    %%  Register argument into environment.
+    %%  replace body from environment(argment)
+    MQ=?MQP(Loc, "fun(_@@params) -> _@@body end(_@@args)", 
+            [{'params', Patterns},
+             {'body', Body},
+             {'args', RArgs}
+            ]),
+    io:format("MQ2: ~p~n", [MQ]),
+    MQ.
 
 
 

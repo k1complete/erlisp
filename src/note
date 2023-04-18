@@ -1,3 +1,31 @@
+A={call,1,
+  {remote,1,{atom,1,lists},{atom,1,reverse}},
+       [{call,1,
+        {remote,1,{atom,{1,16},lists},{atom,{1,22},append}},
+         [{cons,1,
+            {cons,1,{integer,1,1},{nil,1}},
+               {cons,1,
+                  {cons,1,{integer,1,2},{nil,1}},
+                       {cons,1,
+                           {cons,1,{atom,1,b},{nil,1}},
+                                {nil,1}}}}]}]}.
+erl_syntax_lib:map(fun(E) ->
+  B =case erl_syntax:type(E) of
+       module_qualifier ->
+            M=erl_syntax:module_qualifier_argument(E),
+            F=erl_syntax:module_qualifier_body(E),
+            io:format("M ~p F ~p~n", [M, F]),
+            MA = erl_syntax:atom(erl_syntax:atom_name(M)),
+            FA = erl_syntax:atom(erl_syntax:atom_name(F)),
+            erl_syntax:module_qualifier(erl_syntax:set_pos(MA, 0),
+                                        erl_syntax:set_pos(FA, 0));
+       _ ->
+            E
+     end,
+  C = erl_syntax:set_pos(B, 0),
+  C
+end, A)
+
 '(a A 1)
 -->
 
