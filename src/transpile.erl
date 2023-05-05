@@ -97,6 +97,7 @@ dispatch_infix_op(A) ->
 dispatch_special(A) ->
     L = #{"match" => fun match_op/3,
           "export" => fun export_/3,
+          "macro_export" => fun macro_export_/3,
           "module" => fun module_/3,
           "cons" => fun cons_/3,
           "list" => fun list_/3,
@@ -207,6 +208,8 @@ form_trans([List| T], E) when is_list(List) ->
     
 term_make_atom(Term) ->
     erl_syntax:set_pos(erl_syntax:atom(Term#item.value), Term#item.loc).
+term_make_atom(Term, Prefix) ->
+    erl_syntax:set_pos(erl_syntax:atom(Prefix++Term#item.value), Term#item.loc).
 
 export_(X, L, E) ->
     Loc = X#item.loc,
@@ -219,7 +222,18 @@ export_(X, L, E) ->
                    end, L),
     R = erl_syntax:attribute(erl_syntax:atom(export),[erl_syntax:list(Aq)]),
     erl_syntax:set_pos(R, Loc).
-
+macro_export_(X, L, E) ->
+    Loc = X#item.loc,
+    io:format("macro_export X ~p~n", [X]),
+    Aq = lists:map(fun([Fn, Arg]) ->
+                           F = term_make_atom(Fn, "MACRO_"),
+                           A = term(Arg, Loc, E),
+                           io:format("FA Fis ~p~n Ais ~p~n", [F, A]),
+                           erl_syntax:arity_qualifier(F, A)
+                   end, L),
+    R = erl_syntax:attribute(erl_syntax:atom(export),[erl_syntax:list(Aq)]),
+    erl_syntax:set_pos(R, Loc).
+    
 module_(X, L, _E) ->
     Loc = X#item.loc,
     Module = hd(L),
@@ -517,7 +531,7 @@ require_(#item{loc=Loc}, L, Env) ->
     Mod = form(hd(L), Env),
     {value, Ret, Env} = erl_eval:expr(erl_syntax:revert(Mod), Env),
     R = proplists:get_value(require, Env, require),
-    Macros = yal_util:required_macros_from_ets(R, Ret),
+    Macros = yal_util:required_macros(Ret),
     ets:insert(R, Macros),
     erl_syntax:nil().
 
