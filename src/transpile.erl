@@ -107,6 +107,7 @@ dispatch_special(A) ->
           "binary" => fun binary_/3,
           "require" => fun require_/3,
           "defun" => fun defun_/3,
+          "defmacro" => fun defmacro_/3,
           "let" => fun let_/3
          },
     maps:get(A, L, undef).
@@ -114,10 +115,6 @@ dispatch_special(A) ->
 
 -type sexp() :: list().
 
-forms(A, E) ->
-    lists:map(fun(Elem) ->
-                      form(Elem, E)
-              end, A).
 
 walk(F, Env, Fun) when is_list(F) ->
     io:format("ww ~p~n", [F]),
@@ -127,8 +124,10 @@ walk(F, Env, Fun) when is_list(F) ->
         #item{type=atom, value=V} ->
             case maps:get({V, Arity},  Env, undefined)  of
                 {M, Macro} ->
-                    io:format("call: ~p~n", [F]),
-                    Fun(M, Macro, tl(F));
+                    io:format("call-M: ~p~n", [F]),
+                    A = Fun(M, Macro, tl(F)),
+                    io:format("call-M-Result: ~p~n", [A]),
+                    walk(A, Env, Fun);
                 undefined ->
                     [H | lists:map(fun (E) -> 
                                            walk(E, Env, Fun)
@@ -137,8 +136,10 @@ walk(F, Env, Fun) when is_list(F) ->
         #item{type=module_function, value={Module, Function}} ->
             case maps:get({Module, Function, Arity},  Env, undefined)  of
                 {M, Macro} ->
-                    io:format("call: ~p~n", [F]),
-                    Fun(M, Macro, T);
+                    io:format("call2: ~p~n", [F]),
+                    A = Fun(M, Macro, T),
+                    io:format("call-Result: ~p~n", [A]),
+                    walk(A, Env, Fun);
                 undefined ->
                     [H | lists:map(fun (E) -> 
                                            walk(E, Env, Fun)
@@ -149,7 +150,7 @@ walk(F, Env, Fun) when is_list(F) ->
                               walk(E, Env, Fun)
                       end, F)
     end;
-walk(F, Env, Fun) -> 
+walk(F, _Env, _Fun) -> 
     F.
 
 expand_macro(A, E) ->
@@ -386,6 +387,33 @@ defun_(X, L, E) ->
             MQ
     end.
 
+defmacro_(X, L, E) ->
+    io:format("defmacro_ : ~p~n", [X]),
+    Line = X#item.loc,
+    [Name, Args | Rest] = L,
+    Macro = Name#item{value="MACRO_" ++ Name#item.value},
+    io:format("Name, Args | Rest =~n  ~p~n ~p~n ~p ~n", [Macro, Args, Rest]),
+    case hd(Args) of
+        A when is_list(A) ->
+            match_defun_(Macro, [Args|Rest], E);
+        _  ->
+            Body = lists:map(fun(A) -> form(A, E) end, Rest),
+            io:format("simpleArgs ~p ~n", [Args]),
+            ArgList = lists:map(fun(A) -> term(A, E) end, Args),
+            %%  Register argument into environment.
+            %%  replace body from environment(argment)
+            FunName = erl_syntax:atom(Macro#item.value),
+            io:format("MO: ~p ~p~n", [Line, FunName]),
+            MQ=?MQP(Line, "'@name'(_@@args) -> _@@body.", 
+                 [{'name', FunName}, 
+                  {'args', ArgList},
+                  {'body', Body}]),
+            io:format("MQ2: ~p~n", [MQ]),
+            MQ
+    end.
+
+
+
 pattern(Term, Env) ->
     term(Term, Env).
 
@@ -527,14 +555,14 @@ binary_(#item{loc=Loc}, L, Env) ->
     erl_syntax:set_pos(erl_syntax:binary(LForm), Loc).
 
 
-require_(#item{loc=Loc}, L, Env) ->
+require_(#item{loc=_Loc}, L, Env) ->
     Mod = form(hd(L), Env),
     {value, Ret, Env} = erl_eval:expr(erl_syntax:revert(Mod), Env),
     R = proplists:get_value(require, Env, require),
     Macros = yal_util:required_macros(Ret),
+    io:format("required module  ~p: ~p in  ~p ~n", [Ret, Macros, R]),
     ets:insert(R, Macros),
     erl_syntax:nil().
-
 
 lst() ->
     E = [],

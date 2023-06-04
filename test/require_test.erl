@@ -9,7 +9,12 @@ require_test() ->
     Ret = parser:parse(Tokens),
     io:format("Ret: ~p: ~n~p~n", [Ret, Tokens]),
     {ok, Tree} = Ret,
-    ets:new(require, [named_table]),
+    case ets:info(require) of
+        undefined ->
+            ets:new(require, [named_table]);
+        _ ->
+            require
+    end,
     C = lists:map(fun(E) ->
                           erl_syntax:revert(transpile:form(E, [{require, require}]))
                   end, Tree),
