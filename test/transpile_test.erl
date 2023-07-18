@@ -101,7 +101,7 @@ defun_match_test() ->
     Cmd = ["(defun plus (((match A 1) B)\n",
            "(+ A B))\n",
            "((A B) (+ A B)))\n"],
-    {ok, Tokens, _Lines} = scan:from_string(lists:flatten(Cmd), Line),
+    {R, Tokens, _Lines} = scan:from_string(lists:flatten(Cmd), Line),
     {ok, [Tree]} = parser:parse(Tokens),
     C4=transpile:form(Tree, []),
     io:format("~nC4 ~p~n", [C4]),
@@ -114,7 +114,7 @@ defun_match_ml_test() ->
     Cmd = ["(defun plus (((match A 1) B)\n",
            "(+ A B))\n",
            "((A B) (+ A B) (- A B)))\n"],
-    {ok, Tokens, _Lines} = scan:from_string(lists:flatten(Cmd), Line),
+    {R, Tokens, _Lines} = scan:from_string(lists:flatten(Cmd), Line),
     {ok, [Tree]} = parser:parse(Tokens),
     C4=transpile:form(Tree, []),
     io:format("~nC4 ~p~n", [C4]),
@@ -128,7 +128,7 @@ defun_match_when_test() ->
            "(+ A B))\n",
            "((A B) (when (== A 2)) (+ A B) (- A B))\n",
            "((A B) (* A B) (+ A B)))\n"],
-    {ok, Tokens, _Lines} = scan:from_string(lists:flatten(Cmd), Line),
+    {R, Tokens, _Lines} = scan:from_string(lists:flatten(Cmd), Line),
     {ok, [Tree]} = parser:parse(Tokens),
     C4=transpile:form(Tree, []),
     io:format("~nC4 ~p~n", [C4]),
@@ -139,7 +139,7 @@ defun_match_when_test() ->
     ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
 export_test() ->
     Line = ?LINE,
-    Cmd = ["(export (a 2) (b 3))"],
+    Cmd = ["(-export (a 2) (b 3))"],
     {ok, Tokens, _Lines} = scan:string(lists:flatten(Cmd), Line),
     {ok, [Tree]} = parser:parse(Tokens),
     C4=transpile:form(Tree, []),
@@ -148,7 +148,7 @@ export_test() ->
 
 module_test() ->
     Line = ?LINE,
-    Cmd = ["(module b)"],
+    Cmd = ["(-module b)"],
     {ok, Tokens, _Lines} = scan:string(lists:flatten(Cmd), Line),
     {ok, [Tree]} = parser:parse(Tokens),
     C4=transpile:form(Tree, []),

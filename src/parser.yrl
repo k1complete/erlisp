@@ -62,7 +62,7 @@ term ->
 term ->
     string : 
         %%io:format("Term ~p~n", ['$1']),
-        #item{type=string, value=tokenvalue('$1')}.
+        #item{type=string, value=tokenvalue('$1'), loc=element(2, '$1')}.
 term ->
     sexpression : 
         %%io:format("TermFromSexp ~p~n", ['$1']),

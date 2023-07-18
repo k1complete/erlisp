@@ -1,0 +1,11 @@
+(-module doctest)
+(-export (main 1))
+
+(defun main (a)
+"""
+main is double a
+
+Example:
+
+"""
+(+ a a))

@@ -145,11 +145,12 @@ get_until(Encoding, Mod, Func, As,
 		    end
 	    end;
 	{done,Data, RestChars} ->
-            %io:format(standard_error, "done-- ~p/~p~n", [Data, RestChars]),
+            %%io:format(standard_error, "done-- ~p/~p~n", [Data, RestChars]),
 	    {ok, Data, State#state{lookahead=RestChars}};
         {error, {eof, Loc}} ->
             {ok, {eof, Loc}, State};
 	Error ->
+            io:format("getloop: ~p~n ", [Error]),
 	    {error, Error, State}
     end.
 
@@ -158,12 +159,13 @@ get_loop(M,F,A,T,C, LookAhead) ->
         {ok, L} ->
             case catch apply(M,F,[C,L|A]) of
                 {done, List, Rest} ->
+                    %% io:format(standard_error, "done ~p~n", [List]),
                     {done, List, Rest};
                 {more, NewC} ->
-                    % io:format(standard_error, "more ~p~n", [NewC]),
+                    %% io:format(standard_error, "more ~p~n", [NewC]),
                     get_loop(M,F,A, T,NewC, []);
                 Errors ->
-                    io:format(standard_error, "error ~p~n", [Errors]),
+                    io:format(standard_error, "io_server error ~p~n", [Errors]),
                     {error,F}
             end;
         eof ->
@@ -175,6 +177,7 @@ get_loop(M,F,A,T,C, LookAhead) ->
                     {error, {eof, hd(A)}}
             end;
         Error ->
+            %% io:format(standard_error, "Error ~p~n", [Error]),
             {error, Error}
     end.
 
@@ -225,7 +228,7 @@ getc(Fd, []) ->
             Rest
     end;
 getc(_Fd, LookAhead) ->
-    %io:format(standard_error, "[getc ahead '~p']~n", [LookAhead]),
+    io:format("[getc ahead '~p']~n", [LookAhead]),
     {ok, LookAhead}.
 
 my_split(0,Left,Acc) ->

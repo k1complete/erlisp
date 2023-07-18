@@ -33,7 +33,7 @@ backquote_atom_test() ->
 
 backquote_unquote_form_test() ->
     Line = 1,
-    {ok, Tokens, _Line} = scan:from_string("(lists:reverse `,(list 'a 'b))", Line),
+    {_, Tokens, _Line} = scan:from_string("(lists:reverse `,(list 'a 'b))", Line),
     io:format("Line: [~p]~p~n", [Tokens, Line]),
     {ok, [Tree]} = parser:parse(Tokens),
     C = transpile:form(Tree, []),

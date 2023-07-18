@@ -106,7 +106,7 @@ plus_test() ->
 multi_line_test() ->
     Line=?LINE,
     S="(+ 1\n1)",
-    {ok, R, NextLoc} = scan:from_string(S, Line),
+    {RR, R, NextLoc} = scan:from_string(S, Line),
     ?assertEqual([{'(',{Line,1}},
                       {symbol,{Line,2},"+"},
                       {integer,{Line,4},1},

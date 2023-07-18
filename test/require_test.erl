@@ -5,7 +5,7 @@
 
 require_test() ->
     Line=?LINE,
-    {ok, Tokens, _Line} = scan:from_string("(require 'mod)(erlang:hd (mod:reverse (1 2 'a)))", Line),
+    {ok, Tokens, _Line} = scan:from_string("(-require 'mod)(erlang:hd (mod:reverse (1 2 'a)))", Line),
     Ret = parser:parse(Tokens),
     io:format("Ret: ~p: ~n~p~n", [Ret, Tokens]),
     {ok, Tree} = Ret,
@@ -16,7 +16,7 @@ require_test() ->
             require
     end,
     C = lists:map(fun(E) ->
-                          erl_syntax:revert(transpile:form(E, [{require, require}]))
+                          erl_syntax:revert(transpile:form(E, [{'-require', require}]))
                   end, Tree),
     
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
@@ -33,7 +33,7 @@ getmacros_test() ->
 -define(TQ(Line, T), merl:quote(Line, T)).
 macro_export_test() ->
     Line = ?LINE,
-    Cmd = ["(macro_export (a 2) (b 3))"],
+    Cmd = ["(-macro_export (a 2) (b 3))"],
     {ok, Tokens, _Lines} = scan:string(lists:flatten(Cmd), Line),
     {ok, [Tree]} = parser:parse(Tokens),
     C4=transpile:form(Tree, []),

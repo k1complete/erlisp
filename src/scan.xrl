@@ -11,7 +11,10 @@ Symbols = [-+/*a-z]{PostAlphabet}*
 Op = (\+\+|\-\-|==|/=|=<|<|>=|>|=:=|=/=|\+|-|\*|/)
 Variables = [A-Z_]{PostAlphabet}*
 WhiteSpace = [\s\t]+
+MQ = \"\"\"
+%MString = {MQ}(\n|.)*{MQ}
 QString = \"([^\"]|\\\")+\"
+
 LineFeed = \n
 Rules.
 %tokenrules
@@ -43,9 +46,12 @@ Rules.
   {end_token, {read_macro, TokenLoc, 'backquote'}}.
 \#\( :
   {token, {'#(', TokenLoc}}.
+{MQ} :
+  {end_token, {'"""', TokenLoc}}.
 {QString} :
   [_|String] = lists:droplast(TokenChars),
   {token, {string, TokenLoc, String}}.
+
 {WhiteSpace} :
   skip_token.
 {LineFeed} :
@@ -145,7 +151,7 @@ adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line) ->
     Tokens = NNewTokens,
     case {Rest, NLevel} of
         {[], NLevel} when NLevel > 0 -> 
-%%            io:format("Readmore ~p ~p~n", [NLevel, Rest]),
+            io:format("Readmore ~p ~p~n", [NLevel, Rest]),
             read(IO, Prompt0, NewLine, Tokens++Rest, NLevel);
         {Rest, 0} ->
             io:format("Token ~p Rest ~p~n", [Tokens, Rest]),
@@ -154,6 +160,35 @@ adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line) ->
             io:format("readRet ~p~n", [{ok, Tokens, NewLine, Rest}]),
             {ok, Tokens, NewLine, Rest} 
     end.
+
+read_multiline(IO, Line, Add, Stop) ->
+    case io:get_line(IO, "") of
+        {error, Error} ->
+            {error, Error};
+        eof ->
+            eof;
+        Stop ->
+            {Add, Line+1};
+        Data ->
+            io:format("GetLine ~p vi ~p ~p~n", [Stop, Data, Stop=:=Data]),
+            read_multiline(IO, Line+1, string:concat(Add ,Data), Stop)
+    end.
+
+multiline_quote(IO, Line, Tokens) ->
+    case lists:last(Tokens) of
+        {'"""', _} ->
+            {MT, L} = read_multiline(IO, Line, "",
+                                     "\"\"\"\n"),
+            MM = {lists:append(lists:droplast(Tokens),
+                               [{string, Line, MT}]),
+                  L},
+            io:format("REST: ~p n ~p~n", [Tokens,MM]),
+            MM;
+        _ ->
+            {Tokens, Line}
+    end.
+    
+            
 
 read(IO, Prompt0, Line, PrevTokens, PrevLevel) when length(PrevTokens) > 0 andalso PrevLevel == 0 ->
     io:format("CalcLevel PreVTokens  ~p ~n PrevLevel ~p~n", [PrevTokens, PrevLevel]),
@@ -165,12 +200,18 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
             io:format("TokenCalcd L ~p Prev ~p ~nNT ~p~n", 
                       [PrevLevel, 
                        PrevTokens, NewTokens]),
-            adjust_level(IO, Prompt0, PrevTokens++NewTokens, PrevLevel, NextLine);
+            {NewTokens2, NextLine2} =  multiline_quote(IO, NextLine, NewTokens),
+            io:format("adjust_level ~p ~n", [PrevTokens++NewTokens2]),
+            adjust_level(IO, Prompt0, PrevTokens++NewTokens2, PrevLevel, NextLine2);
         {eof, NextLine} ->
             io:format("PrevTokens ~p~n", [PrevTokens]),
-            {ok, PrevTokens, NextLine, []};
+            {eof, PrevTokens, NextLine, []};
+        {error, terminated} ->
+            io:format("PrevTokens ~p~n", [PrevTokens]),
+            {eof, PrevTokens, Line, []};
         Error ->
-            io:format("Error! ~p~n",[{Error, PrevTokens, PrevLevel}]),
+            io:format(
+                      "Error! sss ~p, ~p, ~p ~n",[Error, PrevTokens, PrevLevel]),
             Error
     end.
 from_string(String) ->
@@ -183,6 +224,8 @@ from_string_rest(IO, Line, Rest, Acc) ->
             {ok, Acc ++ Acc2, NewLine};
         {ok, Acc2, _NewLine, Rest2} ->
             from_string_rest(IO, Line, Rest2, Acc++Acc2);
+        {eof, Acc2, Line2, []} ->
+            {eof, Acc2, Line2};
         _ ->
             {ok, Acc, Line}
     end.
@@ -196,10 +239,10 @@ remove_nl(Tokens) ->
 from_string(String, Line) ->
 %%    io:format(standard_error, "~p~n", [length(erlang:processes())]),
     IO = tiny_io_server:start_link(String),
-    {ok, Acc , NewLine} = from_string_rest(IO, Line, [], []),
+    {R, Acc , NewLine} = from_string_rest(IO, Line, [], []),
     tiny_io_server:stop(IO),
 %%    io:format(standard_error, "~p~n", [length(erlang:processes())]),
-    {ok, remove_nl(Acc), NewLine}.
+    {R, remove_nl(Acc), NewLine}.
             
 
 reads(IO, File, Line, PrevTokens, Acc) ->
@@ -212,8 +255,17 @@ reads(IO, File, Line, PrevTokens, Acc) ->
             R = reads(IO, File, NextLine+1, RestTokens, Acc ++ Tokens),
             {ok, element(2, R)}
     end.
+file_rest(IO, Line, Acc0) ->
+    case from_string_rest(IO, Line, [], []) of
+        {ok, Acc, NewLine}  ->
+            file_rest(IO, NewLine, Acc0++Acc);
+        {eof, Acc, NewLine}  ->
+            {ok, Acc0 ++ Acc, NewLine};
+        Error ->
+            Error
+    end.
 file(File, _Option) ->
     {ok, IO} = file:open(File, "r"),
-    {ok, Acc} = reads(IO, File, 1, [], []),
+    {ok, Acc, _Line} = file_rest(IO, 1, []),
     file:close(IO),
     {ok, Acc}.

@@ -7,7 +7,7 @@
 -include("scan.hrl").
 -export([form/2, form_trans/2, term/2, infix_op/4,
         locline/1,
-        expand_macro/2]).
+        expand_macro/2, atom_to_item/2]).
 -type tree() :: erl_syntax:syntaxTree().
 -type env() :: list().
 
@@ -96,21 +96,22 @@ dispatch_infix_op(A) ->
     maps:get(A, L, undef).
 dispatch_special(A) ->
     L = #{"match" => fun match_op/3,
-          "export" => fun export_/3,
-          "macro_export" => fun macro_export_/3,
-          "module" => fun module_/3,
+          "-export" => fun export_/3,
+          "-macro_export" => fun macro_export_/3,
+          "-module" => fun module_/3,
           "cons" => fun cons_/3,
           "list" => fun list_/3,
           "quote" => fun quote_/3,
           "unquote" => fun unquote_/3,
           "tuple" => fun tuple_/3,
           "binary" => fun binary_/3,
-          "require" => fun require_/3,
+          "-require" => fun require_/3,
           "defun" => fun defun_/3,
           "defmacro" => fun defmacro_/3,
           "let" => fun let_/3
          },
     maps:get(A, L, undef).
+
 
 
 -type sexp() :: list().
@@ -153,6 +154,11 @@ walk(F, Env, Fun) when is_list(F) ->
 walk(F, _Env, _Fun) -> 
     F.
 
+atom_to_item([A|Tail], _Env) when is_atom(A) ->
+    [yal_util:make_symbol(A)|Tail];
+atom_to_item(List, _Env) ->
+    List.
+
 expand_macro(A, E) ->
     R2 = proplists:get_value(require, E, require),
     In = #{{"backquote",  1} => {yal_macro, 'MACRO_backquote'}},
@@ -168,12 +174,13 @@ expand_macro(A, E) ->
     Result = walk(A, Env, fun(Module, Function, Arguments) -> 
                                   R = apply(Module, Function, Arguments),
                                   io:format("result ~p~n", [R]),
-                                  R
+                                  R3 = atom_to_item(R, Env),
+                                  R3
                           end),
     io:format("Expanded ~p~n", [Result]),
     Result.
 
-
+    
 -spec form(sexp(), any()) -> tree().
 form(A, E) ->
     B = expand_macro(A, E),
@@ -363,6 +370,32 @@ match_defun_(Name, Clauses, E) ->
     io:format("~n ", []),
     Ret.
 
+match_defun_comment(Name, Com, Clauses, E) ->
+    %%io:format(standard_error, "match-defun-comment ~p~n", [Com]),
+    Tree = match_defun_(Name, Clauses, E),
+    case Com of 
+        #item{type=string, value=""} ->
+            Tree;
+        Com ->
+            Comment = {1, 1, 
+                       0, Com#item.value},
+            R=erl_recomment:recomment_forms(Tree, Comment),
+            R
+    end.
+
+
+defun_comment(Name, A, [#item{type=string} = Com | Rest], E) ->
+    match_defun_comment(Name, Com, [A|Rest], E);
+defun_comment(Name, A, Rest, E) ->
+    match_defun_comment(Name, #item{type=string, value="", loc=Name#item.loc}, [A|Rest], E).
+make_comment({Line, Column}, Value) ->
+    {Line, Column, 0, Value};
+make_comment(undefined, Value) ->
+    {1, 1, 0, Value}.
+getcomment([#item{type=string}=Com|Rest], Pos) ->
+    [make_comment(Pos, [Com#item.value]) | Rest];
+getcomment(Rest, Pos) ->
+    [make_comment(Pos, "")|Rest].
 defun_(X, L, E) ->
     io:format("defun_ : ~p~n", [X]),
     Line = X#item.loc,
@@ -370,9 +403,13 @@ defun_(X, L, E) ->
     io:format("Name, Args | Rest =~n  ~p~n ~p~n ~p ~n", [Name, Args, Rest]),
     case hd(Args) of
         A when is_list(A) ->
-            match_defun_(Name, [Args|Rest], E);
+            %match_defun_(Name, [Args|Rest], E);
+            defun_comment(Name, Args, Rest, E);
         _  ->
-            Body = lists:map(fun(A) -> form(A, E) end, Rest),
+            Pos = Line,
+            %%io:format(standard_error, "Getcom ~p~n", [Rest]),
+            [Comm|RRest]  = getcomment(Rest, Pos),
+            Body = lists:map(fun(A) -> form(A, E) end, RRest),
             io:format("simpleArgs ~p ~n", [Args]),
             ArgList = lists:map(fun(A) -> term(A, E) end, Args),
             %%  Register argument into environment.
@@ -383,8 +420,18 @@ defun_(X, L, E) ->
                  [{'name', FunName}, 
                   {'args', ArgList},
                   {'body', Body}]),
-            io:format("MQ2: ~p~n", [MQ]),
-            MQ
+            io:format("MMQ1: ~p~n~p~n", [MQ, [Comm]]),
+            MMQ = case Comm of 
+                      {_,_,_, []} ->
+                          MQ;
+                      {_, _, _, Comment} ->
+                          R = erl_syntax:set_precomments(MQ, Comment),
+                          %%io:format(standard_error, "PreComment ~p~n", [R]),
+                          R
+                  end,
+            %%MMQ=MQ,
+            io:format("MMQ2: ~p~n", [MMQ]),
+            MMQ
     end.
 
 defmacro_(X, L, E) ->
