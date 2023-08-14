@@ -9,6 +9,7 @@ compile_test() ->
 
 
 compile_doctest_test() ->
-    {ok, ModuleName, Binary} = elisp_compile:file("test/testdata/doctest.elisp", []),
+    {ok, ModuleName, Binary, Ast} = elisp_compile:file_ast("test/testdata/doctest.elisp", []),
+    error_logger:info_report(Ast),
     ?assertEqual(2 , doctest:main(1)).
 

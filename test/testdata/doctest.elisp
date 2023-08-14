@@ -1,6 +1,12 @@
-(-module doctest)
-(-export (main 1))
+(-module doctest
+"""
+doctest module
 
+this is a module
+"""
+)
+(-export (main 1))
+(-spec (main (a integer)) integer)
 (defun main (a)
 """
 main is double a

@@ -11,6 +11,7 @@
 -type tree() :: erl_syntax:syntaxTree().
 -type env() :: list().
 
+
 module_function(A, Loc) ->
     {M, F} = A#item.value,
     erl_syntax:set_pos(erl_syntax:module_qualifier(
@@ -99,6 +100,7 @@ dispatch_special(A) ->
           "-export" => fun export_/3,
           "-macro_export" => fun macro_export_/3,
           "-module" => fun module_/3,
+          "-spec" => fun spec_/3,
           "cons" => fun cons_/3,
           "list" => fun list_/3,
           "quote" => fun quote_/3,
@@ -196,6 +198,7 @@ form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
                 undef ->
                     call_function(XT, T, E);
                 Spf ->
+                    io:format("special XT ~p~n", [[XT, T]]),
                     R1=Spf(XT, T, E),
                     %%io:format("specialform: ~p~n", [R1]),
                     R1
@@ -248,7 +251,50 @@ module_(X, L, _E) ->
     M = term_make_atom(Module),
     io:format("module_ ~p~n", [M]),
     E = erl_syntax:attribute(erl_syntax:atom(module), [M]),
-    erl_syntax:set_pos(E, Loc).
+    E1 = erl_syntax:set_pos(E, Loc),
+    E2 = case tl(L) of
+             [] -> E1;
+             [S|_] ->
+                 case S of
+                     #item{type=string, value=""} ->
+                         E1;
+                     S ->
+                         {Line, Column} = Loc,
+                         Comment = {Line,Column, 0, S#item.value},
+                         {R,_} = erl_recomment:recomment_tree(E1, [Comment]),
+                         R
+                 end
+         end,
+    E2.
+%% spec form
+%% (spec (functionname (argname1 type1) 
+%%           (or (argname1 type2) (argname3 type3)) ) (when (exp)) 
+%%         returntype)
+spec_(X, L, E) ->
+    Loc = X#item.loc,
+    io:format("spec ~p~n", [hd( hd(L) ) ] ),
+    FuncName = term_make_atom(hd(hd(L))),
+    Return = erl_syntax:type_application(term_make_atom(hd(tl(L))),[]),
+    Args = lists:map(fun([AN, AT]) ->
+                             NLoc = AN#item.loc,
+                             Name = term(AN,NLoc, E),
+                             Type=erl_syntax:type_application(term_to_ast(AT, AT#item.loc, E, true), []),
+                             erl_syntax:annotated_type(Name, Type)
+                     end, tl(hd(L))),
+    FFtype = erl_syntax:function_type(Args, Return),
+    Ftype = erl_syntax:list([FFtype]),
+    Spec = erl_syntax:atom("spec"),
+    FuncArity = erl_syntax:integer(length(Args)),
+    SpecArg = erl_syntax:tuple([FuncName, FuncArity]),
+    FF = erl_syntax:revert(FFtype),
+    M = {attribute, Loc, spec, {{erl_syntax:concrete(FuncName),length(Args)}, [FF]}},
+    %%M = erl_syntax:attribute(Spec, [erl_syntax:tuple([SpecArg, Ftype])]),
+    io:format("Spec: ~p~n", [M]),
+    erl_syntax:revert(M),
+    M.
+
+
+
 match_op(#item{value=_X, loc=Loc}, L, E) ->
     [Left, Right] = L,
     %%io:format("Match: ~p ~p~n", [Left, Right]),
@@ -379,7 +425,7 @@ match_defun_comment(Name, Com, Clauses, E) ->
         Com ->
             Comment = {1, 1, 
                        0, Com#item.value},
-            R=erl_recomment:recomment_forms(Tree, Comment),
+            R=erl_recomment:recomment_forms(Tree, [Comment]),
             R
     end.
 

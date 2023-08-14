@@ -222,8 +222,9 @@ from_string_rest(IO, Line, Rest, Acc) ->
         {ok, Acc2, NewLine, []} ->
             io:format("from_string_rest ~p -> ~n ~p~n", [Rest, Acc2]),
             {ok, Acc ++ Acc2, NewLine};
-        {ok, Acc2, _NewLine, Rest2} ->
-            from_string_rest(IO, Line, Rest2, Acc++Acc2);
+        {ok, Acc2, NewLine, Rest2} ->
+            %%from_string_rest(IO, Line, Rest2, Acc++Acc2);
+            from_string_rest(IO, NewLine, Rest2, Acc++Acc2);
         {eof, Acc2, Line2, []} ->
             {eof, Acc2, Line2};
         _ ->
