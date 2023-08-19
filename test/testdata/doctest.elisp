@@ -5,7 +5,7 @@ doctest module
 this is a module
 """
 )
-(-export (main 1))
+(-export (main 1) (triple 1))
 (-spec (main (a integer)) integer)
 (defun main (a)
 """
@@ -15,3 +15,12 @@ Example:
 
 """
 (+ a a))
+
+(defun triple (a)
+"""
+triple is triple a
+
+Example:
+
+"""
+(+ (+ a a) a))

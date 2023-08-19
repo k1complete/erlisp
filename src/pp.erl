@@ -18,7 +18,6 @@ pps(S) when is_integer(S) ->
 pps(S) when is_record(S, item) ->
     list_to_binary(S#item.value).
 
-
 pp(S) ->
     io:format("~p~n", [S]),
     pps(S).

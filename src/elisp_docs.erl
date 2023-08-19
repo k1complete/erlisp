@@ -1,6 +1,9 @@
 -module(elisp_docs).
 -export([make_docs_v1/5,
-        make_docentry/7]).
+         make_docentry/7,
+         add_docentry/2,
+         set_moduledoc/2,
+         new_docs_v1/0]).
 
 -type kind() :: 'function' | 'callback'| 'type' | 'macro' | atom().
 -type name() :: atom().
@@ -22,6 +25,17 @@
                   metadata = #{} :: metadata(),
                   docs = [] :: [doc_entry()] }).
 -type docs_v1() :: #docs_v1{}.
+
+new_docs_v1() ->
+    #docs_v1{}.
+
+set_moduledoc(D, M) ->
+    Docentry = D#docs_v1.docs,
+    DDocentry = M#docs_v1.docs,
+    M#docs_v1{docs=Docentry++DDocentry}.
+
+add_docentry(D, E) ->
+    D#docs_v1{docs=[E|D#docs_v1.docs]}.
 
 -spec make_docentry(kind(), name(), arity(), erl_anno:anno(), 
                     signature(), doc(), metadata()) -> doc_entry().
