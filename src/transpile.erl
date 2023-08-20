@@ -110,6 +110,7 @@ dispatch_special(A) ->
           "-require" => fun require_/3,
           "defun" => fun defun_/3,
           "defmacro" => fun defmacro_/3,
+          "case" => fun case_/3,
           "let" => fun let_/3
          },
     maps:get(A, L, undef).
@@ -504,11 +505,31 @@ defmacro_(X, L, E) ->
             io:format("MQ2: ~p~n", [MQ]),
             MQ
     end.
-
-
+%% (case exp
+%%   (pattern1 (when exp)
+%%           form)
+%%   (pattern2 
+%%           form2
+%%           form3))
+%%   
+case_(X, L, E) ->
+    io:format("case_ : ~p~n", [X]),
+    Line = X#item.loc,
+    [Exp | Clauses] = L,
+    io:format("clause : ~p~n", [Clauses]),
+    ExpAst = term(Exp, E),
+    ClauseAstList = lists:map(fun(Form) -> 
+                                      [H|T] = Form,
+                                      clause_([[H]|T], E) end, Clauses),
+    C = erl_syntax:case_expr(ExpAst, ClauseAstList),
+    R = erl_syntax:set_pos(C, erl_anno:new(Line)),
+    io:format("case : ~p~n", [R]),
+    R.
 
 pattern(Term, Env) ->
     term(Term, Env).
+
+
 
 %%
 %% (let ((a b) (b c))

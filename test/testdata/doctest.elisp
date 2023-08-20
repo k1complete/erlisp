@@ -23,4 +23,4 @@ triple is triple a
 Example:
 
 """
-(+ (+ a a) a))
+(+ (main a) a))
