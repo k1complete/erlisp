@@ -58,11 +58,22 @@ repl(Tab, IN, _OUT, Line, Env) ->
     {ok, Tokens, NextLine, _Rest} = scan:read(IN, "erlisp[~B]> ", Line, [], 0),
     io:format("~p~n", [NextLine]),
     {ok, Forms}  = parser:parse(Tokens),
-    Exp = transpile:form(Forms, Env),
-    Revert = erl_syntax:revert(Exp),
-    io:format("~p~n", [Revert]),
-    {value, Result, NextEnv} = execute(Tab, Revert, Env),
-    io:format("~s~n", [pp:format(Result, 60)]),
+    %%
+    {Results, NextEnv} = lists:mapfoldl(
+                           fun(S, CEnv) -> 
+                                   Exp = transpile:form(S, Env),
+                                   Revert = erl_syntax:revert(Exp),
+                                   {value, Result, NEnv} = execute(Tab, Revert, CEnv),
+                                   io:format("~s~n", [pp:format(Result, 60)]),
+                                   {Result, NEnv}
+                           end, Env, 
+                           Forms),
+    %%Exp = erl_syntax:list(Exps),
+    %%Exp = transpile:form(hd(Forms), Env),
+    %Revert = erl_syntax:revert(Exp),
+    %io:format("~p~n", [Revert]),
+    %{value, Result, NextEnv} = execute(Tab, Revert, Env),
+    %io:format("~s~n", [pp:format(Results, 60)]),
     repl(Tab, IN, _OUT, NextLine, NextEnv).
 
 local_function_hander(Name, Arg) ->

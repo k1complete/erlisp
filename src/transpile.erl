@@ -1,5 +1,5 @@
 -module(transpile).
-
+-include_lib("stdlib/include/assert.hrl").
 -include_lib("syntax_tools/include/merl.hrl").
 -include_lib("erlisp.hrl").
 -compile([{debug_info, true}]).
@@ -67,6 +67,7 @@ term_to_ast(A, Loc, Env, Quote) ->
         [H|T] when is_list(A) ->
             R = erl_syntax:cons(term_to_ast(H, Loc, Env, Quote), term_to_ast(T, Loc, Env, Quote)),
             erl_syntax:set_pos(R, Loc)
+
     end.
 
     
@@ -212,7 +213,7 @@ form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
     R
     ;
 form_trans([List| T], E) when is_list(List) ->
-    %%io:format("nested ~p~n", [List]),
+    io:format("nested ~p~n", [List]),
     form_trans([form_trans(List, E)| T], E).
 
 %%form_trans(#item{value=Term, loc=Loc, type=atom}, _E) ->

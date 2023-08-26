@@ -202,7 +202,8 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
                        PrevTokens, NewTokens]),
             {NewTokens2, NextLine2} =  multiline_quote(IO, NextLine, NewTokens),
             io:format("adjust_level ~p ~n", [PrevTokens++NewTokens2]),
-            adjust_level(IO, Prompt0, PrevTokens++NewTokens2, PrevLevel, NextLine2);
+            %adjust_level(IO, Prompt0, PrevTokens++NewTokens2, PrevLevel, NextLine2);
+            adjust_level(IO, Prompt0, PrevTokens++NewTokens2, 0, NextLine2);
         {eof, NextLine} ->
             io:format("PrevTokens ~p~n", [PrevTokens]),
             {eof, PrevTokens, NextLine, []};
