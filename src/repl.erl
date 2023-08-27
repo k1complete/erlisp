@@ -1,6 +1,5 @@
 -module(repl).
 -include_lib("erlisp.hrl").
-
 -export([repl/5, 
          repl/4,
          init/0,
@@ -56,12 +55,12 @@ repl(IN, OUT, Line, Env) ->
 
 repl(Tab, IN, _OUT, Line, Env) ->
     {ok, Tokens, NextLine, _Rest} = scan:read(IN, "erlisp[~B]> ", Line, [], 0),
-    io:format("~p~n", [NextLine]),
+    %?LOG_DEBUG(#{nextline=> NextLine}),
     {ok, Forms}  = parser:parse(Tokens),
     %%
     {Results, NextEnv} = lists:mapfoldl(
                            fun(S, CEnv) -> 
-                                   Exp = transpile:form(S, Env),
+                                   Exp = transpile:term(S, Env),
                                    Revert = erl_syntax:revert(Exp),
                                    {value, Result, NEnv} = execute(Tab, Revert, CEnv),
                                    io:format("~s~n", [pp:format(Result, 60)]),
@@ -77,10 +76,12 @@ repl(Tab, IN, _OUT, Line, Env) ->
     repl(Tab, IN, _OUT, NextLine, NextEnv).
 
 local_function_hander(Name, Arg) ->
-    io:format("local function: ~p~n", [{Name, Arg}]),
+    ?LOG_DEBUG(#{local_function => {Name, Arg}}),
     apply(?DEFAULT_MODULE(), Name, Arg).
 
 tty() ->
+    S = logger:get_primary_config(),
+    logger:update_primary_config(#{level => debug}),
     Table = init(),
     repl(Table, standard_io, standard_io, 1, []).
 

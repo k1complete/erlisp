@@ -61,6 +61,7 @@ Rules.
 Erlang code.
 
 -include_lib("scan.hrl").
+-include_lib("erlisp.hrl").
 %%-export([tokenizer/2]).
 -export([file/2]).
 %%-export([read_balance/4]).
@@ -98,10 +99,10 @@ do_calclevel(IO, Prompt0, [{read_macro, Loc, MChar}], {Acc, PreLevel}, _Line) ->
            unquote_splice => {scan, replace}
           },
     {MM, MF} = maps:get(MChar, RM, {scan, not_implemented}),
-    io:format("calc-apply before: ~p ~p ~n", [Loc, Acc]),
+    %io:format("calc-apply before: ~p ~p ~n", [Loc, Acc]),
     {ok, NewTokens, NewLoc, RestTokens} = apply(MM, MF, [{IO, Prompt0}, scan, read, 
                                                          Loc, MChar]),
-    io:format("calc-apply after: NT ~p Rest ~p PL ~p ~n", [NewTokens, RestTokens, PreLevel]),
+    %io:format("calc-apply after: NT ~p Rest ~p PL ~p ~n", [NewTokens, RestTokens, PreLevel]),
     do_calclevel(IO, Prompt0, RestTokens, {Acc ++ NewTokens, PreLevel}, NewLoc);
 do_calclevel(IO, Prompt0, [{'\n', _Loc} | Tokens], {Acc, PreLevel}, Line) ->
     do_calclevel(IO, Prompt0, Tokens, {Acc, PreLevel}, Line);
@@ -117,7 +118,7 @@ loctoline(Line) ->
 replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
     %Ret = read(IO, Prompt0, loctoline(Loc), [], 0),
     Ret = read(IO, "", loctoline(Loc), [], 0),
-    io:format("replace-2read ~p~n", [Ret]),
+    %io:format("replace-2read ~p~n", [Ret]),
     {ok, Tokens, NextLine, Rest} = Ret,
     {_L, ACol} = Loc,
     N2Tokens = lists:map(fun({T, {L, C}, V}) ->
@@ -151,10 +152,11 @@ adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line) ->
     Tokens = NNewTokens,
     case {Rest, NLevel} of
         {[], NLevel} when NLevel > 0 -> 
-            io:format("Readmore ~p ~p~n", [NLevel, Rest]),
+            %io:format("Readmore ~p ~p~n", [NLevel, Rest]),
             read(IO, Prompt0, NewLine, Tokens++Rest, NLevel);
         {Rest, 0} ->
-            io:format("Token ~p Rest ~p~n", [Tokens, Rest]),
+            %io:format("Token ~p Rest ~p~n", [Tokens, Rest]),
+            ?LOG_DEBUG(#{ajust_level => [Tokens, Rest]}),
             {ok, Tokens, NewLine, Rest};
         _  ->
             io:format("readRet ~p~n", [{ok, Tokens, NewLine, Rest}]),
@@ -197,11 +199,11 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
     Prompt = make_prompt(Prompt0, Line, PrevTokens),
     case io:request(IO, {get_until, unicode, Prompt, scan, tokens, [Line]}) of
         {ok, NewTokens, NextLine} ->
-            io:format("TokenCalcd L ~p Prev ~p ~nNT ~p~n", 
-                      [PrevLevel, 
-                       PrevTokens, NewTokens]),
+            ?LOG_DEBUG(#{prevlevel => PrevLevel,
+                         prevtokens => PrevTokens,
+                         newtokens => NewTokens}),
             {NewTokens2, NextLine2} =  multiline_quote(IO, NextLine, NewTokens),
-            io:format("adjust_level ~p ~n", [PrevTokens++NewTokens2]),
+            %%?LOG_DEBUG(#{adjust_level => PrevTokens++NewTokens2}),
             %adjust_level(IO, Prompt0, PrevTokens++NewTokens2, PrevLevel, NextLine2);
             adjust_level(IO, Prompt0, PrevTokens++NewTokens2, 0, NextLine2);
         {eof, NextLine} ->
@@ -253,7 +255,7 @@ reads(IO, File, Line, PrevTokens, Acc) ->
             io:format("ReadsRET: ~p~n", [{Acc, RestTokens}]),
             {ok, Acc++RestTokens};
         {ok, Tokens, NextLine, RestTokens} ->
-            io:format("Reads: ~p~n", [Tokens]),
+            logger:degbug(#{reads=> Tokens}),
             R = reads(IO, File, NextLine+1, RestTokens, Acc ++ Tokens),
             {ok, element(2, R)}
     end.

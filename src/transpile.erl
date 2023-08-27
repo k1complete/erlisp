@@ -106,6 +106,7 @@ dispatch_special(A) ->
           "list" => fun list_/3,
           "quote" => fun quote_/3,
           "unquote" => fun unquote_/3,
+          "map" => fun map_/3,
           "tuple" => fun tuple_/3,
           "binary" => fun binary_/3,
           "-require" => fun require_/3,
@@ -656,7 +657,18 @@ quote_(X, [E], _Env) ->
 
 unquote_(X, _L, _Env) ->    
     X.
-
+map_(#item{loc=Loc}, L, Env) ->
+    LForm = lists:map(fun(E) ->
+                              term(E, Env)
+                      end, L),
+    {MapFields, R, Len} =  lists:foldl(fun(E, {A, K, I}) when  I rem 2 == 1 ->
+                                               {A, E, I+1};
+                                          (E, {A, K, I}) ->
+                                               S = erl_syntax:map_field_assoc(K, E),
+                                               S2 = erl_syntax:set_pos(S, erl_syntax:get_pos(K)),
+                                               {[S|A], [], I+1}
+                                       end, {[], [], 1}, LForm),
+    erl_syntax:set_pos(erl_syntax:map_expr(lists:reverse(MapFields)), Loc).
 tuple_(#item{loc=Loc}, L, Env) ->
     LForm = lists:map(fun(E) ->
                               term(E, Env)

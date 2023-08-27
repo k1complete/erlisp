@@ -2,7 +2,8 @@
 -include_lib("erlisp.hrl").
 -export([make_symbol/2, make_symbol/1,
         required_macros/1,
-        getmacros/1]).
+        getmacros/1
+        ]).
 
 make_symbol(S, Pos) ->
     #item{value=atom_to_list(S), loc=Pos, type=atom}.

@@ -119,6 +119,12 @@ erl_to_ast(T) when is_float(T) ->
     T;
 erl_to_ast(T) when is_pid(T) ->
     [#item{type=atom, value="pid"}, #item{type=string, value=pid_to_list(T)}];
+erl_to_ast(T) when is_map(T) ->
+    TList = lists:foldl(
+              fun({K, V}, A) ->
+                      A++[erl_to_ast(K), erl_to_ast(V)]
+              end, [], maps:to_list(T)),
+    [#item{type=atom, value="map"} | TList ];
 erl_to_ast(T) when is_atom(T) ->
     #item{type=atom, value=io_lib:format("~p", [T])}.
     
