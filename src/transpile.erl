@@ -11,6 +11,8 @@
 -type tree() :: erl_syntax:syntaxTree().
 -type env() :: list().
 
+-define(MQ(L, T, B), merl:qquote(erl_syntax:get_pos(L), T, B)).
+-define(MQP(L, T, B), merl:qquote(L, T, B)).
 
 module_function(A, Loc) ->
     {M, F} = A#item.value,
@@ -113,7 +115,8 @@ dispatch_special(A) ->
           "defun" => fun defun_/3,
           "defmacro" => fun defmacro_/3,
           "case" => fun case_/3,
-          "let" => fun let_/3
+          "let" => fun let_/3,
+          "lambda" => fun lambda_/3
          },
     maps:get(A, L, undef).
 
@@ -213,9 +216,23 @@ form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
       end,
     R
     ;
+%form_trans([List| T], E) when is_list(List) ->
+%    io:format("nested ~p~n", [List]),
+%    form_trans([form_trans(List, E)| T], E).
 form_trans([List| T], E) when is_list(List) ->
     io:format("nested ~p~n", [List]),
-    form_trans([form_trans(List, E)| T], E).
+    Callable = form_trans(List, E),
+    Loc = erl_syntax:get_pos(Callable),
+    ?MQP(Loc, "_@F(_@Args)", 
+         [{'F', Callable},
+          {'Args', 
+           lists:map(
+             fun(S) -> 
+                     term(S, E) 
+             end, 
+             T)}]).
+%% nested ではtransしたあとは、beam astになっているので、 trans_formsしてはいけない。
+%% これは、先頭要素をcallableとして残りの要素をtransしたあとで、callするのが正しい。
 
 %%form_trans(#item{value=Term, loc=Loc, type=atom}, _E) ->
 %%    erl_syntax:set_pos(erl_syntax:variable(Term), Loc).
@@ -340,8 +357,6 @@ infix_op_do(Op, [Left|T], E) ->
             end
     end.
 
--define(MQ(L, T, B), merl:qquote(erl_syntax:get_pos(L), T, B)).
--define(MQP(L, T, B), merl:qquote(L, T, B)).
 
 
 cons_(C, L, E) ->
@@ -571,8 +586,20 @@ let_(X, L, E) ->
     io:format("MQ2: ~p~n", [MQ]),
     MQ.
 
+%%
+%% (lambda (a b)
+%%   (+ a b))
+%% (lambda clause1
+%%         clanse2...)
 
-
+lambda_(X, [[#item{type=atom, value=_N, loc=Loc}|_ArgT]=Args|Rest]=L, E) ->
+    Params = lists:map(fun(A) -> term(A, E) end, Args),
+    Body = lists:map(fun(A) -> term(A, E) end, Rest),
+    MQ = ?MQP(Loc, "fun(_@@params) -> _@@body end", 
+              [{'params', Params},
+               {'body', Body}]),
+    io:format("lambda: ~p~n", [MQ]),
+    MQ.
 
 locconv(ES) ->
     E = erl_syntax_lib:map_subtrees(fun(E2) ->

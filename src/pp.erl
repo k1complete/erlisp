@@ -124,7 +124,9 @@ erl_to_ast(T) when is_map(T) ->
               fun({K, V}, A) ->
                       A++[erl_to_ast(K), erl_to_ast(V)]
               end, [], maps:to_list(T)),
-    [#item{type=atom, value="map"} | TList ];
+    [#item{type=atom, value="map"} | TList] ;
+erl_to_ast(T) when is_function(T) ->
+    #item{type=string, value=erlang:fun_to_list(T)};
 erl_to_ast(T) when is_atom(T) ->
     #item{type=atom, value=io_lib:format("~p", [T])}.
     
