@@ -58,7 +58,7 @@ repl(Tab, IN, _OUT, Line, Env) ->
     %?LOG_DEBUG(#{nextline=> NextLine}),
     {ok, Forms}  = parser:parse(Tokens),
     %%
-    {Results, NextEnv} = lists:mapfoldl(
+    {_Results, NextEnv} = lists:mapfoldl(
                            fun(S, CEnv) -> 
                                    Exp = transpile:term(S, Env),
                                    Revert = erl_syntax:revert(Exp),

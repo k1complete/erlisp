@@ -599,7 +599,15 @@ lambda_(X, [[#item{type=atom, value=_N, loc=Loc}|_ArgT]=Args|Rest]=L, E) ->
               [{'params', Params},
                {'body', Body}]),
     io:format("lambda: ~p~n", [MQ]),
-    MQ.
+    MQ;
+lambda_(#item{loc=Loc} = X, L, E) ->
+    Clauses = lists:map(fun(LE) ->
+                                clause_(LE, E)
+                        end, L),
+    Fun=erl_syntax:fun_expr(Clauses),
+    R = erl_syntax:set_pos(Fun, Loc),
+    io:format("lambda-2: ~p~n", [R]),
+    R.
 
 locconv(ES) ->
     E = erl_syntax_lib:map_subtrees(fun(E2) ->
