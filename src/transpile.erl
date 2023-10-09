@@ -6,8 +6,9 @@
 -export([lst/0]).
 -include("scan.hrl").
 -export([form/2, form_trans/2, term/2, infix_op/4,
-        locline/1,
-        expand_macro/2, atom_to_item/2]).
+        locline/1, merge_into_env/3,
+         getmacros_from_module/2,
+        expand_macro/3, atom_to_item/2]).
 -type tree() :: erl_syntax:syntaxTree().
 -type env() :: list().
 
@@ -162,14 +163,21 @@ walk(F, Env, Fun) when is_list(F) ->
 walk(F, _Env, _Fun) -> 
     F.
 
-atom_to_item([A|Tail], _Env) when is_atom(A) ->
-    [yal_util:make_symbol(A)|Tail];
+atom_to_item(A, _Env) when is_list(A) ->
+    lists:map(fun(E) when is_atom(E) ->
+                      yal_util:make_symbol(E);
+                 (E) when is_list(E) ->
+                      atom_to_item(E, _Env);
+                 (E)  ->
+                      E
+              end, A);
 atom_to_item(List, _Env) ->
     List.
-
-expand_macro(A, E) ->
+expand_macro(A, E, Macros) ->
     R2 = proplists:get_value(require, E, require),
-    In = #{{"backquote",  1} => {yal_macro, 'MACRO_backquote'}},
+    In = maps:merge(#{{"backquote",  1} => {yal_macro, 'MACRO_backquote'},
+                      {"make_symbol", 1} => {yal_util, 'make_symbol'}},
+                    Macros),
     Out = case ets:whereis(R2) of
               undefined ->
                   maps:new();
@@ -183,15 +191,28 @@ expand_macro(A, E) ->
                                   R = apply(Module, Function, Arguments),
                                   io:format("result ~p~n", [R]),
                                   R3 = atom_to_item(R, Env),
+                                  %%R4 = expand_macro(R3, Env, Macros),
+                                  io:format("resultR4 ~p~n", [R3]),
                                   R3
                           end),
     io:format("Expanded ~p~n", [Result]),
     Result.
 
+merge_into_env(Env, Key, Value) ->
+    MEnv = proplists:to_map(Env),
+    io:format("merge_into_env ~p~n", [Env]),
+    M = maps:get(Key, MEnv, maps:new()),
+    io:format("merge_into_envM ~p ~p~n", [M, Value]),
+    R = maps:merge(M, Value),
+    Ret = proplists:from_map(maps:put(Key, MEnv, R)),
+    io:format("merge_into_env ~p~n", [Ret]),
+    Ret.
     
+
 -spec form(sexp(), any()) -> tree().
 form(A, E) ->
-    B = expand_macro(A, E),
+    Macros = proplists:get_value(macros, E, maps:new()),
+    B = expand_macro(A, E, Macros),
     io:format("form-E ~p ~nFrom ~p ~n To ~p~n", [E, A, B]),
     R = form_trans(B, E),
     R
@@ -471,8 +492,8 @@ defun_(X, L, E) ->
             defun_comment(Name, Args, Rest, E);
         _  ->
             Pos = Line,
-            %%io:format(standard_error, "Getcom ~p~n", [Rest]),
             [Comm|RRest]  = getcomment(Rest, Pos),
+            io:format(standard_error, "GetBody ~p~n", [RRest]),
             Body = lists:map(fun(A) -> form(A, E) end, RRest),
             io:format("simpleArgs ~p ~n", [Args]),
             ArgList = lists:map(fun(A) -> term(A, E) end, Args),
@@ -522,6 +543,24 @@ defmacro_(X, L, E) ->
             io:format("MQ2: ~p~n", [MQ]),
             MQ
     end.
+
+listsmap(F, L) when is_list(L) ->
+    Fun = fun (E) when is_list(E) ->
+                  listsmap(F, E);
+              (E) ->
+                  F(E)
+          end,
+    lists:map(Fun, L);
+listsmap(F, L) ->
+    F(L).
+
+make_slist(L) ->
+    listsmap(fun(E) when is_atom(E) ->
+                     yal_util:make_symbol(E);
+                (E) ->
+                     E
+             end, L).
+
 %% (case exp
 %%   (pattern1 (when exp)
 %%           form)
@@ -533,8 +572,10 @@ case_(X, L, E) ->
     io:format("case_ : ~p~n", [X]),
     Line = X#item.loc,
     [Exp | Clauses] = L,
+    Exp2 = make_slist(Exp),
+    io:format("exp : ~p~n", [Exp2]),
     io:format("clause : ~p~n", [Clauses]),
-    ExpAst = term(Exp, E),
+    ExpAst = form(Exp, E),
     ClauseAstList = lists:map(fun(Form) -> 
                                       [H|T] = Form,
                                       clause_([[H]|T], E) end, Clauses),
@@ -678,10 +719,10 @@ list_(X, L, Env) ->
     erl_syntax:set_pos(erl_syntax:list(R), Loc).
 
 quote_(X, [E], _Env) ->
-    %%io:format("quote ~p ~p~n", [X, E]),
+    io:format("quote ~p ~p~n", [X, E]),
     #item{loc=Pos} = X,
     R = term_to_ast(E, Pos, _Env, true),
-    %%io:format("quote_ R: ~p~n", [R]),
+    io:format("quote_ R: ~p~n", [R]),
     R.
     
 %backquote_(X, [E], _Env)  -> 
@@ -716,14 +757,29 @@ binary_(#item{loc=Loc}, L, Env) ->
                       end, L),
     erl_syntax:set_pos(erl_syntax:binary(LForm), Loc).
 
+getmacrotable(Env) ->
+    proplists:get_value(require, Env, require).
 
+getmacros_from_module(ModForm, Env) ->
+    Mod = form(ModForm, Env),
+    io:format("getmacros: ~p -> ~n~p~n", [ModForm, erl_syntax:revert(Mod)]),
+    {value, ModuleAtom, Env} = erl_eval:expr(erl_syntax:revert(Mod), Env),
+    yal_util:required_macros(ModuleAtom).
+    
 require_(#item{loc=_Loc}, L, Env) ->
-    Mod = form(hd(L), Env),
-    {value, Ret, Env} = erl_eval:expr(erl_syntax:revert(Mod), Env),
-    R = proplists:get_value(require, Env, require),
-    Macros = yal_util:required_macros(Ret),
-    io:format("required module  ~p: ~p in  ~p ~n", [Ret, Macros, R]),
-    ets:insert(R, Macros),
+    Macros = getmacros_from_module(hd(L), Env),
+    MacroTable=getmacrotable(Env),
+    ets:insert(MacroTable, Macros),
+    erl_syntax:nil().
+
+import_(#item{loc=_Loc}, L, Env) ->
+    Macros = getmacros_from_module(hd(L), Env),
+    MacroTable=getmacrotable(Env),
+    ets:insert(MacroTable, Macros),
+    ImportedMacros = lists:map(fun({{_, F, A}, {Module, Function}}) ->
+                                       {{F, A}, {Module, Function}}
+                               end, Macros),
+    ets:insert(MacroTable, ImportedMacros),
     erl_syntax:nil().
 
 lst() ->

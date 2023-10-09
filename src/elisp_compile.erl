@@ -1,4 +1,5 @@
 -module(elisp_compile).
+-include_lib("erlisp.hrl").
 -export([file/2, file/1, file_ast/2
         ]).
 
@@ -22,19 +23,124 @@ file(File, Opt) ->
     io:format("compiled ~p", [Binary]),
     {ok, Module, Binary}.
 
+getmodulename(A, E) ->
+    Ast = transpile:form(A, E),
+    [ModuleTree] = erl_syntax:attribute_arguments(Ast),
+    erl_syntax:atom_value(ModuleTree).
+
+takewhile(F, List) ->
+    {_, Take, Rest} = lists:foldl(fun(E, {true, A, B}) ->
+                                          case F(E) of
+                                              true ->
+                                                  {true, A++[E], B};
+                                              false ->
+                                                  {false, A, B++[E]}
+                                          end;
+                                     (E, {false, A, B}) ->
+                                          {false, A, B++[E]}
+                                  end, {true, [], []}, List),
+    {Take, Rest}.
+
+%% フォーム一つをトランスパイル
+%% ASTをコンパイルしてmoduleに追加
+%%  > macroはマクロリストに登録
+%% 終りまでいったら、終了
+%% 
+compile_macro(A, E) ->
+    [{MS, ModuleForm}] = lists:filtermap(fun([#item{type=atom, value="-module"}|R]=L) -> 
+                                                 {true, 
+                                                  {L, [#item{type=atom, value="quote"},  hd(R)]}};
+                                            (_) -> false 
+                                         end, A),
+    [MS21,MS22 | _] = MS,
+    ModuleName = erl_syntax:atom_value(transpile:form(ModuleForm, E)),
+    io:format("modulename ~p ~p~n", [ModuleName, is_atom(ModuleName)]),
+    M = lists:filtermap(fun([#item{type=atom, value="defmacro"}|R]) -> 
+                                [#item{type=atom, value=MacroName}, Args| Body] = R,
+                                Macro = MacroName,
+                                MacroFunc = yal_util:make_macro_funcname(Macro),
+                                {true, {{Macro, length(Args)}, {ModuleName, MacroFunc}}};
+                           (_) -> 
+                                false 
+                        end, A),
+    Forms2 = lists:filter(fun([#item{type=atom, value="-export"}|R]) -> 
+                                  false;
+                             ([#item{type=atom, value="-macro_export"}|R]) -> 
+                                  false;
+                             ([#item{type=atom, value="-module"}|R]) -> 
+                                  false;
+                             ([#item{type=atom, value="-spec"}|R]) -> 
+                                  false;
+                             (_) -> 
+                                  true
+                          end, A),
+    IEnv = transpile:merge_into_env(E, macros, maps:from_list(M)),
+    Ret = lists:foldl(fun(S, {Ret, [], EnvAct}) ->
+                              Forms = [[MS21, MS22]]++[S], 
+                              Ast = lists:map(fun(F) ->
+                                                      transpile:form(F, EnvAct)
+                                              end, Forms),
+                              io:format("2222 ~p~n~p", [Forms, erl_syntax:revert(Ast)]),
+                              {module, Module, Binary} = 
+                                  compile_and_write_beam(Ast, [debug_info, export_all]),
+                              R = catch apply(ModuleName, main, [2,3]),
+                              ?LOG_ERROR(#{module_info => R, length => length(Forms2)}),
+                              {Binary, Forms, EnvAct};
+                          (S, {Ret, Acc, EnvAcc}) ->
+                              Macros = transpile:getmacros_from_module(ModuleForm, EnvAcc),
+                              io:format("merged macro1 ~p ~p", 
+                                        [EnvAcc, maps:from_list(Macros)]),
+                              NEnv = transpile:merge_into_env(EnvAcc, macros, maps:from_list(Macros)),
+                              io:format("merged macro2 ~p", [NEnv]),
+                              Forms = Acc++[S], 
+                              io:format("merged macro3 ~p~n", [NEnv]),
+                              Ast = lists:map(fun(F) ->
+                                                      transpile:form(F, NEnv)
+                                              end, Forms),
+                              io:format("transpiled ~p~n", [Ast]),
+                              {module, Module, Binary} = 
+                                  compile_and_write_beam(Ast, [debug_info, export_all]),
+                              R = catch apply(ModuleName, module_info, [exports]),
+                              ?LOG_ERROR(#{module_info2 => R}),
+                              {Binary, Forms, NEnv}
+                  end, {[], [], IEnv}, Forms2),
+    ?LOG_ERROR(#{maros_list => IEnv}),
+    Ret.
+
+compile_and_write_beam(Ast, Options) ->
+    SS = merl:compile_and_load(Ast, Options),
+    ?LOG_ERROR(#{compile2 => erl_syntax:revert(Ast), options=>Options, ss => SS}),
+    {ok, Binary} =SS,
+    Specs = extract_specs(Ast),
+    {ok, DocsV1} = make_docs(Ast, Specs),
+    io:format("compiled ~p", [Binary]),
+    {ok, Module, Chunks} = beam_lib:all_chunks(Binary),
+    ChunksAdded = lists:append(Chunks, [{"Docs", term_to_binary(DocsV1)}]),
+    io:format("Beam ~p", [ChunksAdded]),
+    {ok, Binary2} = beam_lib:build_module(ChunksAdded),
+    ModuleName = atom_to_list(Module),
+    File = ModuleName ++ ".beam",
+    file:write_file(File, Binary),
+    code:ensure_loaded(Module),
+    {module, Module, Binary}.
+
 file_ast(File, Opt) ->
     io:format("cwd ~p", [file:get_cwd()]),
     {ok, Tokens} = scan:file(File, Opt),
     io:format("scan ~p", [Tokens]),
     {ok, Forms} = parser:parse(Tokens),
-    Env=[],
+    {_, _, NEnv} = compile_macro(Forms, []),
+    MR = Forms,
+    Env=NEnv,
+    ?LOG_ERROR(#{macro_compiled => MR, nenv => NEnv}),
     Ast = lists:map(fun(F) ->
                             R = transpile:form(F, Env),
                             io:format("Trans ~p~n", [R]),
                             R
                           end, Forms),
     io:format("Ast ~p~n", [Ast]),
-    {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
+%    {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
+    {ok, Module, Binary} = merl:compile(Ast, [debug_info]),
     Specs = extract_specs(Ast),
     {ok, DocsV1} = make_docs(Ast, Specs),
     io:format("compiled ~p", [Binary]),

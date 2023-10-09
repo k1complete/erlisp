@@ -1,0 +1,10 @@
+(-module macrofunccall "test")
+(-export (main 2))
+(defmacro strlen (s)
+   `(lists:length ,s))
+(defun main (a b)
+  (strlen a))
+
+
+
+

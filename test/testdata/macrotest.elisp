@@ -1,2 +1,14 @@
-(-module macrotest)
+(-module macrotest "test")
+(-export (main 2))
+(-macro_export (aif 3))
+(defmacro aif (bool istrue else)
+  `(case (match it ,bool)
+     ('true ,istrue)
+     ('false ,else)))
+(defun main (a b)
+  (aif (> a b)
+       it
+       'it))
+
+
 
