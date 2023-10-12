@@ -77,7 +77,9 @@ bc_([#item{value="backquote", loc=Loc}, Xn]) when is_list(Xn) ->
                            bc_([yal_util:make_symbol(backquote, Loc), F])]
                   end, Xn),
     R2 = [yal_util:make_symbol(list, Loc) | R],
-    [#item{value={"lists", "append"}, type=module_function, loc=Loc}, R2].
+%%    [#item{value={"lists", "append"}, type=module_function, loc=Loc}, R2].
+    [#item{value="lists:append", type=module_function, loc=Loc}, R2].
+
 %%    R2.
     
 

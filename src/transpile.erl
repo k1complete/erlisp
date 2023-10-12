@@ -125,12 +125,25 @@ dispatch_special(A) ->
 
 -type sexp() :: list().
 
+atom_to_module_function(F) ->            
+    case F of
+        #item{type=atom, value=Value} ->
+            case split(Value) of
+                {module_function, {Module, Function}} ->
+                    F#item{type=module_function,
+                           value={Module, Function}};
+                _ ->
+                    F
+            end;
+        _ ->
+            F
+    end.
 
 walk(F, Env, Fun) when is_list(F) ->
     io:format("ww ~p~n", [F]),
     [H|T] = F,
     Arity = length(T),
-    case H of
+    case atom_to_module_function(H) of
         #item{type=atom, value=V} ->
             case maps:get({V, Arity},  Env, undefined)  of
                 {M, Macro} ->
@@ -697,12 +710,21 @@ call_function(Fun=#item{value=_X, loc=Loc}, T, E) ->
                  {'FHead', FHead}])
     end.
 
+split(F) ->
+    case string:split(F, ":") of
+        S when length(S) > 1 ->
+            {module_function, list_to_tuple(S)};
+        S -> 
+            {atom, hd(S)}
+    end.
+    
 getmodfun(#item{type=Type, value=X, loc=Loc}) ->
-    case Type of
+    {NType, NX} = split(X),
+    case NType of
         atom ->
-            {undef, erl_syntax:set_pos(erl_syntax:atom(X), Loc)};
+            {undef, erl_syntax:set_pos(erl_syntax:atom(NX), Loc)};
         module_function ->
-            {M, F} = X,
+            {M, F} = NX,
             MA=erl_syntax:set_pos(erl_syntax:atom(M), Loc),
             FA=erl_syntax:set_pos(erl_syntax:atom(F), Loc),
             {MA, FA}
@@ -764,6 +786,7 @@ getmacros_from_module(ModForm, Env) ->
     Mod = form(ModForm, Env),
     io:format("getmacros: ~p -> ~n~p~n", [ModForm, erl_syntax:revert(Mod)]),
     {value, ModuleAtom, Env} = erl_eval:expr(erl_syntax:revert(Mod), Env),
+    io:format("getmacro module: ~p~n", [ModuleAtom]),
     yal_util:required_macros(ModuleAtom).
     
 require_(#item{loc=_Loc}, L, Env) ->
