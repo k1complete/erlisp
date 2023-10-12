@@ -113,6 +113,7 @@ dispatch_special(A) ->
           "tuple" => fun tuple_/3,
           "binary" => fun binary_/3,
           "-require" => fun require_/3,
+          "-import" => fun import_/3,
           "defun" => fun defun_/3,
           "defmacro" => fun defmacro_/3,
           "case" => fun case_/3,
@@ -122,8 +123,6 @@ dispatch_special(A) ->
     maps:get(A, L, undef).
 
 
-
--type sexp() :: list().
 
 atom_to_module_function(F) ->            
     case F of
@@ -336,10 +335,10 @@ spec_(X, L, E) ->
                              erl_syntax:annotated_type(Name, Type)
                      end, tl(hd(L))),
     FFtype = erl_syntax:function_type(Args, Return),
-    Ftype = erl_syntax:list([FFtype]),
-    Spec = erl_syntax:atom("spec"),
+    _Ftype = erl_syntax:list([FFtype]),
+    _Spec = erl_syntax:atom("spec"),
     FuncArity = erl_syntax:integer(length(Args)),
-    SpecArg = erl_syntax:tuple([FuncName, FuncArity]),
+    _SpecArg = erl_syntax:tuple([FuncName, FuncArity]),
     FF = erl_syntax:revert(FFtype),
     M = {attribute, Loc, spec, {{erl_syntax:concrete(FuncName),length(Args)}, [FF]}},
     %%M = erl_syntax:attribute(Spec, [erl_syntax:tuple([SpecArg, Ftype])]),
@@ -646,7 +645,7 @@ let_(X, L, E) ->
 %% (lambda clause1
 %%         clanse2...)
 
-lambda_(X, [[#item{type=atom, value=_N, loc=Loc}|_ArgT]=Args|Rest]=L, E) ->
+lambda_(_X, [[#item{type=atom, value=_N, loc=Loc}|_ArgT]=Args|Rest]=_L, E) ->
     Params = lists:map(fun(A) -> term(A, E) end, Args),
     Body = lists:map(fun(A) -> term(A, E) end, Rest),
     MQ = ?MQP(Loc, "fun(_@@params) -> _@@body end", 
@@ -654,7 +653,7 @@ lambda_(X, [[#item{type=atom, value=_N, loc=Loc}|_ArgT]=Args|Rest]=L, E) ->
                {'body', Body}]),
     io:format("lambda: ~p~n", [MQ]),
     MQ;
-lambda_(#item{loc=Loc} = X, L, E) ->
+lambda_(#item{loc=Loc} = _X, L, E) ->
     Clauses = lists:map(fun(LE) ->
                                 clause_(LE, E)
                         end, L),
@@ -718,7 +717,7 @@ split(F) ->
             {atom, hd(S)}
     end.
     
-getmodfun(#item{type=Type, value=X, loc=Loc}) ->
+getmodfun(#item{type=Type, value=X, loc=Loc}) when Type == atom; Type== module_function->
     {NType, NX} = split(X),
     case NType of
         atom ->
@@ -759,13 +758,13 @@ map_(#item{loc=Loc}, L, Env) ->
     LForm = lists:map(fun(E) ->
                               term(E, Env)
                       end, L),
-    {MapFields, R, Len} =  lists:foldl(fun(E, {A, K, I}) when  I rem 2 == 1 ->
-                                               {A, E, I+1};
-                                          (E, {A, K, I}) ->
-                                               S = erl_syntax:map_field_assoc(K, E),
-                                               S2 = erl_syntax:set_pos(S, erl_syntax:get_pos(K)),
-                                               {[S|A], [], I+1}
-                                       end, {[], [], 1}, LForm),
+    {MapFields, _R, _Len} =  lists:foldl(fun(E, {A, _K, I}) when  I rem 2 == 1 ->
+                                                 {A, E, I+1};
+                                            (E, {A, K, I}) ->
+                                                 S = erl_syntax:map_field_assoc(K, E),
+                                                 S2 = erl_syntax:set_pos(S, erl_syntax:get_pos(K)),
+                                                 {[S2|A], [], I+1}
+                                         end, {[], [], 1}, LForm),
     erl_syntax:set_pos(erl_syntax:map_expr(lists:reverse(MapFields)), Loc).
 tuple_(#item{loc=Loc}, L, Env) ->
     LForm = lists:map(fun(E) ->

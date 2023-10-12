@@ -4,6 +4,7 @@
 -export([bc_/1]).
 -export([bc_item/2]).
 
+-spec 'MACRO_backquote'(sexp()) -> sexp().
 'MACRO_backquote'(E)  -> 
     %%io:format("bqquote L:~p~n", [E]),
     R = bc_([yal_util:make_symbol(backquote), E]),

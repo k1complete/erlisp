@@ -23,23 +23,6 @@ file(File, Opt) ->
     io:format("compiled ~p", [Binary]),
     {ok, Module, Binary}.
 
-getmodulename(A, E) ->
-    Ast = transpile:form(A, E),
-    [ModuleTree] = erl_syntax:attribute_arguments(Ast),
-    erl_syntax:atom_value(ModuleTree).
-
-takewhile(F, List) ->
-    {_, Take, Rest} = lists:foldl(fun(E, {true, A, B}) ->
-                                          case F(E) of
-                                              true ->
-                                                  {true, A++[E], B};
-                                              false ->
-                                                  {false, A, B++[E]}
-                                          end;
-                                     (E, {false, A, B}) ->
-                                          {false, A, B++[E]}
-                                  end, {true, [], []}, List),
-    {Take, Rest}.
 
 %% フォーム一つをトランスパイル
 %% ASTをコンパイルしてmoduleに追加
@@ -56,37 +39,37 @@ compile_macro(A, E) ->
     ModuleName = erl_syntax:atom_value(transpile:form(ModuleForm, E)),
     io:format("modulename ~p ~p~n", [ModuleName, is_atom(ModuleName)]),
     M = lists:filtermap(fun([#item{type=atom, value="defmacro"}|R]) -> 
-                                [#item{type=atom, value=MacroName}, Args| Body] = R,
+                                [#item{type=atom, value=MacroName}, Args| _Body] = R,
                                 Macro = MacroName,
                                 MacroFunc = yal_util:make_macro_funcname(Macro),
                                 {true, {{Macro, length(Args)}, {ModuleName, MacroFunc}}};
                            (_) -> 
                                 false 
                         end, A),
-    Forms2 = lists:filter(fun([#item{type=atom, value="-export"}|R]) -> 
+    Forms2 = lists:filter(fun([#item{type=atom, value="-export"}|_]) -> 
                                   false;
-                             ([#item{type=atom, value="-macro_export"}|R]) -> 
+                             ([#item{type=atom, value="-macro_export"}|_]) -> 
                                   false;
-                             ([#item{type=atom, value="-module"}|R]) -> 
+                             ([#item{type=atom, value="-module"}|_]) -> 
                                   false;
-                             ([#item{type=atom, value="-spec"}|R]) -> 
+                             ([#item{type=atom, value="-spec"}|_]) -> 
                                   false;
                              (_) -> 
                                   true
                           end, A),
     IEnv = transpile:merge_into_env(E, macros, maps:from_list(M)),
-    Ret = lists:foldl(fun(S, {Ret, [], EnvAct}) ->
+    Ret = lists:foldl(fun(S, {_Ret, [], EnvAct}) ->
                               Forms = [[MS21, MS22]]++[S], 
                               Ast = lists:map(fun(F) ->
                                                       transpile:form(F, EnvAct)
                                               end, Forms),
                               io:format("2222 ~p~n~p", [Forms, erl_syntax:revert(Ast)]),
-                              {module, Module, Binary} = 
+                              {module, _Module, Binary} = 
                                   compile_and_write_beam(Ast, [debug_info, export_all]),
                               R = catch apply(ModuleName, main, [2,3]),
                               ?LOG_ERROR(#{module_info => R, length => length(Forms2)}),
                               {Binary, Forms, EnvAct};
-                          (S, {Ret, Acc, EnvAcc}) ->
+                          (S, {_Ret, Acc, EnvAcc}) ->
                               Macros = transpile:getmacros_from_module(ModuleForm, EnvAcc),
                               io:format("merged macro1 ~p ~p", 
                                         [EnvAcc, maps:from_list(Macros)]),
@@ -98,7 +81,7 @@ compile_macro(A, E) ->
                                                       transpile:form(F, NEnv)
                                               end, Forms),
                               io:format("transpiled ~p~n", [Ast]),
-                              {module, Module, Binary} = 
+                              {module, _Module, Binary} = 
                                   compile_and_write_beam(Ast, [debug_info, export_all]),
                               R = catch apply(ModuleName, module_info, [exports]),
                               ?LOG_ERROR(#{module_info2 => R}),
@@ -116,13 +99,12 @@ compile_and_write_beam(Ast, Options) ->
     io:format("compiled ~p", [Binary]),
     {ok, Module, Chunks} = beam_lib:all_chunks(Binary),
     ChunksAdded = lists:append(Chunks, [{"Docs", term_to_binary(DocsV1)}]),
-    io:format("Beam ~p", [ChunksAdded]),
     {ok, Binary2} = beam_lib:build_module(ChunksAdded),
     ModuleName = atom_to_list(Module),
     File = ModuleName ++ ".beam",
-    file:write_file(File, Binary),
+    file:write_file(File, Binary2),
     code:ensure_loaded(Module),
-    {module, Module, Binary}.
+    {module, Module, Binary2}.
 
 file_ast(File, Opt) ->
     io:format("cwd ~p", [file:get_cwd()]),
@@ -158,7 +140,7 @@ extract_specs(Trees) ->
                                             "spec" ->
                                                 {attribute, _, spec, {FA, S}} = E,
                                                 {true, {FA, hd(S)}};
-                                            X ->
+                                            _ ->
                                                 false
                                         end;
                                     _ ->

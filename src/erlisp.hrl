@@ -7,4 +7,6 @@
          loc :: location(),
          type :: atype()}).
 
+-type sexp() :: list(any()).
+
 -include_lib("kernel/include/logger.hrl").

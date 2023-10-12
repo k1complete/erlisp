@@ -81,7 +81,7 @@ local_function_hander(Name, Arg) ->
 
 tty() ->
     S = logger:get_primary_config(),
-    logger:update_primary_config(#{level => debug}),
+    logger:update_primary_config(S#{level => debug}),
     Table = init(),
     repl(Table, standard_io, standard_io, 1, []).
 

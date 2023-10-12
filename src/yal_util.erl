@@ -26,7 +26,7 @@ required_macros(M) ->
                                             false
                                     end
                             end, Exports);
-        {error, What} ->
+        {error, _What} ->
             []
     end.
 
