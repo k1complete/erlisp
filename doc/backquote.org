@@ -1,0 +1,177 @@
+** Backquote
+
+Before taking another step, we need to introduce a piece of Lisp
+notation that is indispensable to defining macros, even though
+technically it is quite independent of macros. This is the backquote
+facility. As we saw above, the main job of a macro, when all is said
+and done, is to define a piece of Lisp code, and that means evaluating
+expressions such as (list 'prog (list 'setq ...) ...). As these
+expressions grow in complexity, it becomes hard to read them and write
+them. What we find ourselves wanting is a notation that provides the
+skeleton of an expression, with some of the pieces filled in with new
+expressions. That's what backquote provides. Instead of the the list
+expression given above, one writes
+
+次のステップに進む前に、マクロを定義するのに不可欠な Lisp 表記法を導入
+する必要があります。技術的には、マクロから完全に独立しています。これが
+バッククォート機能です。上で見たように、マクロの主な仕事は、結局のとこ
+ろ、Lisp コードの一部を定義することであり、それは (list 'prog (list
+'setq ...) ...)  のような式を評価することを意味します。 これらの式は複
+雑になるにつれて、読み書きが難しくなります。私たちが求めているのは、表
+現の骨組みで、いくつかの部分が新しい表現で埋められています。それがバッ
+ククォートが提供するものです。 上記のリスト式の代わりに、
+
+    `(progn (setq ,v1 ,e) (setg ,v2 ,e))
+    
+
+    
+The backquote (`) character signals that in the expression that
+follows, every subexpression not preceded by a comma is to be quoted,
+and every subexpression preceded by a comma is to be evaluated.
+
+バッククォート (`) 文字は、後続の式で、コンマが前にないすべての部分式
+が引用され、コンマが前にあるすべての部分式が評価されることを示します。
+
+That's mostly all there is to backquote. There are just two extra
+items to point out. First, if you write ",@e" instead of ",e" then the
+value of e is spliced into the result. So if v=(oh boy), then `(zap
+,@v ,v) evaluates to (zap oh boy (oh boy)). The second occurrence of v
+is replaced by its value. The first is replaced by the elements of its
+value. If v had had value (), it would have disappeared entirely: the
+value of (zap ,@v ,v) would have been (zap ()), which is the same as
+(zap nil).
+
+backquoteする必要があるのはほとんどこれだけです。 指摘する追加の項目が 2
+つだけあります。まず、",e" の代わりに ",@e" と書くと、e の値が結果に結
+合されます。 したがって、v=(oh boy) の場合、`(zap ,@v ,v) は (zap oh
+boy (oh boy)) と評価されます。
+
+2番目に出現する v は、その値に置き換えられます。 最初のものは、その値
+の要素に置き換えられます。v に値 () があった場合、それは完全に消えてし
+まいます。(zap ,@v ,v) の値は (zap ()) になり、(zap nil) と同じになり
+ます。
+
+
+Second, one might wonder what happens if a backquote expression occurs
+inside another backquote. The answer is that the backquote becomes
+essentially unreadable and unwriteable; using nested backquote is
+usually a tedious debugging exercise. The reason, in my not-so-humble
+opinion, is that backquote is defined wrong. A comma pairs up with the
+innermost backquote when the default should be that it pairs up with
+the outermost. But this is not the place for a rant or tutorial;
+consult your favorite Lisp reference for the exact behavior of nested
+backquote plus some examples.
+
+第二に、backquote式が別のbackquoet内で発生するとどうなるか疑問に思うかも
+しれません。 答えは、backquoteが本質的に読み取り不能になり、書き込み不
+能になるということです。 ネストされた逆引用符を使用すると、通常、退屈
+なデバッグ作業になります。 あまり謙虚ではない私の意見では、その理由は、
+逆引用符の定義が間違っているからです。 コンマは、デフォルトでは最も外
+側の逆引用符とペアになるはずですが、最も内側の逆引用符とペアになります。
+しかし、これは暴言やチュートリアルの場所ではありません。ネストされた逆
+引用符の正確な動作といくつかの例については、お気に入りの Lisp リファレ
+ンスを参照してください。
+
+One problem with backquote is that once you learn it you tend to use
+for every list-building occasion. For instance, you might write
+
+backquote の問題点の 1 つは、一度覚えると、リスト作成のあらゆる機会に使
+用する傾向があることです。 たとえば、次のように書くことができます。
+
+    (mapcan (lambda (x)
+           (cond ((symbolp x) `((,x)))
+                 ((> x 10) `(,x ,x))
+                 (t '())))
+           some-list)
+
+which yields ((a) 15 15) when some-list = (a 6 15). The problem is
+that mapcan destructively alters the results returned by the
+lambda-expression. Can we be sure that the lists returned by that
+expression are "fresh," that is, they are different (in the eq sense)
+from the structures returned on other calls of that lambda expression?
+In the present case, close analysis will show that they must be fresh,
+but in general backquote is not obligated to return a fresh list every
+time (whether it does or not is implementation-dependent). If the
+example above got changed to
+
+これは、some-list = (a 6 15) の場合に ((a) 15 15) を生成します。 問題
+は、mapcan がラムダ式によって返される結果を破壊的に変更することです。
+その式によって返されるリストが「新鮮」であること、つまり、そのラムダ式
+の他の呼び出しで返される構造と (eq の意味で) 異なることを確認できます
+か? 現在のケースでは、綿密な分析はそれらが新鮮でなければならないことを
+示しますが、一般的にバッククォートは毎回新鮮なリストを返す義務はありま
+せん (そうするかどうかは実装に依存します)。 上記の例が次のように変更さ
+れた場合
+
+    (mapcan (lambda (x)
+           (cond ((symbolp x) `((,x)))
+                 ((> x 10) `(,x ,x))
+                 ((>= x 0) `(low))
+                 (t '())))
+           some-list)
+
+then backquote may well treat `(low) as if it were '(low); the list
+will be allocated at load time, and every time the lambda is
+evaluated, that same chunk of storage will be returned. So if we
+evaluate the expression with some-list = (a 6 15), we will get ((a)
+low 15 15), but as a side effect the constant (low) will get clobbered
+to become (low 15 15). If we then evaluate the expression with, say,
+some-list = (8 oops), the result will be (low 15 15 (oops)), and now
+the "constant" that started off as '(low) will be (low 15 15
+(oops)). (Note: The bug exemplified here takes other forms, and has
+often bit newbies - as well as experienced programmers - in the
+ass. The general form is that a constant list is produced as the value
+of something that is later destructively altered. The first line of
+defense against this bug is never to destructively alter any list. For
+newbies, this is also the last line of defense. For those of us who
+imagine we're more sophisticated, the next line of defense is to think
+very carefully any time you use nconc or mapcan.)
+
+その場合、バッククォートは `(low) を '(low) であるかのように扱うことが
+できます。リストはロード時に割り当てられ、ラムダが評価されるたびに、同
+じストレージのチャンクが返されます。したがって、式を some-list = (a
+6 15) で評価すると、((a) low 15 15) が得られますが、副作用として、定数
+(low) が上書きされて (low 15 15) になります。次に、たとえば some-list
+= (8 oops) で式を評価すると、結果は (low 15 15 (oops)) になり、'(low)
+として始まった「定数」は (low) になります。 15 15 (おっと))。 (注: こ
+こで例示されているバグは別の形をとっており、経験豊富なプログラマーだけ
+でなく、新参者も悩まされることがよくあります。一般的な形は、定数リスト
+が何かの値として生成され、後で破壊的に変更されるというものです。最初の
+このバグに対する防衛線は、リストを破壊的に変更しないことです. 初心者に
+とって、これは最後の防衛線でもあります. 私たちがより洗練されていると想
+像している私たちにとって、次の防衛線はいつでも非常に慎重に考えることで
+す. nconc または mapcan を使用します。)
+
+To fix the bug, you can write (map 'list ...) instead of
+mapcan. However, if you are determined to use mapcan, write the
+expression this way:
+
+バグを修正するには、mapcan の代わりに (map 'list ...) を記述します。
+ただし、mapcan を使用することに決めた場合は、式を次のように記述します。
+
+    (mapcan (lambda (x)
+           (cond ((symbolp x) (list `(,x)))
+                 ((> x 10) (list x x))
+                 ((>= x 0) (list 'low))
+                 (t '())))
+            some-list)
+
+My personal preference is to use backquote only to build
+S-expressions, that is, hierarchical expressions that consist of
+symbols, numbers, and strings, and that are not conceptualized as
+changing in length. For instance, I would never write
+
+私の個人的な好みは、逆引用符を S 式、つまり、記号、数値、および文字列
+で構成され、長さの変化として概念化されていない階層式を構築する場合にの
+み使用することです。 たとえば、私は決して書きません
+
+    (setq sk `(,x ,@sk))
+
+If sk is being used as a stack, that is, it's going to be popped in
+the normal course of things, I would write tt (push x sk). If not, I
+would write (setq sk (cons x sk)).
+
+sk がスタックとして使用されている場合、つまり、通常の過程でポップされ
+る場合は、tt (push x sk) と書きます。 そうでない場合は、(setq sk (cons
+x sk)) と書きます。
+
