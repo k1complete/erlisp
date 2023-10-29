@@ -29,6 +29,7 @@ to_list(L) ->
 sexp_to_list(List, F) ->
     F(List).
 
+
 to_list({var, _, Arg}, F) ->
     F(Arg);
 to_list({ann_type, _, Args}, F) ->

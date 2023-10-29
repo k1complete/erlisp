@@ -1,11 +1,15 @@
 -module(elisp_compile).
+
 -include_lib("erlisp.hrl").
+-include_lib("elisp_docs.hrl").
 -export([file/2, file/1, file_ast/2
         ]).
 
+-spec file(string()) -> {ok, module(), binary()}.
 file(File) ->
     file(File, []).
 
+-spec file(string(), list()) -> {ok, module(), binary()}.
 file(File, Opt) ->
     io:format("cwd ~p", [file:get_cwd()]),
     Module = m,
@@ -24,6 +28,7 @@ file(File, Opt) ->
     {ok, Module, Binary}.
 
 
+-spec compile_macro(sexp(), env()) -> sexp().
 %% フォーム一つをトランスパイル
 %% ASTをコンパイルしてmoduleに追加
 %%  > macroはマクロリストに登録
@@ -90,6 +95,7 @@ compile_macro(A, E) ->
     ?LOG_ERROR(#{maros_list => IEnv}),
     Ret.
 
+-spec compile_and_write_beam(sexp(), options()) -> {module, module(), binary()}.
 compile_and_write_beam(Ast, Options) ->
     SS = merl:compile_and_load(Ast, Options),
     ?LOG_ERROR(#{compile2 => erl_syntax:revert(Ast), options=>Options, ss => SS}),
@@ -106,6 +112,7 @@ compile_and_write_beam(Ast, Options) ->
     code:ensure_loaded(Module),
     {module, Module, Binary2}.
 
+-spec file_ast(string, options()) -> {module, module(), binary(), sexp()}.
 file_ast(File, Opt) ->
     io:format("cwd ~p", [file:get_cwd()]),
     {ok, Tokens} = scan:file(File, Opt),
@@ -132,6 +139,7 @@ file_ast(File, Opt) ->
     {ok, Binary2} = beam_lib:build_module(ChunksAdded),
     {ok, Module, Binary2, Ast}.
 
+-spec extract_specs(list(erl_syntax:tree())) -> map().
 extract_specs(Trees) ->
     R = lists:filtermap(fun(E) ->
                                 case erl_syntax:type(E) of
@@ -149,6 +157,7 @@ extract_specs(Trees) ->
                         end, Trees),
     maps:from_list(R).
 
+-spec extract_module_comment(erl_syntax:tree()) -> map() | none.
 extract_module_comment(Tree) ->
     case erl_syntax:has_comments(Tree) of
         true ->
@@ -156,9 +165,10 @@ extract_module_comment(Tree) ->
             C = erl_syntax:comment_text(hd(CommentTrees)),
             #{<<"en">> => list_to_binary(C)};
         false ->
-            []
+            none
     end.
-    
+
+-spec make_function_signature(erl_syntax:tree(), map()) -> signature().
 make_function_signature(Tree, Specs) ->
     Name=erl_syntax:atom_value(erl_syntax:function_name(Tree)),
     Cs = erl_syntax:function_clauses(Tree),
@@ -188,6 +198,7 @@ make_function_signature(Tree, Specs) ->
                   end, Cs),
     lists:flatten(R).
 
+-spec extract_comment(erl_syntax:tree(), kind(), map()) -> doc_entry().
 extract_comment(Tree, Kind, Specs) ->
     case erl_syntax:has_comments(Tree) of
         true ->
@@ -200,9 +211,9 @@ extract_comment(Tree, Kind, Specs) ->
                                            list_to_binary(erl_syntax:get_precomments(Tree))}, 
                                      #{});
         false ->
-            []
+            none
     end.
-    
+-spec make_docs([sexp()], map()) -> {ok, docs_v1()}.
 make_docs(AstList, Specs) ->
     S=lists:foldr(fun(Ast, Acc) ->
                           Doc=maps:get(docs, Acc),

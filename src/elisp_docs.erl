@@ -8,14 +8,17 @@
 
 -include_lib("elisp_docs.hrl").
 
+-spec new_docs_v1() -> #docs_v1{}.
 new_docs_v1() ->
     #docs_v1{}.
 
+-spec set_moduledoc(#docs_v1{}, #docs_v1{}) -> #docs_v1{}.
 set_moduledoc(D, M) ->
     Docentry = D#docs_v1.docs,
     DDocentry = M#docs_v1.docs,
     M#docs_v1{docs=Docentry++DDocentry}.
 
+-spec add_docentry(#docs_v1{}, binary()) -> #docs_v1{}.
 add_docentry(D, E) ->
     D#docs_v1{docs=[E|D#docs_v1.docs]}.
 
@@ -28,6 +31,7 @@ make_docentry(Kind, Name, Arity, Anno, Signature, Doc, Meta) ->
      Doc,
      Meta}.
 
+-spec metadata(doc_entry(), any()) -> doc_entry().
 metadata(DocEntry, Type) ->
     setelement(5, DocEntry, Type).
 

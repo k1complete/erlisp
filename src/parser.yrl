@@ -96,12 +96,14 @@ Erlang code.
 
 -export([setline/2]).
 
-
+-spec tokenvalue(tuple()) -> string().
 tokenvalue(T) ->
     element(3, T).
 
+-spec set_pos(string(), erl_anno:pos()) -> #item{}.
 set_pos(Tree, Pos) ->
     #item{value=Tree, loc=Pos, type=atom}.
+-spec setline({string(), string()}, {atom(), tokenloc(), term()}) -> #item{}.
 setline({Module, Function}, {_Type, Line, _Value}) ->
     Pos=erl_anno:new(Line),
     #item{value=Module ++ ":" ++ Function, loc=Pos, type=atom};
@@ -113,6 +115,7 @@ setline(Tree, {_t, Line, _v}) ->
     Pos = erl_anno:new(Line),
     set_pos(Tree, Pos).
 
+-spec mf(string()) -> {string(), string()}.
 mf(Text) ->
     [Module, Function] = string:split(Text, ":"),
     {Module, Function}.

@@ -1,8 +1,7 @@
 {application, erlisp,
- [{description, "An OTP application"},
+ [{description, "erlisp An OTP application"},
   {vsn, "0.1.0"},
   {registered, []},
-  {mod, {erlisp_app, []}},
   {applications,
    [kernel,
     stdlib

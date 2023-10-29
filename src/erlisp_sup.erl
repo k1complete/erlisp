@@ -29,7 +29,12 @@ init([]) ->
     SupFlags = #{strategy => one_for_all,
                  intensity => 0,
                  period => 1},
+    %ChildSpecs = [childspec()],
     ChildSpecs = [],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions
+childspec() ->
+    #{id => erllisp_repl,
+      start => {repl, tty, []}     
+      }.

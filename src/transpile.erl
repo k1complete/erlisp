@@ -9,12 +9,12 @@
         locline/1, merge_into_env/3,
          getmacros_from_module/2,
         expand_macro/3, atom_to_item/2]).
--type tree() :: erl_syntax:syntaxTree().
--type env() :: list().
+-type erl_tree() :: erl_syntax:syntaxTree().
 
 -define(MQ(L, T, B), merl:qquote(erl_syntax:get_pos(L), T, B)).
 -define(MQP(L, T, B), merl:qquote(L, T, B)).
 
+-spec module_function(#item{}, erl_anno:pos()) -> erl_tree().
 module_function(A, Loc) ->
     {M, F} = A#item.value,
     erl_syntax:set_pos(erl_syntax:module_qualifier(
@@ -221,7 +221,7 @@ merge_into_env(Env, Key, Value) ->
     Ret.
     
 
--spec form(sexp(), any()) -> tree().
+-spec form(sexp(), any()) -> erl_tree().
 form(A, E) ->
     Macros = proplists:get_value(macros, E, maps:new()),
     B = expand_macro(A, E, Macros),
@@ -428,7 +428,7 @@ guard_list(WhenClause, Tail, E) ->
     {Guard, NBodyList}.
 
 
--spec clause_(list(), env()) -> tree().
+-spec clause_(list(), env()) -> erl_tree().
 clause_(L, E) ->
     [Args, When| Tail] = L,
     PArgs = lists:map(fun(A) ->

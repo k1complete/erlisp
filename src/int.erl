@@ -130,6 +130,7 @@ special_form(S, T, TL, A, E) ->
             call_func(S, T, TL, A, E)
     end.
 
+-spec ismacro(string(), env()) -> boolean().
 ismacro(S, E) ->
     case maps:find(S, E) of
         {ok, _V} ->
