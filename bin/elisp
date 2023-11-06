@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+APP=erlisp
+PATH=_build/default/lib/$APP/ebin
+MOD=repl
+FUN=tty
+ERL=/usr/local/bin/erl
+$ERL -pa $PATH -noshell -run $MOD $FUN
+
