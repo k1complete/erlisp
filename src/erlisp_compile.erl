@@ -1,7 +1,7 @@
--module(elisp_compile).
+-module(erlisp_compile).
 
 -include_lib("erlisp.hrl").
--include_lib("elisp_docs.hrl").
+-include_lib("erlisp_docs.hrl").
 -export([file/2, file/1, file_ast/2
         ]).
 
@@ -187,7 +187,7 @@ make_function_signature(Tree, Specs) ->
                               none ->
                                   S;
                               Spec ->
-                                  N = [list_to_binary(elisp_typespec:fun_to_string(Name, Spec))],
+                                  N = [list_to_binary(erlisp_typespec:fun_to_string(Name, Spec))],
                                   case N of
                                       [] ->
                                           S;
@@ -202,7 +202,7 @@ make_function_signature(Tree, Specs) ->
 extract_comment(Tree, Kind, Specs) ->
     case erl_syntax:has_comments(Tree) of
         true ->
-            elisp_docs:make_docentry(Kind, 
+            erlisp_docs:make_docentry(Kind, 
                                      erl_syntax:atom_value(erl_syntax:function_name(Tree)),
                                      erl_syntax:function_arity(Tree),
                                      erl_syntax:get_pos(Tree),
@@ -220,16 +220,16 @@ make_docs(AstList, Specs) ->
                           case erl_syntax:type(Ast) of
                             function ->
                                   E = extract_comment(Ast, function, Specs),
-                                  Acc#{docs=> elisp_docs:add_docentry(Doc, E)};
+                                  Acc#{docs=> erlisp_docs:add_docentry(Doc, E)};
                             attribute  ->
                                 case erl_syntax:atom_value(erl_syntax:attribute_name(Ast)) of
                                     module ->
-                                        E = elisp_docs:make_docs_v1(erl_syntax:get_pos(Ast),
+                                        E = erlisp_docs:make_docs_v1(erl_syntax:get_pos(Ast),
                                                                      <<"text/markdown">>,
                                                                      extract_module_comment(Ast),
                                                                      #{},
                                                                      []),
-                                        Acc#{docs=> elisp_docs:set_moduledoc(Doc, E)};
+                                        Acc#{docs=> erlisp_docs:set_moduledoc(Doc, E)};
                                     _Other -> 
                                         %%[{_Other, Ast}|Acc]
                                         Acc
@@ -238,7 +238,7 @@ make_docs(AstList, Specs) ->
                                   O=maps:get(other, Acc),
                                   Acc#{other=>[{s,Ast}|O]}
                           end
-                  end, #{docs=> elisp_docs:new_docs_v1(), other=>[]}, AstList),
+                  end, #{docs=> erlisp_docs:new_docs_v1(), other=>[]}, AstList),
     SS = maps:get(docs, S),
     {ok, SS}.
 

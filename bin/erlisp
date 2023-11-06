@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
-
+BASE=_build/default/lib/ 
 APP=erlisp
-PATH=_build/default/lib/$APP/ebin
+PATH=$BASE/$APP/ebin
 MOD=repl
 FUN=tty
 ERL=/usr/local/bin/erl

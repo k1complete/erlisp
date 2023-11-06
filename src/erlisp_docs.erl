@@ -1,4 +1,4 @@
--module(elisp_docs).
+-module(erlisp_docs).
 -export([make_docs_v1/5,
          make_docentry/7,
          add_docentry/2,
@@ -6,7 +6,7 @@
          set_moduledoc/2,
          new_docs_v1/0]).
 
--include_lib("elisp_docs.hrl").
+-include_lib("erlisp_docs.hrl").
 
 -spec new_docs_v1() -> #docs_v1{}.
 new_docs_v1() ->
@@ -38,7 +38,7 @@ metadata(DocEntry, Type) ->
 -spec make_docs_v1(erl_anno:anno(), mime_type(), doc(), map(), [doc_entry()]) -> docs_v1().
 make_docs_v1(Anno, Format, Doc, Meta, FunDocs) ->
     #docs_v1{anno = Anno,
-             beam_language = 'elisp',
+             beam_language = 'erlisp',
              format = Format,
              module_doc = Doc,
              metadata = Meta,

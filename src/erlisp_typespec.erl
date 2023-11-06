@@ -1,4 +1,4 @@
--module(elisp_typespec).
+-module(erlisp_typespec).
 -export([to_string/1, to_list/1, fun_to_string/2,
         to_binary/1]).
 
