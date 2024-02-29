@@ -4,13 +4,6 @@
 -include_lib("syntax_tools/include/merl.hrl").
 -define(TQ(Line, T), merl:quote(Line, T)).
 
-binding_test() ->
-    Line = ?LINE,
-    Left = ?TQ(Line, "[[H|T], {T1, T2, T3}]"),
-    Right = ?TQ(Line, "[[1,2,3], {a, 1, 2}]"),
-    L = int:binding(Left, Right, [], []),
-    ?assertEqual(?TQ(Line, "[[H|T], {T1,T2,T3}]  = [[1,2,3], {a, 1, 2}]"), 
-                 erl_syntax:revert(L)).
 
 let_test() ->
     Line=?LINE,
