@@ -1,7 +1,7 @@
--module(erlisp_compile).
+-module(els_compile).
 
--include_lib("erlisp.hrl").
--include_lib("erlisp_docs.hrl").
+-include_lib("els.hrl").
+-include_lib("els_docs.hrl").
 -export([file/2, file/1, file_ast/2
         ]).
 
@@ -13,12 +13,12 @@ file(File) ->
 file(File, Opt) ->
     io:format("cwd ~p", [file:get_cwd()]),
     Module = m,
-    {ok, Tokens} = scan:file(File, Opt),
+    {ok, Tokens} = els_scan:file(File, Opt),
     io:format("scan ~p", [Tokens]),
-    {ok, Forms} = parser:parse(Tokens),
+    {ok, Forms} = els_parser:parse(Tokens),
     Env=[],
     Ast = lists:map(fun(F) ->
-                            R = transpile:form(F, Env),
+                            R = els_transpile:form(F, Env),
                             io:format("Trans ~p~n", [R]),
                             R
                           end, Forms),
@@ -41,7 +41,7 @@ compile_macro(A, E) ->
                                             (_) -> false 
                                          end, A),
     [MS21,MS22 | _] = MS,
-    ModuleName = erl_syntax:atom_value(transpile:form(ModuleForm, E)),
+    ModuleName = erl_syntax:atom_value(els_transpile:form(ModuleForm, E)),
     io:format("modulename ~p ~p~n", [ModuleName, is_atom(ModuleName)]),
     M = lists:filtermap(fun([#item{type=atom, value="defmacro"}|R]) -> 
                                 [#item{type=atom, value=MacroName}, Args| _Body] = R,
@@ -62,11 +62,11 @@ compile_macro(A, E) ->
                              (_) -> 
                                   true
                           end, A),
-    IEnv = transpile:merge_into_env(E, macros, maps:from_list(M)),
+    IEnv = els_transpile:merge_into_env(E, macros, maps:from_list(M)),
     Ret = lists:foldl(fun(S, {_Ret, [], EnvAct}) ->
                               Forms = [[MS21, MS22]]++[S], 
                               Ast = lists:map(fun(F) ->
-                                                      transpile:form(F, EnvAct)
+                                                      els_transpile:form(F, EnvAct)
                                               end, Forms),
                               io:format("2222 ~p~n~p", [Forms, erl_syntax:revert(Ast)]),
                               {module, _Module, Binary} = 
@@ -75,15 +75,15 @@ compile_macro(A, E) ->
                               ?LOG_ERROR(#{module_info => R, length => length(Forms2)}),
                               {Binary, Forms, EnvAct};
                           (S, {_Ret, Acc, EnvAcc}) ->
-                              Macros = transpile:getmacros_from_module(ModuleForm, EnvAcc),
+                              Macros = els_transpile:getmacros_from_module(ModuleForm, EnvAcc),
                               io:format("merged macro1 ~p ~p", 
                                         [EnvAcc, maps:from_list(Macros)]),
-                              NEnv = transpile:merge_into_env(EnvAcc, macros, maps:from_list(Macros)),
+                              NEnv = els_transpile:merge_into_env(EnvAcc, macros, maps:from_list(Macros)),
                               io:format("merged macro2 ~p", [NEnv]),
                               Forms = Acc++[S], 
                               io:format("merged macro3 ~p~n", [NEnv]),
                               Ast = lists:map(fun(F) ->
-                                                      transpile:form(F, NEnv)
+                                                      els_transpile:form(F, NEnv)
                                               end, Forms),
                               io:format("transpiled ~p~n", [Ast]),
                               {module, _Module, Binary} = 
@@ -115,15 +115,15 @@ compile_and_write_beam(Ast, Options) ->
 -spec file_ast(string, options()) -> {module, module(), binary(), sexp()}.
 file_ast(File, Opt) ->
     io:format("cwd ~p", [file:get_cwd()]),
-    {ok, Tokens} = scan:file(File, Opt),
+    {ok, Tokens} = els_scan:file(File, Opt),
     io:format("scan ~p", [Tokens]),
-    {ok, Forms} = parser:parse(Tokens),
+    {ok, Forms} = els_parser:parse(Tokens),
     {_, _, NEnv} = compile_macro(Forms, []),
     MR = Forms,
     Env=NEnv,
     ?LOG_ERROR(#{macro_compiled => MR, nenv => NEnv}),
     Ast = lists:map(fun(F) ->
-                            R = transpile:form(F, Env),
+                            R = els_transpile:form(F, Env),
                             io:format("Trans ~p~n", [R]),
                             R
                           end, Forms),
@@ -175,19 +175,19 @@ make_function_signature(Tree, Specs) ->
     R = lists:map(fun(C) ->
                           Patterns = 
                               lists:map(fun(E) ->
-                                                erlast:to_list(E)
+                                                els_ast:to_list(E)
                                         end, erl_syntax:clause_patterns(C)),
                           Guard = case erl_syntax:clause_guard(C) of 
                                       none -> [];
                                       X -> X
                                   end,
                           S = 
-                              unicode:characters_to_binary(pp:pp(pp:erl_to_ast([Name, Patterns, Guard])), utf8),
+                              unicode:characters_to_binary(els_pp:pp(els_pp:erl_to_ast([Name, Patterns, Guard])), utf8),
                           case maps:get({Name, length(Patterns)}, Specs, none) of
                               none ->
                                   S;
                               Spec ->
-                                  N = [list_to_binary(erlisp_typespec:fun_to_string(Name, Spec))],
+                                  N = [list_to_binary(els_typespec:fun_to_string(Name, Spec))],
                                   case N of
                                       [] ->
                                           S;
@@ -202,7 +202,7 @@ make_function_signature(Tree, Specs) ->
 extract_comment(Tree, Kind, Specs) ->
     case erl_syntax:has_comments(Tree) of
         true ->
-            erlisp_docs:make_docentry(Kind, 
+            els_docs:make_docentry(Kind, 
                                      erl_syntax:atom_value(erl_syntax:function_name(Tree)),
                                      erl_syntax:function_arity(Tree),
                                      erl_syntax:get_pos(Tree),
@@ -220,16 +220,16 @@ make_docs(AstList, Specs) ->
                           case erl_syntax:type(Ast) of
                             function ->
                                   E = extract_comment(Ast, function, Specs),
-                                  Acc#{docs=> erlisp_docs:add_docentry(Doc, E)};
+                                  Acc#{docs=> els_docs:add_docentry(Doc, E)};
                             attribute  ->
                                 case erl_syntax:atom_value(erl_syntax:attribute_name(Ast)) of
                                     module ->
-                                        E = erlisp_docs:make_docs_v1(erl_syntax:get_pos(Ast),
+                                        E = els_docs:make_docs_v1(erl_syntax:get_pos(Ast),
                                                                      <<"text/markdown">>,
                                                                      extract_module_comment(Ast),
                                                                      #{},
                                                                      []),
-                                        Acc#{docs=> erlisp_docs:set_moduledoc(Doc, E)};
+                                        Acc#{docs=> els_docs:set_moduledoc(Doc, E)};
                                     _Other -> 
                                         %%[{_Other, Ast}|Acc]
                                         Acc
@@ -238,7 +238,7 @@ make_docs(AstList, Specs) ->
                                   O=maps:get(other, Acc),
                                   Acc#{other=>[{s,Ast}|O]}
                           end
-                  end, #{docs=> erlisp_docs:new_docs_v1(), other=>[]}, AstList),
+                  end, #{docs=> els_docs:new_docs_v1(), other=>[]}, AstList),
     SS = maps:get(docs, S),
     {ok, SS}.
 

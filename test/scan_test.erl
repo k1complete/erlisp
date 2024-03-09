@@ -18,10 +18,10 @@ loctoline(Tree) ->
         
 process(Expected, Got) ->
     Line=?LINE,
-    {ok, Tokens, _Lines} = scan:from_string(Got, Line),
-    {ok, [Tree]} = parser:parse(Tokens),
+    {ok, Tokens, _Lines} = els_scan:from_string(Got, Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
     io:format("Process-form: ~p~n", [Tree]),
-    Trees = transpile:form(Tree, []),
+    Trees = els_transpile:form(Tree, []),
 %    {erl_prettypr:format(merl:quote(Expected)),
 %     erl_prettypr:format(Trees)}.
     Mr = merl:quote(Line, Expected),
@@ -34,9 +34,9 @@ process(Expected, Got) ->
 utf8_test() ->    
     Line=?LINE,
     Got = "(quote Aあ)",
-    {ok, Tokens, _Lines} = scan:string(Got, Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    Trees = transpile:form(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:string(Got, Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    Trees = els_transpile:form(Tree, []),
 %%    LetHead = erl_syntax:list_head(Trees),
     LetHead = Trees,
     io:format("LetHead ~p~n", [LetHead]),
@@ -92,12 +92,12 @@ minus_test() ->
 plus_test() ->
     Line=?LINE,
     S="(+ 1 1)",
-    SR = scan:string(S, Line),
+    SR = els_scan:string(S, Line),
     SRR=element(2, SR),
     io:format("SRR:~p~n", [SRR]),
-    {ok, [SP]}=parser:parse(SRR),
+    {ok, [SP]}=els_parser:parse(SRR),
     io:format("SP:~p~n", [SP]),
-    TP=transpile:form(SP, []),
+    TP=els_transpile:form(SP, []),
     SE = merl:quote(Line, "1+1"),
     A=erl_prettypr:format(SE),
     B=erl_prettypr:format(TP),
@@ -106,7 +106,7 @@ plus_test() ->
 multi_line_test() ->
     Line=?LINE,
     S="(+ 1\n1)",
-    {RR, R, NextLoc} = scan:from_string(S, Line),
+    {RR, R, NextLoc} = els_scan:from_string(S, Line),
     ?assertEqual([{'(',{Line,1}},
                       {symbol,{Line,2},"+"},
                       {integer,{Line,4},1},

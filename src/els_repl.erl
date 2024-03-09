@@ -1,5 +1,5 @@
--module(repl).
--include_lib("erlisp.hrl").
+-module(els_repl).
+-include_lib("els.hrl").
 -export([repl/5, 
          repl/4,
          init/0,
@@ -54,7 +54,7 @@ repl(IN, OUT, Line, Env) ->
     repl(?TABLE(), IN, OUT, Line, Env).
 
 repl(Tab, IN, _OUT, Line, Env) ->
-    {ok, Tokens, NextLine, _Rest} = scan:read(IN, "erlisp[~B]> ", Line, [], 0),
+    {ok, Tokens, NextLine, _Rest} = els_scan:read(IN, "erlisp[~B]> ", Line, [], 0),
     %?LOG_DEBUG(#{nextline=> NextLine}),
     {ok, Forms}  = parser:parse(Tokens),
     %%

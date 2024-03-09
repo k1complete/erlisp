@@ -1,5 +1,5 @@
--module(pp).
--include("erlisp.hrl").
+-module(els_pp).
+-include("els.hrl").
 -export([pp/1]).
 -export([test/1]).
 -export([ppsexp/1]).

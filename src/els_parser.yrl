@@ -92,7 +92,7 @@ literal ->
 
 Erlang code.
 
--include_lib("erlisp.hrl").
+-include_lib("els.hrl").
 
 -export([setline/2]).
 

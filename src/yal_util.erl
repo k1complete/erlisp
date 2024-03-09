@@ -1,5 +1,5 @@
 -module(yal_util).
--include_lib("erlisp.hrl").
+-include_lib("els.hrl").
 -export([make_symbol/2, make_symbol/1,
          required_macros/1,
          getmacros/1,

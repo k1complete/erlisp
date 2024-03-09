@@ -7,178 +7,178 @@
 
 length_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:string("(length (cons 1 (cons 2 nil)))", Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:string("(length (cons 1 (cons 2 nil)))", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     C5=?TQ(Line, "length([1,2])"),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
     
 lists_reverse_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:string("(lists:reverse (cons 1 (cons 2 nil)))", Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:string("(lists:reverse (cons 1 (cons 2 nil)))", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     C5=?TQ(Line, "lists:reverse([1,2])"),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
 lists_reverse2_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:string("(lists:reverse (quote (1 2 3)))", Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:string("(lists:reverse (quote (1 2 3)))", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     C5=?TQ(Line, "lists:reverse([1,2,3])"),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
 lists_reverse3_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:from_string("(lists:reverse '(1 2 3))", Line),
+    {ok, Tokens, _Lines} = els_scan:from_string("(lists:reverse '(1 2 3))", Line),
     %io:format(standard_error, "lists_reverse3_test ~p~n", [Tokens]),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     C5=?TQ(Line, "lists:reverse([1,2,3])"),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
     
 quote_macro_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:from_string("'(a A 1)", Line),
+    {ok, Tokens, _Lines} = els_scan:from_string("'(a A 1)", Line),
     io:format("QM macro ~p~n", [Tokens]),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     C5 = ?TQ(Line, "[a, 'A', 1]"),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
     
 
 literal_atom_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:string("A", Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:term(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:string("A", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:term(Tree, []),
     C5 = merl:quote(Line, "A"),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
 quote_atom_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:from_string("'A", Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:term(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:from_string("'A", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:term(Tree, []),
     C5 = merl:quote(Line, "'A'"),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
 quote_var_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:string("(quote A)", Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:string("(quote A)", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     C5 = merl:quote(Line, "'A'"),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
 quote_list_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:string("(quote ((quote a) A 1))", Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:string("(quote ((quote a) A 1))", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     C5 = ?TQ(Line, "[[quote, a], 'A', 1]"),
-    ?assertEqual(erl_syntax:revert(C5), erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(erl_syntax:revert(C5), erl_syntax:revert(els_transpile:locline(C4))).
     
 defun_form_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:string("(defun plus (A B) (+ A B))", Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:string("(defun plus (A B) (+ A B))", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     C5 = merl:quote(Line, "plus(A, B) -> A + B."),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
 defun_form2_test() ->
     Line = ?LINE,
-    {ok, Tokens, _Lines} = scan:string("(defun plus (A B) (+ A B) (+ A B))", Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4 = transpile:form(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:string("(defun plus (A B) (+ A B) (+ A B))", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4 = els_transpile:form(Tree, []),
     C5 = merl:quote(Line, "plus(A, B) -> A + B, A + B."),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
 defun_match_test() ->
     Line = ?LINE,
     Cmd = ["(defun plus (((match A 1) B)\n",
            "(+ A B))\n",
            "((A B) (+ A B)))\n"],
-    {R, Tokens, _Lines} = scan:from_string(lists:flatten(Cmd), Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {R, Tokens, _Lines} = els_scan:from_string(lists:flatten(Cmd), Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     io:format("~nC4 ~p~n", [C4]),
     C5 = merl:quote(Line, ["plus(A=1, B) ->", 
                            " A+B;",
                           "plus(A, B) -> A + B."]),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 defun_match_ml_test() ->
     Line = ?LINE,
     Cmd = ["(defun plus (((match A 1) B)\n",
            "(+ A B))\n",
            "((A B) (+ A B) (- A B)))\n"],
-    {R, Tokens, _Lines} = scan:from_string(lists:flatten(Cmd), Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {R, Tokens, _Lines} = els_scan:from_string(lists:flatten(Cmd), Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     io:format("~nC4 ~p~n", [C4]),
     C5 = merl:quote(Line, ["plus(A=1, B) ->", 
                            " A+B;",
                           "plus(A, B) -> A + B, A - B."]),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 defun_match_when_test() ->
     Line = ?LINE,
     Cmd = ["(defun plus (((match A 1) B)\n",
            "(+ A B))\n",
            "((A B) (when (== A 2)) (+ A B) (- A B))\n",
            "((A B) (* A B) (+ A B)))\n"],
-    {R, Tokens, _Lines} = scan:from_string(lists:flatten(Cmd), Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {R, Tokens, _Lines} = els_scan:from_string(lists:flatten(Cmd), Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     io:format("~nC4 ~p~n", [C4]),
     C5 = merl:quote(Line, ["plus(A=1, B) ->", 
                            " A+B;",
                           "plus(A, B) when A == 2 -> A + B, A - B;",
                            "plus(A, B) -> A * B, A + B."]),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 export_test() ->
     Line = ?LINE,
     Cmd = ["(-export (a 2) (b 3))"],
-    {ok, Tokens, _Lines} = scan:string(lists:flatten(Cmd), Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:string(lists:flatten(Cmd), Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     C5 = merl:quote(Line, ["-export([a/2, b/3])."]),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
 module_test() ->
     Line = ?LINE,
     Cmd = ["(-module b)"],
-    {ok, Tokens, _Lines} = scan:string(lists:flatten(Cmd), Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:string(lists:flatten(Cmd), Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     C5 = merl:quote(Line, ["-module(b)."]),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
 equal_test() ->
     Line=?LINE,
-%    C4 = transpile:form(?Q(Line, "['==', 1, 2]")),
+%    C4 = els_transpile:form(?Q(Line, "['==', 1, 2]")),
     Cmd = ["(== 1 2)"],
-    {ok, Tokens, _Lines} = scan:string(lists:flatten(Cmd), Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
-    %C40 = transpile:form({cons,1,
+    {ok, Tokens, _Lines} = els_scan:string(lists:flatten(Cmd), Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
+    %C40 = els_transpile:form({cons,1,
     %                     {atom,1,'=='},
     %                     {cons,1,{integer,1,1},{cons,1,{integer,1,2},{nil,1}}}}, []),
     C5 = merl:quote(Line, "1 == 2"),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
 call_function_test() ->
     Line=?LINE,
     Cmd = ["(hd (quote (1 2 3)))"],
-    {ok, Tokens, _Lines} = scan:string(lists:flatten(Cmd), Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C4=transpile:form(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:string(lists:flatten(Cmd), Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C4=els_transpile:form(Tree, []),
     C5 = merl:quote(Line, "hd([1,2,3])"),
-    ?assertEqual(C5, erl_syntax:revert(transpile:locline(C4))).
+    ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
 macro_test() ->
-    C4 = macro:expand_form({cons,1,
+    C4 = els_macro:expand_form({cons,1,
                             {atom,1,'=='},
                             {cons,1,
                              {integer,1,1},
@@ -207,7 +207,7 @@ macro_test() ->
 
 
 macro_2_test() ->
-    C4 = macro:expand_form({cons,1,
+    C4 = els_macro:expand_form({cons,1,
                             {atom,1,'=='},
                             {cons,1,
                              {integer,1,1},

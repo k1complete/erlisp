@@ -3,7 +3,7 @@
 %% @end
 %%%-------------------------------------------------------------------
 
--module(erlisp_app).
+-module(els_app).
 
 -behaviour(application).
 

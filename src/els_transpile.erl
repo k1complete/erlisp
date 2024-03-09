@@ -1,10 +1,10 @@
--module(transpile).
+-module(els_transpile).
 -include_lib("stdlib/include/assert.hrl").
 -include_lib("syntax_tools/include/merl.hrl").
--include_lib("erlisp.hrl").
+-include_lib("els.hrl").
 -compile([{debug_info, true}]).
 -export([lst/0]).
--include("scan.hrl").
+-include("els_scan.hrl").
 -export([form/2, form_trans/2, term/2, infix_op/4,
         locline/1, merge_into_env/3,
          getmacros_from_module/2,

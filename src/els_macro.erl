@@ -1,4 +1,4 @@
--module(macro).
+-module(els_macro).
 -export([expand_forms/2,
          expand_apply/3,
          expand_term/2,

@@ -11,9 +11,9 @@ append_test() ->
 
 little_letters_variable_test() ->
     Line=?LINE,
-    {ok, Tokens, _Line} = scan:from_string("(lists:reverse (list 1 2 b))", Line),
-    {ok, Tree} = parser:parse(Tokens),
-    C = transpile:form(hd(Tree), []),
+    {ok, Tokens, _Line} = els_scan:from_string("(lists:reverse (list 1 2 b))", Line),
+    {ok, Tree} = els_parser:parse(Tokens),
+    C = els_transpile:form(hd(Tree), []),
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     io:format("------ ~p ~n binding ~p~n", [C, Binding]),
     {value, Result, Binding} = erl_eval:expr(erl_syntax:revert(C), Binding),
@@ -21,9 +21,9 @@ little_letters_variable_test() ->
 
 backquote_unquote_variable_test() ->
     Line=?LINE,
-    {ok, Tokens, _Line} = scan:from_string("(lists:reverse `(1 2 ,b))", Line),
-    {ok, Tree} = parser:parse(Tokens),
-    C = transpile:form(hd(Tree), []),
+    {ok, Tokens, _Line} = els_scan:from_string("(lists:reverse `(1 2 ,b))", Line),
+    {ok, Tree} = els_parser:parse(Tokens),
+    C = els_transpile:form(hd(Tree), []),
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     io:format("------ ~p ~n binding ~p~n", [C, Binding]),
     {value, Result, Binding} = erl_eval:expr(erl_syntax:revert(C), Binding),
@@ -32,14 +32,14 @@ backquote_unquote_variable_test() ->
 %%                         [{b,erl_syntax:set_pos(erl_syntax:variable('b'), Line)}]),
     ?assertEqual("lists:reverse(lists:append([[1], [2], [b]]))",
                  erl_prettypr:format(C)).
-%%    ?assertEqual(erl_syntax:revert(transpile:locline(Expect)), 
-%%                 erl_syntax:revert(transpile:locline(C))).
+%%    ?assertEqual(erl_syntax:revert(els_transpile:locline(Expect)), 
+%%                 erl_syntax:revert(els_transpile:locline(C))).
 
 backquote_unquote_variable_dot_test() ->
     Line=?LINE,
-    {ok, Tokens, _Line} = scan:from_string("`(reverse (1 2 . ,b))", Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C = transpile:form(Tree, []),
+    {ok, Tokens, _Line} = els_scan:from_string("`(reverse (1 2 . ,b))", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     io:format("------ ~p ~n binding ~p~n", [C, Binding]),
     {value, Result, Binding} = erl_eval:expr(erl_syntax:revert(C), Binding),
@@ -47,9 +47,9 @@ backquote_unquote_variable_dot_test() ->
 
 backquote_unquote_splice_variable_test() ->
     Line=?LINE,
-    {ok, Tokens, _Line} = scan:from_string("`(reverse (1 ,@(lists:reverse '(4 5)) 2))", Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C = transpile:form(Tree, []),
+    {ok, Tokens, _Line} = els_scan:from_string("`(reverse (1 ,@(lists:reverse '(4 5)) 2))", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     io:format("------ ~p ~n binding ~p~n", [erl_syntax:revert(C), Binding]),
     {value, Result, Binding} = erl_eval:expr(erl_syntax:revert(C), Binding),
@@ -57,9 +57,9 @@ backquote_unquote_splice_variable_test() ->
 
 list_dot_test() ->
     Line=?LINE,
-    {ok, Tokens, _Line} = scan:from_string("'(reverse . 1)", Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C = transpile:form(Tree, []),
+    {ok, Tokens, _Line} = els_scan:from_string("'(reverse . 1)", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     io:format("------ ~p ~n binding ~p~n", [erl_syntax:revert(C), Binding]),
     {value, Result, Binding} = erl_eval:expr(erl_syntax:revert(C), Binding),
@@ -67,9 +67,9 @@ list_dot_test() ->
 
 nested_list_dot_test() ->
     Line=?LINE,
-    {ok, Tokens, _Line} = scan:from_string("'(reverse . (1 2 . a))", Line),
-    {ok, [Tree]} = parser:parse(Tokens),
-    C = transpile:form(Tree, []),
+    {ok, Tokens, _Line} = els_scan:from_string("'(reverse . (1 2 . a))", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
     Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     io:format("------ ~p ~n binding ~p~n", [erl_syntax:revert(C), Binding]),
     {value, Result, Binding} = erl_eval:expr(erl_syntax:revert(C), Binding),
@@ -83,9 +83,9 @@ defun_test() ->
            "  (match c (+ a b))",
            "  (* c c))"
           ],
-    {ok, Tokens, _Line} = scan:from_string(lists:flatten(Cmd), Line),
-    {ok, Tree} = parser:parse(Tokens),
-    C = lists:map(fun(E) -> transpile:form(E, []) end, Tree),
+    {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(Cmd), Line),
+    {ok, Tree} = els_parser:parse(Tokens),
+    C = lists:map(fun(E) -> els_transpile:form(E, []) end, Tree),
     %% Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     {ok, _Binary} = merl:compile_and_load(C, [debug_info]),
     Result = apply(c, add, [2, 3]),
@@ -97,10 +97,10 @@ defmacro_test() ->
            "(defmacro madd (a b)",
            "  `(+ ,a ,b))"
           ],
-    {ok, Tokens, _Line} = scan:from_string(lists:flatten(Cmd), Line),
-    {ok, Tree} = parser:parse(Tokens),
+    {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(Cmd), Line),
+    {ok, Tree} = els_parser:parse(Tokens),
     io:format("OK-2~n", []),
-    C = lists:map(fun(E) -> transpile:form(E, []) end, Tree),
+    C = lists:map(fun(E) -> els_transpile:form(E, []) end, Tree),
     %%Ct = erl_syntax:list(C),
     Ct = C,
     io:format("OK-1~n", []),
@@ -117,12 +117,12 @@ defmacro_test() ->
             "(let ((b 9)) ",
             "(io_lib:format \"~p~n\" `(,(cc1:madd a b)))",
            ")"],
-    {ok, Tokens2, _} = scan:from_string(lists:flatten(Cmd2), Line),
-    {ok, Tree2} = parser:parse(Tokens2),
+    {ok, Tokens2, _} = els_scan:from_string(lists:flatten(Cmd2), Line),
+    {ok, Tree2} = els_parser:parse(Tokens2),
     io:format("OK0 ~p~n", [Tree2]),
     io:format("ETS ~p~n", [ets:info(require)]),
     ets:new(require, [named_table]),
-    C2 = lists:map(fun(E) -> transpile:form(E, []) end, Tree2),
+    C2 = lists:map(fun(E) -> els_transpile:form(E, []) end, Tree2),
     C3 = erl_syntax:list(C2),
     %%Binding2 = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
     Binding3 = erl_eval:add_binding(a, 4, erl_eval:new_bindings()),

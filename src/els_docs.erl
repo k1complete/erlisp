@@ -1,4 +1,4 @@
--module(erlisp_docs).
+-module(els_docs).
 -export([make_docs_v1/5,
          make_docentry/7,
          add_docentry/2,
@@ -6,7 +6,7 @@
          set_moduledoc/2,
          new_docs_v1/0]).
 
--include_lib("erlisp_docs.hrl").
+-include_lib("els_docs.hrl").
 
 -spec new_docs_v1() -> #docs_v1{}.
 new_docs_v1() ->

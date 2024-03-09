@@ -60,8 +60,8 @@ Rules.
 
 Erlang code.
 
--include_lib("scan.hrl").
--include_lib("erlisp.hrl").
+-include_lib("els_scan.hrl").
+-include_lib("els.hrl").
 %%-export([tokenizer/2]).
 -export([file/2]).
 %%-export([read_balance/4]).
@@ -93,14 +93,14 @@ do_calclevel(IO, Prompt0, [{')', _Loc} =T | Tokens], {Acc, PreLevel}, Line) ->
 %%    io:format("calc-apply ): ~p ~p ~p ~n", [PreLevel, Acc, Tokens]),
     do_calclevel(IO, Prompt0, Tokens, {Acc ++ [T], PreLevel-1}, Line);
 do_calclevel(IO, Prompt0, [{read_macro, Loc, MChar}], {Acc, PreLevel}, _Line) ->
-    RM = #{quote => {scan, replace},
-           backquote => {scan, replace},
-           unquote => {scan, replace},
-           unquote_splice => {scan, replace}
+    RM = #{quote => {?MODULE, replace},
+           backquote => {?MODULE, replace},
+           unquote => {?MODULE, replace},
+           unquote_splice => {?MODULE, replace}
           },
-    {MM, MF} = maps:get(MChar, RM, {scan, not_implemented}),
+    {MM, MF} = maps:get(MChar, RM, {?MODULE, not_implemented}),
     %io:format("calc-apply before: ~p ~p ~n", [Loc, Acc]),
-    {ok, NewTokens, NewLoc, RestTokens} = apply(MM, MF, [{IO, Prompt0}, scan, read, 
+    {ok, NewTokens, NewLoc, RestTokens} = apply(MM, MF, [{IO, Prompt0}, ?MODULE, read, 
                                                          Loc, MChar]),
     %io:format("calc-apply after: NT ~p Rest ~p PL ~p ~n", [NewTokens, RestTokens, PreLevel]),
     do_calclevel(IO, Prompt0, RestTokens, {Acc ++ NewTokens, PreLevel}, NewLoc);
@@ -197,7 +197,7 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) when length(PrevTokens) > 0 andal
     adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line);
 read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
     Prompt = make_prompt(Prompt0, Line, PrevTokens),
-    case io:request(IO, {get_until, unicode, Prompt, scan, tokens, [Line]}) of
+    case io:request(IO, {get_until, unicode, Prompt, ?MODULE, tokens, [Line]}) of
         {ok, NewTokens, NextLine} ->
             ?LOG_DEBUG(#{prevlevel => PrevLevel,
                          prevtokens => PrevTokens,

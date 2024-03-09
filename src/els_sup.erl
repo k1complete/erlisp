@@ -3,7 +3,7 @@
 %% @end
 %%%-------------------------------------------------------------------
 
--module(erlisp_sup).
+-module(els_sup).
 
 -behaviour(supervisor).
 

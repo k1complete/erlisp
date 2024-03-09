@@ -8,7 +8,7 @@ slist_test() ->
                        {symbol, {0,4}, "b"},
                        {symbol, {0,6}, "c"},
                        {')', {0,7}}], 0},
-                 scan:from_string("(q b c)", 0)).
+                 els_scan:from_string("(q b c)", 0)).
 quote_test() ->
     ?assertEqual({ok, [{'(',{0,1}},
                        {symbol, {0,2}, "q"},
@@ -18,7 +18,7 @@ quote_test() ->
                        {')',{0,4}},
                        {symbol, {0,7}, "c"},
                        {')', {0,8}}], 0},
-                 scan:from_string("(q 'b c)", 0)).
+                 els_scan:from_string("(q 'b c)", 0)).
 backquote_test() ->
     ?assertEqual({ok, [{'(',{0,1}},
                        {symbol, {0,2}, "q"},
@@ -28,7 +28,7 @@ backquote_test() ->
                        {')',{0,4}},
                        {symbol, {0,7}, "c"},
                        {')', {0,8}}], 0},
-                 scan:from_string("(q `b c)", 0)).
+                 els_scan:from_string("(q `b c)", 0)).
 backquote_list_test() ->
     ?assertEqual({ok, [{'(',{0,1}},
                        {symbol,{0,1},"backquote"},
@@ -41,7 +41,7 @@ backquote_list_test() ->
                        {symbol,{0,8},"c"},
                        {')',{0,9}},
                        {')',{0,1}}], 0},
-                 scan:from_string("`(q `b c)", 0)).
+                 els_scan:from_string("`(q `b c)", 0)).
 unquote_test() ->
     ?assertEqual({ok, [{'(',{0,1}},
                        {symbol, {0,2}, "q"},
@@ -51,7 +51,7 @@ unquote_test() ->
                        {')',{0,4}},
                        {symbol, {0,7}, "c"},
                        {')', {0,8}}], 0},
-                 scan:from_string("(q ,b c)", 0)),
+                 els_scan:from_string("(q ,b c)", 0)),
     ?assertEqual({ok,[{'(',{0,1}},
                       {symbol,{0,2},"a"},
                       {'(',{0,4}},
@@ -67,7 +67,7 @@ unquote_test() ->
                       {')',{0,4}},
                       {')',{0,13}}],
                      0},
-                 scan:from_string("(a `(q ,b c))", 0)).
+                 els_scan:from_string("(a `(q ,b c))", 0)).
 
     
     
