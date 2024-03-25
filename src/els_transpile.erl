@@ -117,6 +117,7 @@ dispatch_special(A) ->
           "defun" => fun defun_/3,
           "defmacro" => fun defmacro_/3,
           "case" => fun case_/3,
+          "if" => fun if_/3,
           "let" => fun let_/3,
           "lambda" => fun lambda_/3
          },
@@ -572,6 +573,91 @@ make_slist(L) ->
                 (E) ->
                      E
              end, L).
+%%%
+%%% (if ((when (isatom a) (bb) ) true )
+%%% (if ((when (, (isatom a) (bb)) (, (aaa) )) true )
+%%%     (disjunctiive_form bod...)
+%%%     (disjunctiive_form bod...))
+%%%     
+%%% (if ((, (isatom a) (bbb)) 1))
+%%% (if ((isatom a) 1))
+%%%     ((isatom a) (a) (b) (c))
+%%% -->
+%%% if if_clause1;
+%%%    if_clause2;
+%%%    if_clause3.
+%%%
+%%% disjunctive normal form:
+%%% (; (, | list) (, | list))
+%%% (; list) --> 
+%%% 
+conjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == "whenc"; A == "when"->
+    ?LOG_DEBUG(#{conjunctive_form => Tail}),
+    lists:map(fun(V) ->
+		      term(V, Env)
+	      end, Tail).
+%%%
+%%% (if (when (| (& (== 1 2) 
+%%%               (== 2 2))
+%%%               (a ) 
+%%%            (b )  )    (1 ) ('true))
+%%%     (when 'true 'ng))
+%%% (if (& (== 1 2) 
+%%%        (== 2 2))
+%%% 
+%%% (if ( test1  sexp1..) (test2 sexp2...))
+%%% test-> (when cnf1 cnf2)
+%%% cnf-> (, test1 test2...)
+%%% test -> (, test1 test2..)
+%%% test -> (other)
+%%% (if (== 1 2)  'true) (when 'true 'ng))
+%%% (if (when (== 1 2) (== 2 2) (a ) (b)  ) 'true) (when 'true 'ng))
+%%% (if (whend (, (== 1 2) (== 2 2)) (a ) (b)  ) 'true) (when 'true 'ng))
+disjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == ";"; A == "whend" ->
+    lists:map(fun([#item{type = atom, value = "whenc"}|_]=V) -> 
+		      conjunctive_form(V, Env);
+		 (V) ->
+		      [term(V, Env)]
+	      end, Tail);
+disjunctive_form(L, Env) ->
+    [[term(L, Env)]].
+
+if_(X, L, E) ->
+    Line = X#item.loc,
+    ?LOG_DEBUG(#{if_ => L}),
+    ClauseAstList = lists:map(fun([Test|Body]) ->
+				      {G, GLine} = case Test of
+						       [#item{loc=GL, value="when"}|T] ->
+							   io:format("IFc <-> ~p~n", [T]),
+							   {[conjunctive_form(Test, E)], GL};
+						       [#item{loc=GL, value="whend"}|_T] ->
+							   io:format("IFd <-> ~p~n", [Test]),
+							   {disjunctive_form(Test, E), GL};
+						       [[#item{loc=GL}|_]|_]  ->
+							   io:format("TermList <-> ~p~n", [Test]),
+							   {[conjunctive_form([#item{value="when", 
+										     loc=GL,
+										     type=atom}|Test], E)], GL};
+
+						       [#item{loc=GL}|_] ->
+							   io:format("TermList <-> ~p~n", [Test]),
+							   {[[term(Test, E)]], GL};
+						       #item{loc=GL} ->
+							   io:format("Term <-> ~p~n", [Test]),
+							   {[[form(Test, E)]], GL}
+						   end,
+				      io:format("body ~p~n", [Body]),
+				      B = lists:map(fun(V) -> term(V, E) end, Body),
+				      io:format("bodyB ~p~n", [B]),
+				      S= erl_syntax:clause([], G, B),
+				      erl_syntax:set_pos(S, erl_anno:new(GLine))
+			      end, L),
+    C = erl_syntax:if_expr(ClauseAstList),
+    R = erl_syntax:set_pos(C, erl_anno:new(Line)),
+    io:format("if : ~p~n", [R]),
+    io:format("if : ~p~n", [erl_syntax:revert(R)]),
+    R.
+
 
 %% (case exp
 %%   (pattern1 (when exp)

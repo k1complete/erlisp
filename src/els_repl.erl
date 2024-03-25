@@ -56,14 +56,14 @@ repl(IN, OUT, Line, Env) ->
 repl(Tab, IN, _OUT, Line, Env) ->
     {ok, Tokens, NextLine, _Rest} = els_scan:read(IN, "erlisp[~B]> ", Line, [], 0),
     %?LOG_DEBUG(#{nextline=> NextLine}),
-    {ok, Forms}  = parser:parse(Tokens),
+    {ok, Forms}  = els_parser:parse(Tokens),
     %%
     {_Results, NextEnv} = lists:mapfoldl(
                            fun(S, CEnv) -> 
-                                   Exp = transpile:term(S, Env),
+                                   Exp = els_transpile:term(S, Env),
                                    Revert = erl_syntax:revert(Exp),
                                    {value, Result, NEnv} = execute(Tab, Revert, CEnv),
-                                   io:format("~s~n", [pp:format(Result, 60)]),
+                                   io:format("~s~n", [els_pp:format(Result, 60)]),
                                    {Result, NEnv}
                            end, Env, 
                            Forms),

@@ -51,9 +51,9 @@ pptr(S, {LLevel, LChar}, {RLevel, RChar}, _Direction) when is_list(S) ->
     lists:append([[Head], Middle, [Last]]).
 
 form(S) ->
-    S1 = pp:erl_to_ast(S),
+    S1 = ?MODULE:erl_to_ast(S),
     S2 = pptr(S1, {0, "("}, {0, ")"}, 0),
-    pp:ppsexp(S2).
+    ?MODULE:ppsexp(S2).
 
 format(S, Column) ->
     prettypr:format(form(S), Column).
