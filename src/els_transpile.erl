@@ -409,6 +409,19 @@ cons_(C, L, E) ->
             ?MQP(Loc, "[_@HHead|_@TTail]", [{'HHead', HHead}, {'TTail', TTail}])
     end.
 
+
+
+-spec clause_(list(), term(), env()) -> erl_tree().
+clause_(L, Loc, E) ->
+    [Args, WhenCandidate| BodyCandidate] = L,
+    {When, Body} = case WhenCandidate of
+		       [#item{type=atom, value=V}|_] when V=="when"; V=="whend"; V=="whenc" ->
+			   {WhenCandidate, BodyCandidate};
+		       _ ->
+			   {[], [WhenCandidate| BodyCandidate]}
+		   end,
+    clause_arg_guard_body(Args, When, Body, Loc, E).
+
 is_when(#item{type=atom, value="when"}) ->
     true;
 is_when(_) ->
@@ -427,10 +440,7 @@ guard_list(WhenClause, Tail, E) ->
                                  {[], [WhenClause | Tail]}
                          end,
     {Guard, NBodyList}.
-
-
--spec clause_(list(), env()) -> erl_tree().
-clause_(L, E) ->
+clause0_(L, Loc, E) ->
     [Args, When| Tail] = L,
     PArgs = lists:map(fun(A) ->
                               R = term(A, E),
@@ -458,9 +468,8 @@ match_defun_(Name, Clauses, E) ->
     FuncName = erl_syntax:set_pos(erl_syntax:atom(Name#item.value), Name#item.loc),
     Md = erl_syntax:function(FuncName, 
                              lists:map(fun(A) ->
-                                               AST = A,
-                                               io:format("AST ~p~n", [AST]),
-                                               clause_(AST, E)
+                                               io:format("AST ~p~n", [A]),
+                                               clause_(A, Name#item.loc, E)
                                        end, Clauses)),
     Ret=erl_syntax:copy_pos(FuncName, Md),
     io:format("~nmatch_defun_output ~p~n", [erl_syntax:get_pos(Ret)]),
@@ -622,35 +631,52 @@ disjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == ";"; A == "w
 disjunctive_form(L, Env) ->
     [[term(L, Env)]].
 
+get_leastlefthand([#item{loc=G}|T], _) ->
+    G;
+get_leastlefthand([H|L], G) ->
+    get_leastlefthand(H, G);
+get_leastlefthand(#item{loc=G}, _) ->
+    G;
+get_leastlefthand(_, G) ->
+    G.
+
+    
+%% {Param, Test, Body}
+%split_param_from_clause
+detect_guard(Test, Body, E) ->
+    G = case Test of
+	    [#item{loc=GL, value="when"}|T] ->
+		[conjunctive_form(Test, E)];
+	    [#item{loc=GL, value="whend"}|T] ->
+		[disjunctive_form(Test, E)];
+	    [[#item{loc=GL}|_]|_] ->
+		When=#item{value="when", loc=GL, type=atom},
+		[conjunctive_form([When|Test], E)];
+	    [#item{loc=GL}|_] ->
+		[[term(Test, E)]];
+	    #item{loc=GL} ->
+		[[term(Test, E)]];
+	    [] ->
+		[]
+	end.
+
+clause_arg_guard_body(Args, Test, Body, GL, E) ->
+    Params = lists:map(fun(A) -> term(A, E) end, Args),
+    G = detect_guard(Test, Body, E),
+    
+    GLine = get_leastlefthand(lists:flatten([Args|[Test|Body]]), 0),
+    io:format("#{clause_mono_least => ~p~n", [Test]),
+    B = lists:map(fun(V) -> term(V, E) end, Body),
+    S = erl_syntax:clause(Params, G, B),
+    ?LOG_DEBUG(#{clause_mono => S}),
+    erl_syntax:set_pos(S, erl_anno:new(GLine)).
+
+
 if_(X, L, E) ->
     Line = X#item.loc,
     ?LOG_DEBUG(#{if_ => L}),
     ClauseAstList = lists:map(fun([Test|Body]) ->
-				      {G, GLine} = case Test of
-						       [#item{loc=GL, value="when"}|T] ->
-							   io:format("IFc <-> ~p~n", [T]),
-							   {[conjunctive_form(Test, E)], GL};
-						       [#item{loc=GL, value="whend"}|_T] ->
-							   io:format("IFd <-> ~p~n", [Test]),
-							   {disjunctive_form(Test, E), GL};
-						       [[#item{loc=GL}|_]|_]  ->
-							   io:format("TermList <-> ~p~n", [Test]),
-							   {[conjunctive_form([#item{value="when", 
-										     loc=GL,
-										     type=atom}|Test], E)], GL};
-
-						       [#item{loc=GL}|_] ->
-							   io:format("TermList <-> ~p~n", [Test]),
-							   {[[term(Test, E)]], GL};
-						       #item{loc=GL} ->
-							   io:format("Term <-> ~p~n", [Test]),
-							   {[[form(Test, E)]], GL}
-						   end,
-				      io:format("body ~p~n", [Body]),
-				      B = lists:map(fun(V) -> term(V, E) end, Body),
-				      io:format("bodyB ~p~n", [B]),
-				      S= erl_syntax:clause([], G, B),
-				      erl_syntax:set_pos(S, erl_anno:new(GLine))
+				      clause_arg_guard_body([], Test, Body, Line, E)
 			      end, L),
     C = erl_syntax:if_expr(ClauseAstList),
     R = erl_syntax:set_pos(C, erl_anno:new(Line)),
@@ -676,7 +702,7 @@ case_(X, L, E) ->
     ExpAst = form(Exp, E),
     ClauseAstList = lists:map(fun(Form) -> 
                                       [H|T] = Form,
-                                      clause_([[H]|T], E) end, Clauses),
+                                      clause_([[H]|T], Line, E) end, Clauses),
     C = erl_syntax:case_expr(ExpAst, ClauseAstList),
     R = erl_syntax:set_pos(C, erl_anno:new(Line)),
     io:format("case : ~p~n", [R]),
@@ -741,7 +767,7 @@ lambda_(_X, [[#item{type=atom, value=_N, loc=Loc}|_ArgT]=Args|Rest]=_L, E) ->
     MQ;
 lambda_(#item{loc=Loc} = _X, L, E) ->
     Clauses = lists:map(fun(LE) ->
-                                clause_(LE, E)
+                                clause_(LE, Loc, E)
                         end, L),
     Fun=erl_syntax:fun_expr(Clauses),
     R = erl_syntax:set_pos(Fun, Loc),
