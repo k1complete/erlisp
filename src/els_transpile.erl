@@ -582,6 +582,53 @@ make_slist(L) ->
                 (E) ->
                      E
              end, L).
+	    
+
+	    
+%%%
+%%% (try 
+%%%  ((a b) (b c) (c d))
+%%%  of 
+%%%  (case-pattern-clause)
+%%%  catch
+%%%  (a (with (a)) (a) (b) : hander)
+%%%  (a (a) (b)))
+%%% (try 
+%%%  ((lambda a b) (list 'a)) body
+%%%  ((lambda a b) (list 'a))
+%%%  of 
+%%%  (case-pattern-clause1): clause
+%%%  (case-pattern-clause2)
+%%%  catch
+%%%  (a (with (a)) (a) (b) : hander)
+%%%  (a (a) (b)))
+%%%  after 
+%%%  (a b)
+%%%  (c d))
+%%% (try 
+%%%  ((lambda a b) (list 'a)) body
+%%%  ((lambda a b) (list 'a))
+%%%  catch
+%%%  (a (with (a)) (a) (b) : hander)
+%%%  (a (a) (b)))
+%%% 
+%%try_(X, L, E) ->
+%%    io:format("try_ : ~p~n", [X]),
+%%    Line = X#item.loc,
+    %%M = scanlist([X|L], ["try", "of", "catch", "after"]),
+    %%Clauses = maps:map(fun(K, V) ->
+    %%clause_(V, E)
+    %%		       end, M),
+%%    C = erl_syntax:try_expr(maps.get("try", Clauses),
+%%			    maps.get("of", Clauses, []),
+%%			    maps.get("catch", Clauses, []),
+%%			    maps.get("after", Clauses, [])),
+%%    R = erl_syntax:try_expr(C, erl_anno:new(Line)),
+%%    io:format("try : ~p~n", [R]),
+%%    R.
+			
+
+
 %%%
 %%% (if ((when (isatom a) (bb) ) true )
 %%% (if ((when (, (isatom a) (bb)) (, (aaa) )) true )
