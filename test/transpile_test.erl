@@ -52,7 +52,7 @@ literal_atom_test() ->
     Line = ?LINE,
     {ok, Tokens, _Lines} = els_scan:string("A", Line),
     {ok, [Tree]} = els_parser:parse(Tokens),
-    C4=els_transpile:term(Tree, []),
+    C4=els_transpile:sterm(Tree, []),
     C5 = merl:quote(Line, "A"),
     ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
@@ -60,7 +60,7 @@ quote_atom_test() ->
     Line = ?LINE,
     {ok, Tokens, _Lines} = els_scan:from_string("'A", Line),
     {ok, [Tree]} = els_parser:parse(Tokens),
-    C4=els_transpile:term(Tree, []),
+    C4=els_transpile:sterm(Tree, []),
     C5 = merl:quote(Line, "'A'"),
     ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 

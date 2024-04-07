@@ -60,7 +60,7 @@ repl(Tab, IN, _OUT, Line, Env) ->
     %%
     {_Results, NextEnv} = lists:mapfoldl(
                            fun(S, CEnv) -> 
-                                   Exp = els_transpile:term(S, Env),
+                                   Exp = els_transpile:sterm(S, Env),
                                    Revert = erl_syntax:revert(Exp),
                                    {value, Result, NEnv} = execute(Tab, Revert, CEnv),
                                    io:format("~s~n", [els_pp:format(Result, 60)]),

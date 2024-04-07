@@ -5,7 +5,8 @@
 -compile([{debug_info, true}]).
 -export([lst/0]).
 -include("els_scan.hrl").
--export([form/2, form_trans/2, term/2, infix_op/4,
+-export([clause_/3]).
+-export([form/2, form_trans/2, sterm/2, infix_op/4,
         locline/1, merge_into_env/3,
          getmacros_from_module/2,
         expand_macro/3, atom_to_item/2]).
@@ -24,9 +25,9 @@ module_function(A, Loc) ->
 %%                         erl_syntax:set_pos(erl_syntax:atom(F), Loc)), 
                        Loc).
 
-term(A, Env) ->
-    term(A, 0, Env).
-term(A, Loc, Env) ->
+sterm(A, Env) ->
+    sterm(A, 0, Env).
+sterm(A, Loc, Env) ->
     term_to_ast(A, Loc, Env, false).
 
 term_to_ast(A, Loc, Env, Quote) ->
@@ -262,7 +263,7 @@ form_trans([List| T], E) when is_list(List) ->
           {'Args', 
            lists:map(
              fun(S) -> 
-                     term(S, E) 
+                     sterm(S, E) 
              end, 
              T)}]).
 %% nested ではtransしたあとは、beam astになっているので、 trans_formsしてはいけない。
@@ -281,7 +282,7 @@ export_(X, L, E) ->
     io:format("export X ~p~n", [X]),
     Aq = lists:map(fun([Fn, Arg]) ->
                            F = term_make_atom(Fn),
-                           A = term(Arg, Loc, E),
+                           A = sterm(Arg, Loc, E),
                            io:format("FA Fis ~p~n Ais ~p~n", [F, A]),
                            erl_syntax:arity_qualifier(F, A)
                    end, L),
@@ -292,7 +293,7 @@ macro_export_(X, L, E) ->
     io:format("macro_export X ~p~n", [X]),
     Aq = lists:map(fun([Fn, Arg]) ->
                            F = term_make_atom(Fn, "MACRO_"),
-                           A = term(Arg, Loc, E),
+                           A = sterm(Arg, Loc, E),
                            io:format("FA Fis ~p~n Ais ~p~n", [F, A]),
                            erl_syntax:arity_qualifier(F, A)
                    end, L),
@@ -331,7 +332,7 @@ spec_(X, L, E) ->
     Return = erl_syntax:type_application(term_make_atom(hd(tl(L))),[]),
     Args = lists:map(fun([AN, AT]) ->
                              NLoc = AN#item.loc,
-                             Name = term(AN,NLoc, E),
+                             Name = sterm(AN,NLoc, E),
                              Type=erl_syntax:type_application(term_to_ast(AT, AT#item.loc, E, true), []),
                              erl_syntax:annotated_type(Name, Type)
                      end, tl(hd(L))),
@@ -355,7 +356,7 @@ match_op(#item{value=_X, loc=Loc}, L, E) ->
     %%LeftT = term(Left, Loc, E),
     %%RightT= term(Right, Loc, E),
     %%io:format("MatchT: ~p ~p~n", [LeftT, RightT]),
-    Me = erl_syntax:match_expr(term(Left, Loc, E), term(Right, Loc, E)),
+    Me = erl_syntax:match_expr(sterm(Left, Loc, E), sterm(Right, Loc, E)),
     %%io:format("Match2: ~p~n", [Me]),
     erl_syntax:set_pos(Me, Loc).
 
@@ -366,7 +367,7 @@ anary_op(Op, Left, _E) ->
 infix_op(Op, Loc, [Left|Right], E) ->
     %%io:format("TreeInfix~n", []),
     OpType = erl_syntax:set_pos(erl_syntax:operator(Op), Loc),
-    Xp =infix_op_do(OpType, [term(Left, Loc, E) |Right], E),
+    Xp =infix_op_do(OpType, [sterm(Left, Loc, E) |Right], E),
     %%io:format("TreeInfix ~p~nLoc ~p~n", [Xp, Loc]),
     erl_syntax:set_pos(Xp, Loc).
 
@@ -379,12 +380,12 @@ infix_op_do(Op, [Left|T], E) ->
         [Right|Tail] ->
             case Tail of
                 [] ->
-                    RightTerm = term(Right, Pos, E),
+                    RightTerm = sterm(Right, Pos, E),
                     Nexp = erl_syntax:infix_expr(Left, Op, RightTerm),
                     Exp = erl_syntax:copy_pos(RightTerm, Nexp),
                     Exp;
                 _ ->
-                    RightEx = term(Right, Pos, E),
+                    RightEx = sterm(Right, Pos, E),
                     Nexp = erl_syntax:infix_expr(Left, Op, RightEx),
                     Exp = erl_syntax:copy_pos(Right, Nexp),
                     infix_op_do(Op, [Exp|Tail], E)
@@ -400,9 +401,9 @@ cons_(C, L, E) ->
     case Tail of
         [] -> Head;
         [X] ->
-            HHead = term(Head, Loc, E),
+            HHead = sterm(Head, Loc, E),
             %%io:format("HHead: ~p~n", [HHead]),
-            TTail0 = term(X, Loc, E),
+            TTail0 = sterm(X, Loc, E),
 %            TTail = erl_syntax:set_pos(erl_syntax:cons(TTail0, erl_syntax:nil()), Loc),
             TTail = TTail0,
             %%io:format("TTail: ~p C: ~p~n", [TTail, C]),
@@ -443,7 +444,7 @@ guard_list(WhenClause, Tail, E) ->
 clause0_(L, Loc, E) ->
     [Args, When| Tail] = L,
     PArgs = lists:map(fun(A) ->
-                              R = term(A, E),
+                              R = sterm(A, E),
                               io:format("<P> ~p~n", [R]),
                               R
                       end, Args),
@@ -453,7 +454,7 @@ clause0_(L, Loc, E) ->
                true ->
                    lists:map(fun(Elem) -> form(Elem, E) end, NBodyList);
                false ->
-                   term(NBodyList, E)
+                   sterm(NBodyList, E)
            end,
     io:format("Arg: ~p~nG: ~p~nB: ~p~n", [PArgs, Guard, Body]),
     Loc = erl_syntax:get_pos(hd(PArgs)),
@@ -518,7 +519,7 @@ defun_(X, L, E) ->
             io:format(standard_error, "GetBody ~p~n", [RRest]),
             Body = lists:map(fun(A) -> form(A, E) end, RRest),
             io:format("simpleArgs ~p ~n", [Args]),
-            ArgList = lists:map(fun(A) -> term(A, E) end, Args),
+            ArgList = lists:map(fun(A) -> sterm(A, E) end, Args),
             %%  Register argument into environment.
             %%  replace body from environment(argment)
             FunName = erl_syntax:atom(Name#item.value),
@@ -553,7 +554,7 @@ defmacro_(X, L, E) ->
         _  ->
             Body = lists:map(fun(A) -> form(A, E) end, Rest),
             io:format("simpleArgs ~p ~n", [Args]),
-            ArgList = lists:map(fun(A) -> term(A, E) end, Args),
+            ArgList = lists:map(fun(A) -> sterm(A, E) end, Args),
             %%  Register argument into environment.
             %%  replace body from environment(argment)
             FunName = erl_syntax:atom(Macro#item.value),
@@ -612,13 +613,11 @@ make_slist(L) ->
 %%%  (a (with (a)) (a) (b) : hander)
 %%%  (a (a) (b)))
 %%% 
-%%try_(X, L, E) ->
-%%    io:format("try_ : ~p~n", [X]),
-%%    Line = X#item.loc,
-    %%M = scanlist([X|L], ["try", "of", "catch", "after"]),
-    %%Clauses = maps:map(fun(K, V) ->
-    %%clause_(V, E)
-    %%		       end, M),
+try_(X, L, E) ->
+    io:format("try_ : ~p~n", [X]),
+    Line = X#item.loc,
+    M = els_util:scanlist([X|L], ["try", "of", "catch", "after"]).
+
 %%    C = erl_syntax:try_expr(maps.get("try", Clauses),
 %%			    maps.get("of", Clauses, []),
 %%			    maps.get("catch", Clauses, []),
@@ -650,7 +649,7 @@ make_slist(L) ->
 conjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == "whenc"; A == "when"->
     ?LOG_DEBUG(#{conjunctive_form => Tail}),
     lists:map(fun(V) ->
-		      term(V, Env)
+		      sterm(V, Env)
 	      end, Tail).
 %%%
 %%% (if (when (| (& (== 1 2) 
@@ -673,10 +672,10 @@ disjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == ";"; A == "w
     lists:map(fun([#item{type = atom, value = "whenc"}|_]=V) -> 
 		      conjunctive_form(V, Env);
 		 (V) ->
-		      [term(V, Env)]
+		      [sterm(V, Env)]
 	      end, Tail);
 disjunctive_form(L, Env) ->
-    [[term(L, Env)]].
+    [[sterm(L, Env)]].
 
 get_leastlefthand([#item{loc=G}|T], _) ->
     G;
@@ -700,20 +699,20 @@ detect_guard(Test, Body, E) ->
 		When=#item{value="when", loc=GL, type=atom},
 		[conjunctive_form([When|Test], E)];
 	    [#item{loc=GL}|_] ->
-		[[term(Test, E)]];
+		[[sterm(Test, E)]];
 	    #item{loc=GL} ->
-		[[term(Test, E)]];
+		[[sterm(Test, E)]];
 	    [] ->
 		[]
 	end.
 
 clause_arg_guard_body(Args, Test, Body, GL, E) ->
-    Params = lists:map(fun(A) -> term(A, E) end, Args),
+    Params = lists:map(fun(A) -> sterm(A, E) end, Args),
     G = detect_guard(Test, Body, E),
     
     GLine = get_leastlefthand(lists:flatten([Args|[Test|Body]]), 0),
     io:format("#{clause_mono_least => ~p~n", [Test]),
-    B = lists:map(fun(V) -> term(V, E) end, Body),
+    B = lists:map(fun(V) -> sterm(V, E) end, Body),
     S = erl_syntax:clause(Params, G, B),
     ?LOG_DEBUG(#{clause_mono => S}),
     erl_syntax:set_pos(S, erl_anno:new(GLine)).
@@ -756,7 +755,7 @@ case_(X, L, E) ->
     R.
 
 pattern(Term, Env) ->
-    term(Term, Env).
+    sterm(Term, Env).
 
 
 
@@ -780,10 +779,10 @@ let_(X, L, E) ->
                                     case Arg of
                                         [[_Pattern | _] = Match, Value] ->
                                             {P ++ [pattern(Match, E)], 
-                                             A ++ [term(Value, E)]};
+                                             A ++ [sterm(Value, E)]};
                                         [#item{type = atom} = Param, Value] ->
-                                            {P ++ [term(Param, E)], 
-                                             A ++ [term(Value, E)]}
+                                            {P ++ [sterm(Param, E)], 
+                                             A ++ [sterm(Value, E)]}
                                     end
                               end, {[], []}, Args),
     Body = lists:map(fun(A) -> form(A, E) end, Rest),
@@ -805,8 +804,8 @@ let_(X, L, E) ->
 %%         clanse2...)
 
 lambda_(_X, [[#item{type=atom, value=_N, loc=Loc}|_ArgT]=Args|Rest]=_L, E) ->
-    Params = lists:map(fun(A) -> term(A, E) end, Args),
-    Body = lists:map(fun(A) -> term(A, E) end, Rest),
+    Params = lists:map(fun(A) -> sterm(A, E) end, Args),
+    Body = lists:map(fun(A) -> sterm(A, E) end, Rest),
     MQ = ?MQP(Loc, "fun(_@@params) -> _@@body end", 
               [{'params', Params},
                {'body', Body}]),
@@ -843,15 +842,15 @@ call_function(Fun=#item{value=_X, loc=Loc}, T, E) ->
     FHead = lists:map(fun(Elem) ->
                               io:format("Term ~p~n", [Elem]),
 %                              A = lists:map(fun(Arg) ->
-%                                                    term(Arg, E)
+%                                                    sterm(Arg, E)
 %                                            end, Elem),
-                              A = term(Elem, E),
+                              A = sterm(Elem, E),
                               io:format("TermAfter ~p~n", [A]),
                               A
                       end, T),
-    %%io:format("call X2 ~p~nT ~p~n", [term(Fun,E, Loc), FHead]),
+    %%io:format("call X2 ~p~nT ~p~n", [sterm(Fun,E, Loc), FHead]),
     %FName = erl_syntax:set_pos(erl_syntax:atom(X), Loc),
-    %FName = term(Fun, E, Loc),
+    %FName = sterm(Fun, E, Loc),
     {M, F} = getmodfun(Fun),
     %%io:format("MQP: ~p : ~p : arg ~p~n", [M, F, FHead]),
     case M of
@@ -891,7 +890,7 @@ getmodfun(#item{type=Type, value=X, loc=Loc}) when Type == atom; Type== module_f
 list_(X, L, Env) ->
     R = lists:map(fun(Elem) ->
                           io:format("List Term ~p~n", [Elem]),
-                          A=term(Elem, Env),
+                          A=sterm(Elem, Env),
                           io:format("List TermAfter ~p~n", [A]),
                           A
                   end, L),
@@ -915,7 +914,7 @@ unquote_(X, _L, _Env) ->
     X.
 map_(#item{loc=Loc}, L, Env) ->
     LForm = lists:map(fun(E) ->
-                              term(E, Env)
+                              sterm(E, Env)
                       end, L),
     {MapFields, _R, _Len} =  lists:foldl(fun(E, {A, _K, I}) when  I rem 2 == 1 ->
                                                  {A, E, I+1};
@@ -927,13 +926,13 @@ map_(#item{loc=Loc}, L, Env) ->
     erl_syntax:set_pos(erl_syntax:map_expr(lists:reverse(MapFields)), Loc).
 tuple_(#item{loc=Loc}, L, Env) ->
     LForm = lists:map(fun(E) ->
-                              term(E, Env)
+                              sterm(E, Env)
                       end, L),
     erl_syntax:set_pos(erl_syntax:tuple(LForm), Loc).
 
 binary_(#item{loc=Loc}, L, Env) ->
     LForm = lists:map(fun(E) ->
-                              erl_syntax:binary_field(term(E, Env))
+                              erl_syntax:binary_field(sterm(E, Env))
                       end, L),
     erl_syntax:set_pos(erl_syntax:binary(LForm), Loc).
 

@@ -25,18 +25,18 @@ bc_item([#item{value="backquote", loc=Loc}, Xn], Env) when is_list(Xn) ->
     R = lists:map(fun 
                       %% . ,form -> form
                       ([#item{value="dot"}, [#item{value="unquote"}, F]])  ->
-                          transpile:term(F, Env);
+                          transpile:sterm(F, Env);
                       %% . atom -> quote atom 
                       ([#item{value="dot"}, #item{type=atom} = F])  ->
-                          S = transpile:term([yal_util:make_symbol(quote, Loc), F], Env),
+                          S = transpile:sterm([yal_util:make_symbol(quote, Loc), F], Env),
                           erl_syntax:set_pos(S, Loc);
                       %% ,@form -> form
                       ([#item{value="unquote_splice"}, F]) ->
-                          M=transpile:term(F, Env),
+                          M=transpile:sterm(F, Env),
                           M;
                       %% ,form -> (list form)
                       ([#item{value="unquote"}, F]) ->
-                          S = erl_syntax:list([transpile:term(F, Env)]),
+                          S = erl_syntax:list([transpile:sterm(F, Env)]),
                           erl_syntax:set_pos(S, Loc);
                       %% form -> (list `form)
                       (F) ->
