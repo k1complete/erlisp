@@ -97,7 +97,8 @@ dispatch_infix_op(A) ->
           "bor" => fun infix_op/4,
           "bxor" => fun infix_op/4,
           "bsl" => fun infix_op/4,
-          "bsr" => fun infix_op/4
+          "bsr" => fun infix_op/4,
+	  "!" => fun infix_op/4
          },
     maps:get(A, L, undef).
 dispatch_special(A) ->
@@ -106,6 +107,8 @@ dispatch_special(A) ->
           "-macro_export" => fun macro_export_/3,
           "-module" => fun module_/3,
           "-spec" => fun spec_/3,
+          "-require" => fun require_/3,
+          "-import" => fun import_/3,
           "cons" => fun cons_/3,
           "list" => fun list_/3,
           "quote" => fun quote_/3,
@@ -113,13 +116,12 @@ dispatch_special(A) ->
           "map" => fun map_/3,
           "tuple" => fun tuple_/3,
           "binary" => fun binary_/3,
-          "-require" => fun require_/3,
-          "-import" => fun import_/3,
           "defun" => fun defun_/3,
           "defmacro" => fun defmacro_/3,
           "case" => fun case_/3,
           "if" => fun if_/3,
           "try" => fun try_/3,
+          "receive" => fun receive_/3,
           "let" => fun let_/3,
           "lambda" => fun lambda_/3
          },
@@ -671,14 +673,33 @@ try_(X, L, E) ->
     io:format("try : ~p~n", [R]),
     R.
 
-%%    C = erl_syntax:try_expr(maps.get("try", Clauses),
-%%			    maps.get("of", Clauses, []),
-%%			    maps.get("catch", Clauses, []),
-%%			    maps.get("after", Clauses, [])),
-%%    R = erl_syntax:try_expr(C, erl_anno:new(Line)),
-%%    io:format("try : ~p~n", [R]),
-%%    R.
-			
+receive_(X, L, E) ->
+    io:format("receive_ : ~p~n", [[X|L]]),
+    Line = X#item.loc,
+    {M, LocH}  = els_util:scanlist([X|L], ["receive", "after"]),
+    io:format("scanlist : ~p~n LockH : ~p~n", [M, LocH]),
+    Cls = maps:map(fun(K, V) when K=="after" ->
+			   [TimeoutTerm|AfterBody] = V,
+			   Timeout = sterm(TimeoutTerm, E),
+			   After = lists:map(fun(S) ->
+						     sterm(S, E)
+					     end, AfterBody),
+			   {Timeout, After};
+		      (K, V) ->
+			   LocK = (maps:get(K, LocH))#item.loc,
+			   lists:map(fun(S) ->
+					     [H|T]=S,
+					     clause_([[H]|T], LocK, E)
+				     end, V)
+		   end, M),
+    io:format("trycl : ~p~n", [Cls]),
+    {Timeout, After} = maps:get("after", Cls, {none, []}),
+    C = erl_syntax:receive_expr(maps:get("receive", Cls),
+				Timeout, After),
+    R = erl_syntax:set_pos(C, erl_anno:new(Line)),
+    io:format("receive : ~p~n", [R]),
+    R.
+
 
 
 %%%
