@@ -119,6 +119,7 @@ dispatch_special(A) ->
           "defmacro" => fun defmacro_/3,
           "case" => fun case_/3,
           "if" => fun if_/3,
+          "try" => fun try_/3,
           "let" => fun let_/3,
           "lambda" => fun lambda_/3
          },
@@ -423,6 +424,34 @@ clause_(L, Loc, E) ->
 		   end,
     clause_arg_guard_body(Args, When, Body, Loc, E).
 
+class_qualifier(Args, Loc, E) ->
+    Params = lists:map(fun(A) -> sterm(A, E) end, Args),
+    Class = hd(Params),
+    ClassQ = case length(Params) of
+		 1 -> 
+		     Throw = erl_syntax:set_pos(erl_syntax:atom("throw"),Loc),
+		     erl_syntax:class_qualifier(Throw, Class);
+		 2 ->
+		     Body = lists:nth(2, Params),
+		     erl_syntax:class_qualifier(Class, Body);
+		 3 ->
+		     Body = lists:nth(2, Params),
+		     StackTrace = lists:nth(3, Params),
+		     erl_syntax:class_qualifier(Class, Body, StackTrace)
+	     end,
+    erl_syntax:set_pos(ClassQ, Loc).
+
+handler_(L, Loc, E) ->
+    [Args, WhenCandidate| BodyCandidate] = L,
+    {When, Body} = case WhenCandidate of
+		       [#item{type=atom, value=V}|_] when V=="when"; V=="whend"; V=="whenc" ->
+			   {WhenCandidate, BodyCandidate};
+		       _ ->
+			   {[], [WhenCandidate| BodyCandidate]}
+		   end,
+    ClassQualifier = class_qualifier(Args, Loc, E),
+    clause_ast_guard_body([ClassQualifier], When, Body, Loc, E).
+
 is_when(#item{type=atom, value="when"}) ->
     true;
 is_when(_) ->
@@ -614,9 +643,33 @@ make_slist(L) ->
 %%%  (a (a) (b)))
 %%% 
 try_(X, L, E) ->
-    io:format("try_ : ~p~n", [X]),
+    io:format("try_ : ~p~n", [[X|L]]),
     Line = X#item.loc,
-    M = els_util:scanlist([X|L], ["try", "of", "catch", "after"]).
+    {M, LocH}  = els_util:scanlist([X|L], ["try", "of", "catch", "after"]),
+    io:format("scanlist : ~p~n LockH : ~p~n", [M, LocH]),
+    Cls = maps:map(fun(K, V) when K == "try"; K == "after" ->
+			   lists:map(fun(S) ->
+					     form(S, E)
+				     end, V);
+		      (K, V) when K=="of" ->
+			   LocK = (maps:get(K, LocH))#item.loc,
+			   lists:map(fun(S) ->
+					     clause_(S, LocK, E)
+				     end, V);
+		      (K, V) ->
+			   LocK = (maps:get(K, LocH))#item.loc,
+			   lists:map(fun(S) ->
+					     handler_(S, LocK, E)
+				     end, V)
+		   end, M),
+    io:format("trycl : ~p~n", [Cls]),
+    C = erl_syntax:try_expr(maps:get("try", Cls),
+			    maps:get("of", Cls, []),
+			    maps:get("catch", Cls, []),
+			    maps:get("after", Cls, [])),
+    R = erl_syntax:set_pos(C, erl_anno:new(Line)),
+    io:format("try : ~p~n", [R]),
+    R.
 
 %%    C = erl_syntax:try_expr(maps.get("try", Clauses),
 %%			    maps.get("of", Clauses, []),
@@ -706,17 +759,20 @@ detect_guard(Test, Body, E) ->
 		[]
 	end.
 
-clause_arg_guard_body(Args, Test, Body, GL, E) ->
-    Params = lists:map(fun(A) -> sterm(A, E) end, Args),
+clause_ast_guard_body(Pattern, Test, Body, GL, E) ->
+%%    GLine = get_leastlefthand(lists:flatten([Test|Body]), GL),
+    GLine = GL,
     G = detect_guard(Test, Body, E),
-    
-    GLine = get_leastlefthand(lists:flatten([Args|[Test|Body]]), 0),
     io:format("#{clause_mono_least => ~p~n", [Test]),
     B = lists:map(fun(V) -> sterm(V, E) end, Body),
-    S = erl_syntax:clause(Params, G, B),
+    S = erl_syntax:clause(Pattern, G, B),
     ?LOG_DEBUG(#{clause_mono => S}),
     erl_syntax:set_pos(S, erl_anno:new(GLine)).
 
+clause_arg_guard_body(Args, Test, Body, GL, E) ->
+    GLine = get_leastlefthand(lists:flatten([[Args],Test|Body]), GL),
+    Params = lists:map(fun(A) -> sterm(A, E) end, Args),
+    clause_ast_guard_body(Params, Test, Body, GLine, E).
 
 if_(X, L, E) ->
     Line = X#item.loc,
