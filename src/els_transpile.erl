@@ -87,7 +87,9 @@ dispatch_infix_op(A) ->
           "=:=" => fun infix_op/4,
           "=/=" => fun infix_op/4,
           "+" => fun infix_op/4,
+          "++" => fun infix_op/4,
           "-" => fun infix_op/4,
+          "--" => fun infix_op/4,
           "*" => fun infix_op/4,
           "/" => fun infix_op/4,
           "bnot" => fun infix_op/4,
@@ -98,6 +100,11 @@ dispatch_infix_op(A) ->
           "bxor" => fun infix_op/4,
           "bsl" => fun infix_op/4,
           "bsr" => fun infix_op/4,
+          "and" => fun infix_op/4,
+          "or" => fun infix_op/4,
+          "not" => fun infix_op/4,
+          "andalso" => fun infix_op/4,
+          "orelse" => fun infix_op/4,
 	  "!" => fun infix_op/4
          },
     maps:get(A, L, undef).
