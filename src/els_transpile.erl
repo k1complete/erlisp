@@ -461,46 +461,6 @@ handler_(L, Loc, E) ->
     ClassQualifier = class_qualifier(Args, Loc, E),
     clause_ast_guard_body([ClassQualifier], When, Body, Loc, E).
 
-is_when(#item{type=atom, value="when"}) ->
-    true;
-is_when(_) ->
-    false.
-
-guard_list(WhenClause, _Tail, _E) when not is_list(WhenClause) ->
-    {[], WhenClause};
-guard_list(WhenClause, Tail, E) ->
-    {Guard, NBodyList} = case is_when(hd(WhenClause)) of
-                             true ->
-                                 io:format("Guard: ~p~n", [tl(WhenClause)]),
-                                 [WhenGuard | _] = tl(WhenClause),
-                                 io:format("Body: ~p~n", [Tail]),
-                                 {form(WhenGuard, E), Tail};
-                             false ->
-                                 {[], [WhenClause | Tail]}
-                         end,
-    {Guard, NBodyList}.
-clause0_(L, Loc, E) ->
-    [Args, When| Tail] = L,
-    PArgs = lists:map(fun(A) ->
-                              R = sterm(A, E),
-                              io:format("<P> ~p~n", [R]),
-                              R
-                      end, Args),
-    io:format("WArg: ~p~n", [When]),
-    {Guard, NBodyList} = guard_list(When, Tail, E),
-    Body = case is_list(NBodyList) of
-               true ->
-                   lists:map(fun(Elem) -> form(Elem, E) end, NBodyList);
-               false ->
-                   sterm(NBodyList, E)
-           end,
-    io:format("Arg: ~p~nG: ~p~nB: ~p~n", [PArgs, Guard, Body]),
-    Loc = erl_syntax:get_pos(hd(PArgs)),
-    S=?MQP(Loc, "(_@PArgs) when _@__Guard -> _@Body",
-        [{'PArgs', PArgs}, {'Guard', Guard}, {'Body', Body} ]),
-    io:format("SSS: ~p~n", [S]),
-    S.
-
 
 match_defun_(Name, Clauses, E) ->
     io:format("match-defun ~p~n", [Name]),
@@ -758,9 +718,9 @@ disjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == ";"; A == "w
 disjunctive_form(L, Env) ->
     [[sterm(L, Env)]].
 
-get_leastlefthand([#item{loc=G}|T], _) ->
+get_leastlefthand([#item{loc=G}|_], _) ->
     G;
-get_leastlefthand([H|L], G) ->
+get_leastlefthand([H|_L], G) ->
     get_leastlefthand(H, G);
 get_leastlefthand(#item{loc=G}, _) ->
     G;
@@ -770,22 +730,22 @@ get_leastlefthand(_, G) ->
     
 %% {Param, Test, Body}
 %split_param_from_clause
-detect_guard(Test, Body, E) ->
-    G = case Test of
-	    [#item{loc=GL, value="when"}|T] ->
-		[conjunctive_form(Test, E)];
-	    [#item{loc=GL, value="whend"}|T] ->
-		[disjunctive_form(Test, E)];
-	    [[#item{loc=GL}|_]|_] ->
-		When=#item{value="when", loc=GL, type=atom},
-		[conjunctive_form([When|Test], E)];
-	    [#item{loc=GL}|_] ->
-		[[sterm(Test, E)]];
-	    #item{loc=GL} ->
-		[[sterm(Test, E)]];
-	    [] ->
-		[]
-	end.
+detect_guard(Test, _Body, E) ->
+    case Test of
+	[#item{value="when"}|_] ->
+	    [conjunctive_form(Test, E)];
+	[#item{value="whend"}|_] ->
+	    [disjunctive_form(Test, E)];
+	[[#item{loc=GL}|_]|_] ->
+	    When=#item{value="when", loc=GL, type=atom},
+	    [conjunctive_form([When|Test], E)];
+	[#item{}|_] ->
+	    [[sterm(Test, E)]];
+	#item{} ->
+	    [[sterm(Test, E)]];
+	[] ->
+	    []
+    end.
 
 clause_ast_guard_body(Pattern, Test, Body, GL, E) ->
 %%    GLine = get_leastlefthand(lists:flatten([Test|Body]), GL),
