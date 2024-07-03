@@ -5,10 +5,10 @@ Definitions.
 %macro definitions
 Digits = [0-9]+
 Alphabet = [A-Za-z_]|[\x{80}-\x{10fff}]
-Griph=[-+*/]
+Griph=[-+*/\|]
 PostAlphabet = ({Alphabet}|{Digits}|{Griph})
-Symbols = [-+/*a-z]{PostAlphabet}*
-Op = (\+\+|\-\-|==|/=|=<|<|>=|>|=:=|=/=|\+|-|\*|/|!)
+Symbols = [-+/*\|a-z]{PostAlphabet}*
+Op = (\+\+|\-\-|==|/=|=<|<|>=|>|=:=|=/=|\+|-|\*|/|!|<-|:=)
 Variables = [A-Z_]{PostAlphabet}*
 WhiteSpace = [\s\t]+
 MQ = \"\"\"

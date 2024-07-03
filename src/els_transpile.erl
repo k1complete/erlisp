@@ -130,7 +130,11 @@ dispatch_special(A) ->
           "try" => fun try_/3,
           "receive" => fun receive_/3,
           "let" => fun let_/3,
-          "lambda" => fun lambda_/3
+          "lambda" => fun lambda_/3,
+	  "<-" => fun generator_/3,
+	  ":=" => fun map_field_exact_/3,
+	  "lc||" => fun list_comp_/3,
+	  "mc||" => fun map_comp_/3
          },
     maps:get(A, L, undef).
 
@@ -840,6 +844,48 @@ let_(X, L, E) ->
             ]),
     io:format("MQ2: ~p~n", [MQ]),
     MQ.
+
+%% (lc|| a generators)
+list_comp_(_X, [TT|Rest] = _L, E) ->
+    Template = sterm(TT, E),
+    Body = lists:map(fun(A) -> sterm(A, E) end, Rest),
+    MQ = erl_syntax:list_comp(Template, Body).
+			      
+%%
+%% (mc|| a b generators)
+%%
+%% 
+map_comp_(_X, [KT, VT|Rest]=_L, E) ->
+    Template = erl_syntax:map_field_assoc(sterm(KT, E), sterm(VT, E)),
+    Body = lists:map(fun(A) -> sterm(A, E) end, Rest),
+    MQ = erl_syntax:map_comp(Template, Body).
+
+map_field_exact_(#item{loc=Loc}=_X, L, E) ->
+    [Name, Value] = lists:map(fun(A) ->
+			       sterm(A, E)
+		       end, L), 
+    S = erl_syntax:map_field_exact(Name, Value),
+    erl_syntax:set_pos(S, Loc).
+
+%%
+%% (<- x        (list a 1 2 3)) (=:= x 1)
+%% (<- x        (bitstring a 1 2 3))
+%% (<- k v (maps 1 2 3 4))
+%%
+generator_(#item{loc=Loc}=_X, [K, Rest]=L, E) ->
+    Pattern = sterm(K, E),
+    Body = sterm(Rest, E),
+    S = erl_syntax:generator(Pattern, Body),
+    erl_syntax:set_pos(S, Loc);
+generator_(#item{loc=Loc}=_X, [K, V, Rest]=L, E) ->
+    PK = sterm(K, E),
+    PV = sterm(V, E),
+    Pattern = erl_syntax:map_field_exact(PK, PV),
+    Body = sterm(Rest, E),
+    S = erl_syntax:map_generator(Pattern, Body),
+    erl_syntax:set_pos(S, Loc).
+
+
 
 %%
 %% (lambda (a b)
