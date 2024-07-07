@@ -7,7 +7,8 @@ Digits = [0-9]+
 Alphabet = [A-Za-z_]|[\x{80}-\x{10fff}]
 Griph=[-+*/\|]
 PostAlphabet = ({Alphabet}|{Digits}|{Griph})
-Symbols = [-+/*\|a-z]{PostAlphabet}*
+Symbols = [-+/*\|\?a-z]{PostAlphabet}*
+
 Op = (\+\+|\-\-|==|/=|=<|<|>=|>|=:=|=/=|\+|-|\*|/|!|<-|<=|:=)
 Variables = [A-Z_]{PostAlphabet}*
 WhiteSpace = [\s\t]+

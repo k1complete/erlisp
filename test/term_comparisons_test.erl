@@ -1,0 +1,88 @@
+-module(term_comparisons_test).
+
+-include_lib("eunit/include/eunit.hrl").
+-include_lib("syntax_tools/include/merl.hrl").
+
+problem_list() ->
+    [
+     #{src => "(== 1 1)",
+       var => [],
+       result => {value, true, []}},
+     #{src => "(== 1 2)",
+       var => [],
+       result => {value, false, []}},
+     #{src => "(/= 1 1)",
+       var => [],
+       result => {value, false, []}},
+     #{src => "(/= 1 2)",
+       var => [],
+       result => {value, true, []}},
+     #{src => "(=< 1 1)",
+       var => [],
+       result => {value, true, []}},
+     #{src => "(=< 2 1)",
+       var => [],
+       result => {value, false, []}},
+     #{src => "(=< 1 2)",
+       var => [],
+       result => {value, true, []}},
+     #{src => "(< 1 1)",
+       var => [],
+       result => {value, false, []}},
+     #{src => "(< 2 1)",
+       var => [],
+       result => {value, false, []}},
+     #{src => "(< 1 2)",
+       var => [],
+       result => {value, true, []}},
+     #{src => "(>= 1 1)",
+       var => [],
+       result => {value, true, []}},
+     #{src => "(>= 2 1)",
+       var => [],
+       result => {value, true, []}},
+     #{src => "(>= 1 2)",
+       var => [],
+       result => {value, false, []}},
+     #{src => "(> 1 1)",
+       var => [],
+       result => {value, false, []}},
+     #{src => "(> 2 1)",
+       var => [],
+       result => {value, true, []}},
+     #{src => "(> 1 2)",
+       var => [],
+       result => {value, false, []}},
+     #{src => "(=:= 1 1)",
+       var => [],
+       result => {value, true, []}},
+     #{src => "(=:= 1 2)",
+       var => [],
+       result => {value, false, []}},
+     #{src => "(=/= 1 1)",
+       var => [],
+       result => {value, false, []}},
+     #{src => "(=/= 1 2)",
+       var => [],
+       result => {value, true, []}}
+
+    ].
+term_comparisons_test() ->
+    Line = ?LINE,
+    lists:map(fun(L) ->
+		      io:format("KKKK ~p~n", [L]),
+		      Cmd = maps:get(src, L),
+		      Result = maps:get(result, L),
+		      Var = maps:get(var, L),
+		      Binding = lists:foldr(fun({K, V}, A) ->
+						    erl_eval:add_bindings(K, V, A)
+					    end, erl_eval:new_bindings(),
+					    Var),
+		      {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(Cmd), Line),
+		      io:format("tokens ~p~n", [Tokens]),
+		      {ok, [Tree]} =els_parser:parse(Tokens),
+		      C = els_transpile:form(Tree, []),
+		      io:format("TransForm ~p~n", [erl_syntax:revert(C)]),
+		      ?assertEqual(Result,
+				   erl_eval:expr(erl_syntax:revert(C), Binding))
+	      end, problem_list()).

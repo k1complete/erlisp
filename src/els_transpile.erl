@@ -102,6 +102,7 @@ dispatch_infix_op(A) ->
           "bsr" => fun infix_op/4,
           "and" => fun infix_op/4,
           "or" => fun infix_op/4,
+          "xor" => fun infix_op/4,
           "not" => fun infix_op/4,
           "andalso" => fun infix_op/4,
           "orelse" => fun infix_op/4,
@@ -136,7 +137,9 @@ dispatch_special(A) ->
 	  ":=" => fun map_field_exact_/3,
 	  "lc||" => fun list_comp_/3,
 	  "bc||" => fun binary_comp_/3,
-	  "mc||" => fun map_comp_/3
+	  "mc||" => fun map_comp_/3,
+	  "maybe" => fun maybe_/3,
+	  "?match" => fun maybe_match_/3
          },
     maps:get(A, L, undef).
 
@@ -645,6 +648,41 @@ try_(X, L, E) ->
     R = erl_syntax:set_pos(C, erl_anno:new(Line)),
     io:format("try : ~p~n", [R]),
     R.
+
+maybe_match_(X, [LH, RH], E) ->
+    Line = X#item.loc,
+    C = erl_syntax:maybe_match_expr(sterm(LH, E), sterm(RH, E)),
+    io:format("maybe_match : ~p~n", [C]),
+    R = erl_syntax:set_pos(C, erl_anno:new(Line)).
+
+%%%
+%% (maybe 
+%%  (?= exp exp)
+%%  (= exp exp)
+%%  (?= exp exp)
+%%  else
+%%  (pattern (when exp)
+%%     form)
+%%  (pattern (when exp)
+%%     form))
+maybe_(X, L, E) ->
+    Line = X#item.loc,
+    {M, LocH}  = els_util:scanlist([X|L], ["maybe", "else"]),
+    io:format("maybe_ : ~p~n", [M]),
+    Cls = maps:map(fun("maybe", V) ->
+			   lists:map(fun(S) ->
+					     sterm(S, E)
+				     end, V);
+		      ("else", V) ->
+			   LocK = (maps:get("else", LocH))#item.loc,
+			   lists:map(fun(S) ->
+					     clause_(S, LocK, E)
+				     end, V)
+		   end, M),
+    C = erl_syntax:maybe_expr(maps:get("maybe", Cls), 
+			      maps:get("else", Cls, none)),
+    io:format("maybe2_ : ~p~n", [C]),
+    R = erl_syntax:set_pos(C, erl_anno:new(Line)).
 
 receive_(X, L, E) ->
     io:format("receive_ : ~p~n", [[X|L]]),
