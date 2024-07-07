@@ -885,7 +885,48 @@ let_(X, L, E) ->
     io:format("MQ2: ~p~n", [MQ]),
     MQ.
 %%
+parse_types(#item{loc=Loc, value=Val}) ->
+    TList = string:split(Val, "-", all),
+    lists:map(fun("unit:"++X) ->
+		      {Int, []} = string:to_integer(X),
+		      Body = erl_syntax:atom("unit"),
+		      Size = erl_syntax:integer(Int),
+		      Q = erl_syntax:size_qualifier(Body, Size),
+		      erl_syntax:set_pos(Q, Loc);
+		 (X) ->
+		      Q = erl_syntax:atom(X),
+		      erl_syntax:set_pos(Q, Loc)
+	      end, TList).
 
+%% typespecifierlist
+%% (ts types or unit:[1-256])
+%% (binary X)
+%% (binary (:bf value size typespec) ) (: aaa ))
+%% (binary (:bf value / aaa-sss-fff ) ...
+binary_field_(#item{loc=Loc}, [Value], E) ->
+    Body = sterm(Value, E),
+    R = erl_syntax:binary_field(Body),
+    erl_erl_syntax:set_pos(R, Loc);
+binary_field_(#item{loc=Loc}, [Value, Size], E) ->
+    Body = sterm(Value, E),
+    Size = sterm(Size, E),
+    R = erl_syntax:binary_field(Body),
+    erl_erl_syntax:set_pos(R, Loc);
+binary_field_(#item{loc=Loc}, [Value, #item{value="/"}, Types], E) ->
+    Body = sterm(Value, E),
+    TypeList = parse_types(Types),
+    Q = erl_syntax:binary_field(Body, TypeList),
+    erl_syntax:set_pos(Q, Loc);
+binary_field_(#item{loc=Loc}, [Value, SizeP, Types], E) ->
+    io:format("bf: ~p ~p ~p ~n", [Value, SizeP, Types]),
+    Body = sterm(Value, E),
+    Size = sterm(SizeP, E),
+    TypeList = parse_types(Types),
+    Q = erl_syntax:binary_field(Body, Size, TypeList),
+    erl_syntax:set_pos(Q, Loc).
+
+
+%%
 binary_comp_(_X, [TT|Rest] = _L, E) ->
     Template = sterm(TT, E),
     Body = lists:map(fun(A) -> sterm(A, E) end, Rest),
@@ -1073,8 +1114,11 @@ tuple_(#item{loc=Loc}, L, Env) ->
     erl_syntax:set_pos(erl_syntax:tuple(LForm), Loc).
 
 binary_(#item{loc=Loc}, L, Env) ->
-    LForm = lists:map(fun(E) ->
-                              erl_syntax:binary_field(sterm(E, Env))
+    LForm = lists:map(fun([#item{value=":bf"}|_]=S) when is_list(S) ->
+			       binary_field_(hd(S), tl(S), Env);
+			 (S) ->
+			      B = sterm(S, Env),
+			      erl_syntax:binary_field(B)
                       end, L),
     erl_syntax:set_pos(erl_syntax:binary(LForm), Loc).
 
