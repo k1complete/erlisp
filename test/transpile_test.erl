@@ -202,7 +202,7 @@ macro_test() ->
                    ),
     C5= {cons,1,
          {atom,1,'!='},
-         {cons,1,{integer,1,1},{cons,1,{integer,2,2},{nil,1}}}},
+         {cons,1,{integer,1,1},{cons,2,{integer,2,2},{nil,2}}}},
     ?assertEqual(C5, erl_syntax:revert(C4)).
 
 
@@ -231,8 +231,8 @@ macro_2_test() ->
          {cons,1,{integer,1,1},
           {cons,1,
            {atom,1,'!='},
-           {cons, 1, 
-            {integer,2,2},{nil,1}}}}},
+           {cons, 2, 
+            {integer,2,2},{nil,2}}}}},
     ?assertEqual(C5, erl_syntax:revert(C4)).
 
 

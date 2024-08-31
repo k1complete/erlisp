@@ -11,10 +11,10 @@ file(File) ->
 
 -spec file(string(), list()) -> {ok, module(), binary()}.
 file(File, Opt) ->
-    io:format("cwd ~p", [file:get_cwd()]),
+    io:format("cwd ~p~n", [file:get_cwd()]),
     Module = m,
     {ok, Tokens} = els_scan:file(File, Opt),
-    io:format("scan ~p", [Tokens]),
+    io:format("scan ~p~n", [Tokens]),
     {ok, Forms} = els_parser:parse(Tokens),
     Env=[],
     Ast = lists:map(fun(F) ->
@@ -24,7 +24,7 @@ file(File, Opt) ->
                           end, Forms),
     io:format("Ast ~p~n", [Ast]),
     {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
-    io:format("compiled ~p", [Binary]),
+    io:format("compiled ~p~n", [Binary]),
     {ok, Module, Binary}.
 
 
@@ -35,6 +35,7 @@ file(File, Opt) ->
 %% 終りまでいったら、終了
 %% 
 compile_macro(A, E) ->
+    io:format("pre-compiled ~p~n", [A]),
     [{MS, ModuleForm}] = lists:filtermap(fun([#item{type=atom, value="-module"}|R]=L) -> 
                                                  {true, 
                                                   {L, [#item{type=atom, value="quote"},  hd(R)]}};
@@ -51,6 +52,7 @@ compile_macro(A, E) ->
                            (_) -> 
                                 false 
                         end, A),
+    io:format("compile-macro: ~p~n", [M]),
     Forms2 = lists:filter(fun([#item{type=atom, value="-export"}|_]) -> 
                                   false;
                              ([#item{type=atom, value="-macro_export"}|_]) -> 
@@ -63,12 +65,17 @@ compile_macro(A, E) ->
                                   true
                           end, A),
     IEnv = els_transpile:merge_into_env(E, macros, maps:from_list(M)),
+    io:format("merge_env ~p ~p~n", [ModuleName, IEnv]),
+
     Ret = lists:foldl(fun(S, {_Ret, [], EnvAct}) ->
                               Forms = [[MS21, MS22]]++[S], 
                               Ast = lists:map(fun(F) ->
-                                                      els_transpile:form(F, EnvAct)
+						      io:format("merge_form ~p~n", [F]),
+                                                      Asst = els_transpile:form(F, EnvAct),
+						      io:format("merge_ast ~p~n", [Asst]),
+						      Asst
                                               end, Forms),
-                              io:format("2222 ~p~n~p", [Forms, erl_syntax:revert(Ast)]),
+                              io:format("2222 ~p~n~p", [Forms, erl_syntax:revert_forms(Ast)]),
                               {module, _Module, Binary} = 
                                   compile_and_write_beam(Ast, [debug_info, export_all]),
                               R = catch apply(ModuleName, main, [2,3]),
@@ -90,19 +97,21 @@ compile_macro(A, E) ->
                                   compile_and_write_beam(Ast, [debug_info, export_all]),
                               R = catch apply(ModuleName, module_info, [exports]),
                               ?LOG_ERROR(#{module_info2 => R}),
-                              {Binary, Forms, NEnv}
+                              {Binary, Forms, NEnv};
+			 (S, AA) ->
+			      io:format("error!!: ~p ~n~pn", [S, AA])
                   end, {[], [], IEnv}, Forms2),
+    io:format("compiled-macro: ~p ~n", [Ret]),
     ?LOG_ERROR(#{maros_list => IEnv}),
     Ret.
 
 -spec compile_and_write_beam(sexp(), options()) -> {module, module(), binary()}.
 compile_and_write_beam(Ast, Options) ->
     SS = merl:compile_and_load(Ast, Options),
-    ?LOG_ERROR(#{compile2 => erl_syntax:revert(Ast), options=>Options, ss => SS}),
+    ?LOG_ERROR(#{compile2 => erl_syntax:revert_forms(Ast), options=>Options, ss => SS}),
     {ok, Binary} =SS,
     Specs = extract_specs(Ast),
     {ok, DocsV1} = make_docs(Ast, Specs),
-    io:format("compiled ~p", [Binary]),
     {ok, Module, Chunks} = beam_lib:all_chunks(Binary),
     ChunksAdded = lists:append(Chunks, [{"Docs", term_to_binary(DocsV1)}]),
     {ok, Binary2} = beam_lib:build_module(ChunksAdded),
@@ -118,7 +127,11 @@ file_ast(File, Opt) ->
     {ok, Tokens} = els_scan:file(File, Opt),
     io:format("scan ~p", [Tokens]),
     {ok, Forms} = els_parser:parse(Tokens),
-    {_, _, NEnv} = compile_macro(Forms, []),
+    io:format("parsed ~p~n", [Forms]),
+    Compiled = compile_macro(Forms, []),
+    io:format("compiled ~p~n", [Forms]),
+    {_, _, NEnv} = Compiled,
+    io:format("compiled ~p", [NEnv]),
     MR = Forms,
     Env=NEnv,
     ?LOG_ERROR(#{macro_compiled => MR, nenv => NEnv}),

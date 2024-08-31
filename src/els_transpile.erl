@@ -545,7 +545,7 @@ defun_(X, L, E) ->
                           R
                   end,
             %%MMQ=MQ,
-            io:format("MMQ2: ~p~n", [MMQ]),
+            io:format("MMQ2: ~p~n", [erl_syntax:revert(MMQ)]),
             MMQ
     end.
 
@@ -653,7 +653,8 @@ maybe_match_(X, [LH, RH], E) ->
     Line = X#item.loc,
     C = erl_syntax:maybe_match_expr(sterm(LH, E), sterm(RH, E)),
     io:format("maybe_match : ~p~n", [C]),
-    R = erl_syntax:set_pos(C, erl_anno:new(Line)).
+    R = erl_syntax:set_pos(C, erl_anno:new(Line)),
+    R.
 
 %%%
 %% (maybe 
@@ -682,7 +683,8 @@ maybe_(X, L, E) ->
     C = erl_syntax:maybe_expr(maps:get("maybe", Cls), 
 			      maps:get("else", Cls, none)),
     io:format("maybe2_ : ~p~n", [C]),
-    R = erl_syntax:set_pos(C, erl_anno:new(Line)).
+    R = erl_syntax:set_pos(C, erl_anno:new(Line)),
+    R.
 
 receive_(X, L, E) ->
     io:format("receive_ : ~p~n", [[X|L]]),
@@ -930,13 +932,15 @@ binary_field_(#item{loc=Loc}, [Value, SizeP, Types], E) ->
 binary_comp_(_X, [TT|Rest] = _L, E) ->
     Template = sterm(TT, E),
     Body = lists:map(fun(A) -> sterm(A, E) end, Rest),
-    MQ = erl_syntax:binary_comp(Template, Body).
+    MQ = erl_syntax:binary_comp(Template, Body),
+    MQ.
 			      
 %% (lc|| a generators)
 list_comp_(_X, [TT|Rest] = _L, E) ->
     Template = sterm(TT, E),
     Body = lists:map(fun(A) -> sterm(A, E) end, Rest),
-    MQ = erl_syntax:list_comp(Template, Body).
+    MQ = erl_syntax:list_comp(Template, Body),
+    MQ.
 			      
 %%
 %% (mc|| a b generators)
@@ -945,7 +949,8 @@ list_comp_(_X, [TT|Rest] = _L, E) ->
 map_comp_(_X, [KT, VT|Rest]=_L, E) ->
     Template = erl_syntax:map_field_assoc(sterm(KT, E), sterm(VT, E)),
     Body = lists:map(fun(A) -> sterm(A, E) end, Rest),
-    MQ = erl_syntax:map_comp(Template, Body).
+    MQ = erl_syntax:map_comp(Template, Body),
+    MQ.
 
 map_field_exact_(#item{loc=Loc}=_X, L, E) ->
     [Name, Value] = lists:map(fun(A) ->
@@ -956,7 +961,7 @@ map_field_exact_(#item{loc=Loc}=_X, L, E) ->
 
 
 %% (<= x        (bitstring a 1 2 3))
-binary_generator_(#item{loc=Loc}=_X, [K, Rest]=L, E) ->
+binary_generator_(#item{loc=Loc}=_X, [K, Rest]=_L, E) ->
     Pattern = sterm(K, E),
     Body = sterm(Rest, E),
     S = erl_syntax:binary_generator(Pattern, Body),
@@ -965,12 +970,12 @@ binary_generator_(#item{loc=Loc}=_X, [K, Rest]=L, E) ->
 %% (<- x        (list a 1 2 3)) (=:= x 1)
 %% (<- k v (maps 1 2 3 4))
 %%
-generator_(#item{loc=Loc}=_X, [K, Rest]=L, E) ->
+generator_(#item{loc=Loc}=_X, [K, Rest]=_L, E) ->
     Pattern = sterm(K, E),
     Body = sterm(Rest, E),
     S = erl_syntax:generator(Pattern, Body),
     erl_syntax:set_pos(S, Loc);
-generator_(#item{loc=Loc}=_X, [K, V, Rest]=L, E) ->
+generator_(#item{loc=Loc}=_X, [K, V, Rest]=_L, E) ->
     PK = sterm(K, E),
     PV = sterm(V, E),
     Pattern = erl_syntax:map_field_exact(PK, PV),

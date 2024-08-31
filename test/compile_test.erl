@@ -10,8 +10,10 @@ compile_test() ->
 
 
 compile_doctest_test() ->
-    {ok, Module, Binary, _Ast} = els_compile:file_ast("test/testdata/doctest.elisp", []),
-    %%error_logger:info_report(Ast),
+    RR = els_compile:file_ast("test/testdata/doctest.elisp", []),
+    {ok, Module, Binary, _Ast} = RR,
+    error_logger:info_report(_Ast),
+    io:format("doctest: ~p~n", [_Ast]),
     ModuleName = atom_to_list(Module),
     File = ModuleName ++ ".beam",
     file:write_file(File, Binary),
@@ -37,7 +39,7 @@ compile_with_macro_test() ->
 compile_with_macrofunccall_test() ->
     {ok, Module, _Binary, Ast} = els_compile:file_ast("test/testdata/macrofunccall.elisp", []),
     ?assertEqual({module, macrofunccall}, code:ensure_loaded(macrofunccall)),
-    error_logger:info_report(erl_syntax:revert(Ast)),
+    error_logger:info_report(erl_syntax:revert_forms(Ast)),
     {file, _File} = code:is_loaded(Module),
     ?assertEqual(1 , macrofunccall:main("a",2)).
     
