@@ -74,8 +74,6 @@ term_to_ast(A, Loc, Env, Quote) ->
 
     end.
 
-    
-
 dispatch_infix_op(A) ->
     L = #{
           "==" => fun infix_op/4,
@@ -92,54 +90,58 @@ dispatch_infix_op(A) ->
           "--" => fun infix_op/4,
           "*" => fun infix_op/4,
           "/" => fun infix_op/4,
-          "bnot" => fun infix_op/4,
-          "div" => fun infix_op/4,
-          "rem" => fun infix_op/4,
+	  "!" => fun infix_op/4,
+          "and" => fun infix_op/4,
+          "andalso" => fun infix_op/4,
           "band" => fun infix_op/4,
+          "bnot" => fun infix_op/4,
           "bor" => fun infix_op/4,
-          "bxor" => fun infix_op/4,
           "bsl" => fun infix_op/4,
           "bsr" => fun infix_op/4,
-          "and" => fun infix_op/4,
-          "or" => fun infix_op/4,
-          "xor" => fun infix_op/4,
+          "bxor" => fun infix_op/4,
+          "div" => fun infix_op/4,
           "not" => fun infix_op/4,
-          "andalso" => fun infix_op/4,
+          "or" => fun infix_op/4,
           "orelse" => fun infix_op/4,
-	  "!" => fun infix_op/4
+          "rem" => fun infix_op/4,
+          "xor" => fun infix_op/4
          },
     maps:get(A, L, undef).
+
 dispatch_special(A) ->
-    L = #{"match" => fun match_op/3,
+    L = #{
+          "if" => fun if_/3,
+	  "bc||" => fun binary_comp_/3,
+          "binary" => fun binary_/3,
+          "defmacro" => fun defmacro_/3,
+          "defun" => fun defun_/3,
+          "case" => fun case_/3,
+          "cons" => fun cons_/3,
+          "lambda" => fun lambda_/3,
+	  "lc||" => fun list_comp_/3,
+          "let" => fun let_/3,
+          "list" => fun list_/3,
+          "map" => fun map_/3,
+	  "=" => fun match_op/3,
+	  "?=" => fun match_op/3,
+	  "match" => fun match_op/3,
+	  "maybe" => fun maybe_/3,
+	  "mc||" => fun map_comp_/3,
+          "quote" => fun quote_/3,
+          "receive" => fun receive_/3,
+          "try" => fun try_/3,
+          "tuple" => fun tuple_/3,
+          "unquote" => fun unquote_/3,
+	  "?match" => fun maybe_match_/3,
           "-export" => fun export_/3,
+          "-import" => fun import_/3,
           "-macro_export" => fun macro_export_/3,
           "-module" => fun module_/3,
           "-spec" => fun spec_/3,
           "-require" => fun require_/3,
-          "-import" => fun import_/3,
-          "cons" => fun cons_/3,
-          "list" => fun list_/3,
-          "quote" => fun quote_/3,
-          "unquote" => fun unquote_/3,
-          "map" => fun map_/3,
-          "tuple" => fun tuple_/3,
-          "binary" => fun binary_/3,
-          "defun" => fun defun_/3,
-          "defmacro" => fun defmacro_/3,
-          "case" => fun case_/3,
-          "if" => fun if_/3,
-          "try" => fun try_/3,
-          "receive" => fun receive_/3,
-          "let" => fun let_/3,
-          "lambda" => fun lambda_/3,
 	  "<-" => fun generator_/3,
 	  "<=" => fun binary_generator_/3,
-	  ":=" => fun map_field_exact_/3,
-	  "lc||" => fun list_comp_/3,
-	  "bc||" => fun binary_comp_/3,
-	  "mc||" => fun map_comp_/3,
-	  "maybe" => fun maybe_/3,
-	  "?match" => fun maybe_match_/3
+	  ":=" => fun map_field_exact_/3
          },
     maps:get(A, L, undef).
 
@@ -658,9 +660,9 @@ maybe_match_(X, [LH, RH], E) ->
 
 %%%
 %% (maybe 
-%%  (?= exp exp)
-%%  (= exp exp)
-%%  (?= exp exp)
+%%  (?match pattern exp)
+%%  (match pattern exp)
+%%  (?match pattern exp)
 %%  else
 %%  (pattern (when exp)
 %%     form)
@@ -717,6 +719,7 @@ receive_(X, L, E) ->
 
 %%%
 %%% (if ((when (isatom a) (bb) ) true )
+%%% (if ((whend (whenc (isatom a) (bb)) (whenc (aaa).. )) true )
 %%% (if ((when (, (isatom a) (bb)) (, (aaa) )) true )
 %%%     (disjunctiive_form bod...)
 %%%     (disjunctiive_form bod...))
@@ -735,9 +738,11 @@ receive_(X, L, E) ->
 %%% 
 conjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == "whenc"; A == "when"->
     ?LOG_DEBUG(#{conjunctive_form => Tail}),
-    lists:map(fun(V) ->
+    L = lists:map(fun(V) ->
 		      sterm(V, Env)
-	      end, Tail).
+		  end, Tail),
+    io:format("Conjunctive: ~p~n", [L]),
+    L.
 %%%
 %%% (if (when (| (& (== 1 2) 
 %%%               (== 2 2))
@@ -753,15 +758,22 @@ conjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == "whenc"; A =
 %%% test -> (, test1 test2..)
 %%% test -> (other)
 %%% (if (== 1 2)  'true) (when 'true 'ng))
-%%% (if (when (== 1 2) (== 2 2) (a ) (b)  ) 'true) (when 'true 'ng))
+%%% (if (when (== 1 2) (== 2 2) 'true) (when 'true 'ng))
 %%% (if (whend (, (== 1 2) (== 2 2)) (a ) (b)  ) 'true) (when 'true 'ng))
-disjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == ";"; A == "whend" ->
-    lists:map(fun([#item{type = atom, value = "whenc"}|_]=V) -> 
-		      conjunctive_form(V, Env);
-		 (V) ->
-		      [sterm(V, Env)]
-	      end, Tail);
+disjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == "whend" ->
+    io:format("Disjuncti:: ~p~n", [Tail]),
+    R0 = lists:map(fun([#item{type = atom, value = "whenc"}|_]=V) -> 
+			   io:format("Disjuncti:::: ~p~n", [V]),
+			   R = conjunctive_form(V, Env),
+			   io:format("Disjuncti:::::: ~p ~n--> ~p~n", [V, R]),
+			   R;
+		      (V) ->
+			   [sterm(V, Env)]
+		   end, Tail),
+    io:format("Disjuncti:: ~p ~n ---> ~p~n", [Tail, R0]),
+    R0;
 disjunctive_form(L, Env) ->
+    io:format("Disjunction_form Other: ~p~n"< [L]),
     [[sterm(L, Env)]].
 
 get_leastlefthand([#item{loc=G}|_], _) ->
@@ -781,7 +793,8 @@ detect_guard(Test, _Body, E) ->
 	[#item{value="when"}|_] ->
 	    [conjunctive_form(Test, E)];
 	[#item{value="whend"}|_] ->
-	    [disjunctive_form(Test, E)];
+	    io:format("detect_guard ~p~n", [Test]),
+	    disjunctive_form(Test, E);
 	[[#item{loc=GL}|_]|_] ->
 	    When=#item{value="when", loc=GL, type=atom},
 	    [conjunctive_form([When|Test], E)];
@@ -797,8 +810,11 @@ clause_ast_guard_body(Pattern, Test, Body, GL, E) ->
 %%    GLine = get_leastlefthand(lists:flatten([Test|Body]), GL),
     GLine = GL,
     G = detect_guard(Test, Body, E),
-    io:format("#{clause_mono_least => ~p~n", [Test]),
-    B = lists:map(fun(V) -> sterm(V, E) end, Body),
+    io:format("#{clause_mono_least => ~p~n~p~n", [Test, Body]),
+    B = lists:map(fun(V) -> 
+			  io:format("#{clause_elem => ~p~n", [V]),
+			  sterm(V, E) 
+		  end, Body),
     S = erl_syntax:clause(Pattern, G, B),
     ?LOG_DEBUG(#{clause_mono => S}),
     erl_syntax:set_pos(S, erl_anno:new(GLine)).
@@ -816,8 +832,8 @@ if_(X, L, E) ->
 			      end, L),
     C = erl_syntax:if_expr(ClauseAstList),
     R = erl_syntax:set_pos(C, erl_anno:new(Line)),
-    io:format("if : ~p~n", [R]),
-    io:format("if : ~p~n", [erl_syntax:revert(R)]),
+    io:format("if1 : ~p~n", [R]),
+    %io:format("if2 : ~p~n", [erl_syntax:revert(hd(R))]),
     R.
 
 
