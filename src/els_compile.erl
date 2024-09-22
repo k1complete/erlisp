@@ -17,12 +17,16 @@ file(File, Opt) ->
     io:format("scan ~p~n", [Tokens]),
     {ok, Forms} = els_parser:parse(Tokens),
     Env=[],
-    Ast = lists:map(fun(F) ->
-                            R = els_transpile:form(F, Env),
-                            io:format("Trans ~p~n", [R]),
-                            R
-                          end, Forms),
-    io:format("Ast ~p~n", [Ast]),
+    {Ast, Error} = lists:mapfoldl(fun(F, A) ->
+					  try
+					      R = els_transpile:form(F, Env),
+					      {R, A}
+					  catch
+					      throw:{error, L, Reason} ->
+						  {[], [{error, File, L, Reason} | A]}
+					  end
+				  end, [], Forms),
+    io:format("Ast ~p~n Err ~p~n", [Ast, Error]),
     {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
     io:format("compiled ~p~n", [Binary]),
     {ok, Module, Binary}.

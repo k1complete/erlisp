@@ -15,6 +15,8 @@
 -define(MQ(L, T, B), merl:qquote(erl_syntax:get_pos(L), T, B)).
 -define(MQP(L, T, B), merl:qquote(L, T, B)).
 
+-export([if_/3]).
+
 -spec module_function(#item{}, erl_anno:pos()) -> erl_tree().
 module_function(A, Loc) ->
     {M, F} = A#item.value,
@@ -392,10 +394,31 @@ infix_op(Op, Loc, [Left|Right], E) ->
     %%io:format("TreeInfix ~p~nLoc ~p~n", [Xp, Loc]),
     erl_syntax:set_pos(Xp, Loc).
 
+op_arity(Op, A) -> 
+    V = erl_syntax:operator_literal(Op),
+    Loc = erl_syntax:get_pos(Op),
+    case {V, length(A)+1} of 
+	{"+", AL} when AL ==2;
+		       AL == 1->
+	    A;
+	{"-", AL} when AL ==2;
+		       AL == 1->
+	    A;
+	{"bnot", AL} when  AL == 1->
+	    A;
+	{"not", AL} when  AL == 1->
+	    A;
+	{_, AL} when AL ==2 ->
+	    A;
+	{V, AL} ->
+	    throw({error, {bad_arity, Loc, {V, AL}}})
+    end.
+
 infix_op_do(Op, [Left|T], E) ->
     %%io:format("infix L: ~p, R: ~p~n", [Left, T]),
     Pos = erl_syntax:get_pos(Left),
-    case T of
+    case op_arity(Op,T) of
+%%%    case T of
         [] -> 
             anary_op(Op, Left, E);
         [Right|Tail] ->
@@ -803,14 +826,16 @@ detect_guard(Test, _Body, E) ->
 	#item{} ->
 	    [[sterm(Test, E)]];
 	[] ->
-	    []
+	    [];
+	_ ->
+	    [[sterm(Test, E)]]
     end.
 
 clause_ast_guard_body(Pattern, Test, Body, GL, E) ->
 %%    GLine = get_leastlefthand(lists:flatten([Test|Body]), GL),
     GLine = GL,
-    G = detect_guard(Test, Body, E),
     io:format("#{clause_mono_least => ~p~n~p~n", [Test, Body]),
+    G = detect_guard(Test, Body, E),
     B = lists:map(fun(V) -> 
 			  io:format("#{clause_elem => ~p~n", [V]),
 			  sterm(V, E) 
@@ -824,10 +849,21 @@ clause_arg_guard_body(Args, Test, Body, GL, E) ->
     Params = lists:map(fun(A) -> sterm(A, E) end, Args),
     clause_ast_guard_body(Params, Test, Body, GLine, E).
 
+%
+%%%
+%%% (if ((whend (whenc a b c) (whenc a b c)) 
+%%%        explist)
+%%%     ((whenc a b c) 
+%%%        explist)
+%%%     (guard explist))
+%%%
 if_(X, L, E) ->
     Line = X#item.loc,
     ?LOG_DEBUG(#{if_ => L}),
-    ClauseAstList = lists:map(fun([Test|Body]) ->
+    ClauseAstList = lists:map(fun([Test|[]]) ->
+				      ELoc = get_leastlefthand(Test, Line),
+				      throw({error, ELoc, non_body});
+				 ([Test|Body]) ->
 				      clause_arg_guard_body([], Test, Body, Line, E)
 			      end, L),
     C = erl_syntax:if_expr(ClauseAstList),

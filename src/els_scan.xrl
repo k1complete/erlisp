@@ -161,7 +161,7 @@ adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line) ->
             ?LOG_DEBUG(#{ajust_level => [Tokens, Rest]}),
             {ok, Tokens, NewLine, Rest};
         _  ->
-            io:format("readRet ~p~n", [{ok, Tokens, NewLine, Rest}]),
+            %io:format("readRet ~p~n", [{ok, Tokens, NewLine, Rest}]),
             {ok, Tokens, NewLine, Rest} 
     end.
 
@@ -174,7 +174,7 @@ read_multiline(IO, Line, Add, Stop) ->
         Stop ->
             {Add, Line+1};
         Data ->
-            io:format("GetLine ~p vi ~p ~p~n", [Stop, Data, Stop=:=Data]),
+            %io:format("GetLine ~p vi ~p ~p~n", [Stop, Data, Stop=:=Data]),
             read_multiline(IO, Line+1, string:concat(Add ,Data), Stop)
     end.
 
@@ -186,7 +186,7 @@ multiline_quote(IO, Line, Tokens) ->
             MM = {lists:append(lists:droplast(Tokens),
                                [{string, Line, MT}]),
                   L},
-            io:format("REST: ~p n ~p~n", [Tokens,MM]),
+            %io:format("REST: ~p n ~p~n", [Tokens,MM]),
             MM;
         _ ->
             {Tokens, Line}
@@ -195,7 +195,7 @@ multiline_quote(IO, Line, Tokens) ->
             
 
 read(IO, Prompt0, Line, PrevTokens, PrevLevel) when length(PrevTokens) > 0 andalso PrevLevel == 0 ->
-    io:format("CalcLevel PreVTokens  ~p ~n PrevLevel ~p~n", [PrevTokens, PrevLevel]),
+    %io:format("CalcLevel PreVTokens  ~p ~n PrevLevel ~p~n", [PrevTokens, PrevLevel]),
     adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line);
 read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
     Prompt = make_prompt(Prompt0, Line, PrevTokens),
@@ -209,10 +209,10 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
             %adjust_level(IO, Prompt0, PrevTokens++NewTokens2, PrevLevel, NextLine2);
             adjust_level(IO, Prompt0, PrevTokens++NewTokens2, 0, NextLine2);
         {eof, NextLine} ->
-            io:format("PrevTokens ~p~n", [PrevTokens]),
+            %io:format("PrevTokens ~p~n", [PrevTokens]),
             {eof, PrevTokens, NextLine, []};
         {error, terminated} ->
-            io:format("PrevTokens ~p~n", [PrevTokens]),
+            %io:format("PrevTokens ~p~n", [PrevTokens]),
             {eof, PrevTokens, Line, []};
         Error ->
             io:format(
@@ -225,7 +225,7 @@ from_string(String) ->
 from_string_rest(IO, Line, Rest, Acc) ->
     case read(IO, [], Line, Rest, 0) of
         {ok, Acc2, NewLine, []} ->
-            io:format("from_string_rest ~p -> ~n ~p~n", [Rest, Acc2]),
+            %io:format("from_string_rest ~p -> ~n ~p~n", [Rest, Acc2]),
             {ok, Acc ++ Acc2, NewLine};
         {ok, Acc2, NewLine, Rest2} ->
             %%from_string_rest(IO, Line, Rest2, Acc++Acc2);
@@ -254,7 +254,7 @@ from_string(String, Line) ->
 reads(IO, File, Line, PrevTokens, Acc) ->
     case read(IO, [], Line, PrevTokens, 0) of
         {ok, [], _, RestTokens}  ->
-            io:format("ReadsRET: ~p~n", [{Acc, RestTokens}]),
+            %% io:format("ReadsRET: ~p~n", [{Acc, RestTokens}]),
             {ok, Acc++RestTokens};
         {ok, Tokens, NextLine, RestTokens} ->
             logger:degbug(#{reads=> Tokens}),
