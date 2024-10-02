@@ -5,15 +5,19 @@
 -include_lib("els.hrl").
 -include_lib("els_docs.hrl").
 compile_test() ->
-    ?assertException(throw, {error, {bad_arity, {4,9}, {"*", 1}}},
-		     els_compile:file("test/testdata/c1_error.elisp", [])).
+    ?assertThrow([{error, {bad_arity, {4,9}, {"*", 1}}}],
+		 els_compile:file("test/testdata/c1_error.elisp", [])).
+
+compile2_test() ->
+    ?assertThrow([{error, {bad_arity, {4,9}, {"*", 1}}},
+		  {error, {bad_arity, {6,9}, {"*", 1}}}],
+		 els_compile:file("test/testdata/c1_error2.elisp", [])).
 
 
 compile_doctest_test() ->
     RR = els_compile:file_ast("test/testdata/doctest.elisp", []),
     {ok, Module, Binary, _Ast} = RR,
-    error_logger:info_report(_Ast),
-    io:format("doctest: ~p~n", [_Ast]),
+    ?LOG_DEBUG(_Ast),
     ModuleName = atom_to_list(Module),
     File = ModuleName ++ ".beam",
     file:write_file(File, Binary),
@@ -21,7 +25,7 @@ compile_doctest_test() ->
     false = code:purge(Module),
     {module, Module} = code:load_binary(Module, File, Binary),
     {file, File} = code:is_loaded(Module),
-    ?LOG_ERROR(#{loaded => Module}),
+    ?LOG_DEBUG(#{loaded => Module}),
     {Module, _Binary2, _File2} = code:get_object_code(Module),
     {ok, MMM} = code:get_doc(Module),
     ?assertMatch(#docs_v1{}, MMM),
@@ -39,7 +43,7 @@ compile_with_macro_test() ->
 compile_with_macrofunccall_test() ->
     {ok, Module, _Binary, Ast} = els_compile:file_ast("test/testdata/macrofunccall.elisp", []),
     ?assertEqual({module, macrofunccall}, code:ensure_loaded(macrofunccall)),
-    error_logger:info_report(erl_syntax:revert_forms(Ast)),
+    ?LOG_DEBUG(erl_syntax:revert_forms(Ast)),
     {file, _File} = code:is_loaded(Module),
     ?assertEqual(1 , macrofunccall:main("a",2)).
     

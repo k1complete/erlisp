@@ -548,14 +548,14 @@ defun_(X, L, E) ->
         _  ->
             Pos = Line,
             [Comm|RRest]  = getcomment(Rest, Pos),
-            io:format(standard_error, "GetBody ~p~n", [RRest]),
+            %% io:format(standard_error, "GetBody ~p~n", [RRest]),
             Body = lists:map(fun(A) -> form(A, E) end, RRest),
-            io:format("simpleArgs ~p ~n", [Args]),
+            %% io:format("simpleArgs ~p ~n", [Args]),
             ArgList = lists:map(fun(A) -> sterm(A, E) end, Args),
             %%  Register argument into environment.
             %%  replace body from environment(argment)
             FunName = erl_syntax:atom(Name#item.value),
-            io:format("MO: ~p ~p~n", [Line, FunName]),
+            %% io:format("MO: ~p ~p~n", [Line, FunName]),
             MQ=?MQP(Line, "'@name'(_@@args) -> _@@body.", 
                  [{'name', FunName}, 
                   {'args', ArgList},

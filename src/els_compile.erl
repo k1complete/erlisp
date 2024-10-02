@@ -17,16 +17,25 @@ file(File, Opt) ->
     io:format("scan ~p~n", [Tokens]),
     {ok, Forms} = els_parser:parse(Tokens),
     Env=[],
-    {Ast, Error} = lists:mapfoldl(fun(F, A) ->
+    {Ast0, Errors} = lists:mapfoldl(fun(F, A) ->
 					  try
 					      R = els_transpile:form(F, Env),
 					      {R, A}
 					  catch
-					      throw:{error, L, Reason} ->
-						  {[], [{error, File, L, Reason} | A]}
+					      throw:{error, ErrorA} ->
+						  io:format("catched : ~p~n", [ErrorA]),
+						  {[], A++[{error, ErrorA}]};
+					      throw:Error when is_list(Error) ->
+						  io:format("catched : ~p~n", [Error]),
+						  {[],  A++ Error}
 					  end
 				  end, [], Forms),
-    io:format("Ast ~p~n Err ~p~n", [Ast, Error]),
+    Ast = case Errors of
+	      [] -> Ast0;
+	      _ ->
+		  throw(Errors)
+	  end,
+    io:format("Ast ~p~n Err ~p~n", [Ast, Errors]),
     {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
     io:format("compiled ~p~n", [Binary]),
     {ok, Module, Binary}.
@@ -83,7 +92,7 @@ compile_macro(A, E) ->
                               {module, _Module, Binary} = 
                                   compile_and_write_beam(Ast, [debug_info, export_all]),
                               R = catch apply(ModuleName, main, [2,3]),
-                              ?LOG_ERROR(#{module_info => R, length => length(Forms2)}),
+                              ?LOG_DEBUG(#{module_info => R, length => length(Forms2)}),
                               {Binary, Forms, EnvAct};
                           (S, {_Ret, Acc, EnvAcc}) ->
                               Macros = els_transpile:getmacros_from_module(ModuleForm, EnvAcc),
@@ -100,19 +109,19 @@ compile_macro(A, E) ->
                               {module, _Module, Binary} = 
                                   compile_and_write_beam(Ast, [debug_info, export_all]),
                               R = catch apply(ModuleName, module_info, [exports]),
-                              ?LOG_ERROR(#{module_info2 => R}),
+                              ?LOG_DEBUG(#{module_info2 => R}),
                               {Binary, Forms, NEnv};
 			 (S, AA) ->
 			      io:format("error!!: ~p ~n~pn", [S, AA])
                   end, {[], [], IEnv}, Forms2),
     io:format("compiled-macro: ~p ~n", [Ret]),
-    ?LOG_ERROR(#{maros_list => IEnv}),
+    ?LOG_DEBUG(#{maros_list => IEnv}),
     Ret.
 
 -spec compile_and_write_beam(sexp(), options()) -> {module, module(), binary()}.
 compile_and_write_beam(Ast, Options) ->
     SS = merl:compile_and_load(Ast, Options),
-    ?LOG_ERROR(#{compile2 => erl_syntax:revert_forms(Ast), options=>Options, ss => SS}),
+    ?LOG_DEBUG(#{compile2 => erl_syntax:revert_forms(Ast), options=>Options, ss => SS}),
     {ok, Binary} =SS,
     Specs = extract_specs(Ast),
     {ok, DocsV1} = make_docs(Ast, Specs),
@@ -138,11 +147,9 @@ file_ast(File, Opt) ->
     io:format("compiled ~p", [NEnv]),
     MR = Forms,
     Env=NEnv,
-    ?LOG_ERROR(#{macro_compiled => MR, nenv => NEnv}),
+    ?LOG_DEBUG(#{macro_compiled => MR, nenv => NEnv}),
     Ast = lists:map(fun(F) ->
-                            R = els_transpile:form(F, Env),
-                            io:format("Trans ~p~n", [R]),
-                            R
+			    els_transpile:form(F, Env) 
                           end, Forms),
     io:format("Ast ~p~n", [Ast]),
 %    {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
