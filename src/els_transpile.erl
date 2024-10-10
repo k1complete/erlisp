@@ -411,7 +411,7 @@ op_arity(Op, A) ->
 	{_, AL} when AL ==2 ->
 	    A;
 	{V, AL} ->
-	    throw({error, {bad_arity, Loc, {V, AL}}})
+	    ?THROW({error, {bad_arity, Loc, {V, AL}}})
     end.
 
 infix_op_do(Op, [Left|T], E) ->
@@ -443,7 +443,8 @@ cons_(C, L, E) ->
     [Head|Tail] = L,
     #item{loc=Loc} = C,
     case Tail of
-        [] -> Head;
+        [] ->
+	    ?THROW({error, {bad_arity, Loc, {L, 1}}});
         [X] ->
             HHead = sterm(Head, Loc, E),
             %%io:format("HHead: ~p~n", [HHead]),
@@ -451,7 +452,9 @@ cons_(C, L, E) ->
 %            TTail = erl_syntax:set_pos(erl_syntax:cons(TTail0, erl_syntax:nil()), Loc),
             TTail = TTail0,
             %%io:format("TTail: ~p C: ~p~n", [TTail, C]),
-            ?MQP(Loc, "[_@HHead|_@TTail]", [{'HHead', HHead}, {'TTail', TTail}])
+            ?MQP(Loc, "[_@HHead|_@TTail]", [{'HHead', HHead}, {'TTail', TTail}]);
+	_ ->
+	    ?THROW({error, {bad_arity, Loc, {L, 1}}})
     end.
 
 
@@ -862,7 +865,7 @@ if_(X, L, E) ->
     ?LOG_DEBUG(#{if_ => L}),
     ClauseAstList = lists:map(fun([Test|[]]) ->
 				      ELoc = get_leastlefthand(Test, Line),
-				      throw({error, ELoc, non_body});
+				      ?THROW({error, ELoc, non_body});
 				 ([Test|Body]) ->
 				      clause_arg_guard_body([], Test, Body, Line, E)
 			      end, L),

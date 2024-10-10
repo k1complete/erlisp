@@ -22,9 +22,6 @@ file(File, Opt) ->
 					      R = els_transpile:form(F, Env),
 					      {R, A}
 					  catch
-					      throw:{error, ErrorA} ->
-						  io:format("catched : ~p~n", [ErrorA]),
-						  {[], A++[{error, ErrorA}]};
 					      throw:Error when is_list(Error) ->
 						  io:format("catched : ~p~n", [Error]),
 						  {[],  A++ Error}

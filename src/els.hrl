@@ -25,3 +25,9 @@
 
 -type tokenloc() :: {integer(), integer()} | integer().
 -include_lib("kernel/include/logger.hrl").
+-record(compile_error, 
+	{msg:: atom(), 
+	 loc:: location(),
+	 detail:: any()}).
+
+-define(THROW(A), throw([A])).

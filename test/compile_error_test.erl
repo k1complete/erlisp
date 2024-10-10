@@ -12,7 +12,7 @@ compile2_test() ->
     ?assertThrow([{error, {bad_arity, {4,9}, {"*", 1}}},
 		  {error, {bad_arity, {6,9}, {"*", 1}}}],
 		 els_compile:file("test/testdata/c1_error2.elisp", [])).
-
+    
 
 compile_doctest_test() ->
     RR = els_compile:file_ast("test/testdata/doctest.elisp", []),
