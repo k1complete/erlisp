@@ -443,8 +443,6 @@ cons_(C, L, E) ->
     [Head|Tail] = L,
     #item{loc=Loc} = C,
     case Tail of
-        [] ->
-	    ?THROW({error, {bad_arity, Loc, {L, 1}}});
         [X] ->
             HHead = sterm(Head, Loc, E),
             %%io:format("HHead: ~p~n", [HHead]),
@@ -460,6 +458,8 @@ cons_(C, L, E) ->
 
 
 -spec clause_(list(), term(), env()) -> erl_tree().
+clause_(L, Loc, E) when length(L) < 2 ->
+    ?THROW([{error, {bad_arity, Loc, {L, 1}}}]);
 clause_(L, Loc, E) ->
     [Args, WhenCandidate| BodyCandidate] = L,
     {When, Body} = case WhenCandidate of
@@ -865,7 +865,7 @@ if_(X, L, E) ->
     ?LOG_DEBUG(#{if_ => L}),
     ClauseAstList = lists:map(fun([Test|[]]) ->
 				      ELoc = get_leastlefthand(Test, Line),
-				      ?THROW({error, ELoc, non_body});
+				      ?THROW({error, no_body, ELoc, Test});
 				 ([Test|Body]) ->
 				      clause_arg_guard_body([], Test, Body, Line, E)
 			      end, L),

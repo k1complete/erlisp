@@ -33,10 +33,10 @@ if_lint_err_test() ->
     {error, Loc, C} = try 
 			  els_transpile:form(Tree, [])
 		      catch 
-			  throw:[{error, L, Reason}] ->
+			  throw:[{error, Reason, L, _}] ->
 			      {error, L, Reason}
 		      end,
-    ?assertEqual(non_body, C),
+    ?assertEqual(no_body, C),
     ?assertEqual({Line, 7}, Loc).
 
 

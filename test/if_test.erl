@@ -67,4 +67,16 @@ if_with_disjunctive2_test() ->
     ?assertEqual({value, 23, [{x, [3,2]}, {y, 20}]},
                  erl_eval:expr(erl_syntax:revert(C), Binding)).
 
-
+if_clause_no_body_error_test() ->
+    Line = ?LINE,
+    Cmd = ["(if ",
+           "  ('true))"],
+    {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(Cmd), Line),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    ?assertThrow(
+       [{error, no_body, {Line, 8},
+	 [{item,"quote",{71,8},atom},
+	  {item,"true",{71,9},atom}]}],
+       C = els_transpile:form(Tree, [])
+    ).
+    
