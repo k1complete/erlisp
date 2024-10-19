@@ -86,9 +86,9 @@ dispatch_infix_op(A) ->
           ">" => fun infix_op/4,
           "=:=" => fun infix_op/4,
           "=/=" => fun infix_op/4,
-          "+" => fun infix_op/4,
+          "+" => fun unary_op/4,
           "++" => fun infix_op/4,
-          "-" => fun infix_op/4,
+          "-" => fun unary_op/4,
           "--" => fun infix_op/4,
           "*" => fun infix_op/4,
           "/" => fun infix_op/4,
@@ -96,13 +96,13 @@ dispatch_infix_op(A) ->
           "and" => fun infix_op/4,
           "andalso" => fun infix_op/4,
           "band" => fun infix_op/4,
-          "bnot" => fun infix_op/4,
+          "bnot" => fun unary_op/4,
           "bor" => fun infix_op/4,
           "bsl" => fun infix_op/4,
           "bsr" => fun infix_op/4,
           "bxor" => fun infix_op/4,
           "div" => fun infix_op/4,
-          "not" => fun infix_op/4,
+          "not" => fun unary_op/4,
           "or" => fun infix_op/4,
           "orelse" => fun infix_op/4,
           "rem" => fun infix_op/4,
@@ -383,16 +383,56 @@ match_op(#item{value=_X, loc=Loc}, L, E) ->
     %%io:format("Match2: ~p~n", [Me]),
     erl_syntax:set_pos(Me, Loc).
 
-anary_op(Op, Left, _E) ->
+
+list_op(#item{value=V} = Op, Loc, [Left, Right] = List, E) 
+  when V == "++", is_list(Left), is_list(Right) ->
+    infix_op(Op, Loc, List, E);
+list_op(#item{value=V} = Op, Loc, [Left, Right] = List, E) 
+  when V == "--", is_list(Left), is_list(Right) ->
+    infix_op(Op, Loc, List, E);
+list_op(_Op, Loc, [Left, Right], E) ->
+    ?THROW({error, {bad_arg, Loc, {Left, Right}}});
+list_op(_Op, Loc, List, E) ->
+    ?THROW({error, {bad_arity, Loc, {2, length(List)}}}).
+
+unary_op(Op, Loc, [Item]=List, E) ->
+    io:format("error1 ~p~n", [{Op, List}]),
+    unary_op_do(Op, Loc, Item, E);
+unary_op(Op, Loc, [Left, Right] = List, E) 
+  when Op == "+" ->
+    io:format("error2 ~p~n", [{Op, List}]),
+    infix_op(Op, Loc, List, E);
+unary_op(Op, Loc, [Left, Right] = List, E) 
+  when Op == "-" ->
+    io:format("error3 ~p~n", [{Op, List}]),
+    infix_op(Op, Loc, List, E);
+unary_op(Op, Loc, List, E) ->
+    io:format("error4 ~p~n", [{Op, List}]),
+    ?THROW({error, {bad_arity, Loc, {Op, length(List)}}}).
+
+unary_op_do(Op, Loc, Left, E) ->
+    OpType = erl_syntax:set_pos(erl_syntax:operator(Op), Loc),
+    Operand = sterm(Left, E),
+    Operand2 = erl_syntax:set_pos(Operand, Loc),
+    io:format("error5 ~p~n", [{OpType, Operand2, Loc}]),
+    Nexp = erl_syntax:prefix_expr(OpType, Operand2),
+    io:format("error6 ~p~n", [{Nexp, Loc}]),
+    erl_syntax:copy_pos(OpType, Nexp).
+
+anary_op_do(Op, Left, _E) ->
     Nexp = erl_syntax:prefix_expr(Op, Left),
     erl_syntax:copy_pos(Op, Nexp).
-
+    
+infix_op(Op, Loc, [Left], E) ->
+    %%io:format("TreeInfix~n", []),
+    ?THROW({error, {bad_arity, Loc, {Op, 1}}});
 infix_op(Op, Loc, [Left|Right], E) ->
     %%io:format("TreeInfix~n", []),
     OpType = erl_syntax:set_pos(erl_syntax:operator(Op), Loc),
     Xp =infix_op_do(OpType, [sterm(Left, Loc, E) |Right], E),
     %%io:format("TreeInfix ~p~nLoc ~p~n", [Xp, Loc]),
     erl_syntax:set_pos(Xp, Loc).
+
 
 op_arity(Op, A) -> 
     V = erl_syntax:operator_literal(Op),
@@ -417,10 +457,32 @@ op_arity(Op, A) ->
 infix_op_do(Op, [Left|T], E) ->
     %%io:format("infix L: ~p, R: ~p~n", [Left, T]),
     Pos = erl_syntax:get_pos(Left),
+%%%    case op_arity(Op,T) of
+    case T of
+        [] -> 
+	    ?THROW({error, {bad_arity, erl_syntax:get_pos(Op), {erl_syntax:atom_name(Op), 1}}});
+        [Right|Tail] ->
+            case Tail of
+                [] ->
+                    RightTerm = sterm(Right, Pos, E),
+                    Nexp = erl_syntax:infix_expr(Left, Op, RightTerm),
+                    Exp = erl_syntax:copy_pos(RightTerm, Nexp),
+                    Exp;
+                _ ->
+                    RightEx = sterm(Right, Pos, E),
+                    Nexp = erl_syntax:infix_expr(Left, Op, RightEx),
+                    Exp = erl_syntax:copy_pos(Right, Nexp),
+                    infix_op_do(Op, [Exp|Tail], E)
+            end
+    end.
+
+infix_op_do_old(Op, [Left|T], E) ->
+    %%io:format("infix L: ~p, R: ~p~n", [Left, T]),
+    Pos = erl_syntax:get_pos(Left),
     case op_arity(Op,T) of
 %%%    case T of
         [] -> 
-            anary_op(Op, Left, E);
+            anary_op_do(Op, Left, E);
         [Right|Tail] ->
             case Tail of
                 [] ->
