@@ -18,3 +18,19 @@ receive_test() ->
     Binding=erl_eval:add_binding('A', 1, erl_eval:new_bindings()),
     ?assertEqual({value, {ok, 1}, [{'A', 1}]},
                  erl_eval:exprs(Cr, Binding)).
+
+receive_after_test() ->
+    Line = ?LINE,
+    Command = lists:flatten(["(receive after A (tuple 'ok A))"]),
+    {ok, Tokens, _Line} = els_scan:from_string(Command, Line),
+    {ok, Tree} =els_parser:parse(Tokens),
+    C = lists:map(fun(E) ->
+			  els_transpile:form(E, [])
+		  end, Tree),
+    Cr = lists:map(fun(E) ->
+			   erl_syntax:revert(E)
+		   end, C),
+    io:format("testcode: ~p~n", [Cr]),
+    Binding=erl_eval:add_binding('A', 1, erl_eval:new_bindings()),
+    ?assertEqual({value, {ok, 1}, [{'A', 1}]},
+                 erl_eval:exprs(Cr, Binding)).

@@ -113,11 +113,12 @@ dispatch_infix_op(A) ->
 dispatch_special(A) ->
     L = #{
           "if" => fun if_/3,
+          "case" => fun case_/3,
+	  "maybe" => fun maybe_/3,
 	  "bc||" => fun binary_comp_/3,
           "binary" => fun binary_/3,
           "defmacro" => fun defmacro_/3,
           "defun" => fun defun_/3,
-          "case" => fun case_/3,
           "cons" => fun cons_/3,
           "lambda" => fun lambda_/3,
 	  "lc||" => fun list_comp_/3,
@@ -125,9 +126,8 @@ dispatch_special(A) ->
           "list" => fun list_/3,
           "map" => fun map_/3,
 	  "=" => fun match_op/3,
-	  "?=" => fun match_op/3,
+	  "?=" => fun maybe_match_/3,
 	  "match" => fun match_op/3,
-	  "maybe" => fun maybe_/3,
 	  "mc||" => fun map_comp_/3,
           "quote" => fun quote_/3,
           "receive" => fun receive_/3,
@@ -459,7 +459,7 @@ cons_(C, L, E) ->
 
 -spec clause_(list(), term(), env()) -> erl_tree().
 clause_(L, Loc, E) when length(L) < 2 ->
-    ?THROW([{error, {bad_arity, Loc, {L, 1}}}]);
+    ?THROW({error, {no_body, Loc, L}} );
 clause_(L, Loc, E) ->
     [Args, WhenCandidate| BodyCandidate] = L,
     {When, Body} = case WhenCandidate of
@@ -468,9 +468,13 @@ clause_(L, Loc, E) ->
 		       _ ->
 			   {[], [WhenCandidate| BodyCandidate]}
 		   end,
+    io:format("clause_args: ~p~n", [Args]),
     clause_arg_guard_body(Args, When, Body, Loc, E).
 
-class_qualifier(Args, Loc, E) ->
+%%
+%% Args: (class) | (class body) | (class body stacktrace)
+%% 
+class_qualifier(Args, Loc, E) when length(Args) =< 3, length(Args) >= 1 ->
     Params = lists:map(fun(A) -> sterm(A, E) end, Args),
     Class = hd(Params),
     ClassQ = case length(Params) of
@@ -485,7 +489,10 @@ class_qualifier(Args, Loc, E) ->
 		     StackTrace = lists:nth(3, Params),
 		     erl_syntax:class_qualifier(Class, Body, StackTrace)
 	     end,
-    erl_syntax:set_pos(ClassQ, Loc).
+    erl_syntax:set_pos(ClassQ, Loc);
+class_qualifier(Args, Loc, E) ->
+    ?THROW({error, {bad_class_qualifier, Loc, Args}}).
+
 
 handler_(L, Loc, E) ->
     [Args, WhenCandidate| BodyCandidate] = L,
@@ -653,6 +660,14 @@ try_(X, L, E) ->
     Line = X#item.loc,
     {M, LocH}  = els_util:scanlist([X|L], ["try", "of", "catch", "after"]),
     io:format("scanlist : ~p~n LockH : ~p~n", [M, LocH]),
+    case lists:any(fun("catch") -> true;
+		      ("after") -> true;
+		      (_) -> false
+		   end, maps:keys(M)) of
+	false ->
+	    ?THROW({error, {try_must_be_after_or_catch_clause, Line, LocH}});
+	true -> true
+    end,
     Cls = maps:map(fun(K, V) when K == "try"; K == "after" ->
 			   lists:map(fun(S) ->
 					     form(S, E)
@@ -668,7 +683,7 @@ try_(X, L, E) ->
 					     handler_(S, LocK, E)
 				     end, V)
 		   end, M),
-    io:format("trycl : ~p~n", [Cls]),
+
     C = erl_syntax:try_expr(maps:get("try", Cls),
 			    maps:get("of", Cls, []),
 			    maps:get("catch", Cls, []),
@@ -704,15 +719,18 @@ maybe_(X, L, E) ->
 				     end, V);
 		      ("else", V) ->
 			   LocK = (maps:get("else", LocH))#item.loc,
-			   lists:map(fun(S) ->
-					     clause_(S, LocK, E)
-				     end, V)
+			   Clauses = lists:map(fun(S) ->
+						       [H|T]=S,
+						       clause_([[H]|T], LocK, E)
+					       end, V),
+			   erl_syntax:else_expr(Clauses)
 		   end, M),
     C = erl_syntax:maybe_expr(maps:get("maybe", Cls), 
 			      maps:get("else", Cls, none)),
-    io:format("maybe2_ : ~p~n", [C]),
+    io:format("maybe-2_ : ~p~n", [erl_syntax:revert(C)]),
     R = erl_syntax:set_pos(C, erl_anno:new(Line)),
     R.
+
 
 receive_(X, L, E) ->
     io:format("receive_ : ~p~n", [[X|L]]),
@@ -735,7 +753,9 @@ receive_(X, L, E) ->
 		   end, M),
     io:format("trycl : ~p~n", [Cls]),
     {Timeout, After} = maps:get("after", Cls, {none, []}),
-    C = erl_syntax:receive_expr(maps:get("receive", Cls),
+    Clauses = maps:get("receive", Cls),
+    io:format("timeout: ~p, after : ~p~n", [Timeout, After]),
+    C = erl_syntax:receive_expr(Clauses,
 				Timeout, After),
     R = erl_syntax:set_pos(C, erl_anno:new(Line)),
     io:format("receive : ~p~n", [R]),
@@ -834,6 +854,7 @@ detect_guard(Test, _Body, E) ->
 	    [[sterm(Test, E)]]
     end.
 
+%% 
 clause_ast_guard_body(Pattern, Test, Body, GL, E) ->
 %%    GLine = get_leastlefthand(lists:flatten([Test|Body]), GL),
     GLine = GL,
@@ -849,7 +870,13 @@ clause_ast_guard_body(Pattern, Test, Body, GL, E) ->
 
 clause_arg_guard_body(Args, Test, Body, GL, E) ->
     GLine = get_leastlefthand(lists:flatten([[Args],Test|Body]), GL),
-    Params = lists:map(fun(A) -> sterm(A, E) end, Args),
+    Params = case Args of
+		 Args when is_list(Args) ->
+		     lists:map(fun(A) -> sterm(A, E) end, Args);
+		 _ ->
+		     [sterm(Args, E)]
+	     end,
+    % Params = lists:map(fun(A) -> sterm(A, E) end, Args),
     clause_ast_guard_body(Params, Test, Body, GLine, E).
 
 %
@@ -865,7 +892,7 @@ if_(X, L, E) ->
     ?LOG_DEBUG(#{if_ => L}),
     ClauseAstList = lists:map(fun([Test|[]]) ->
 				      ELoc = get_leastlefthand(Test, Line),
-				      ?THROW({error, no_body, ELoc, Test});
+				      ?THROW({error, {no_body, ELoc, Test}});
 				 ([Test|Body]) ->
 				      clause_arg_guard_body([], Test, Body, Line, E)
 			      end, L),
@@ -902,7 +929,7 @@ case_(X, L, E) ->
 pattern(Term, Env) ->
     sterm(Term, Env).
 
-
+    
 
 %%
 %% (let ((a b) (b c))

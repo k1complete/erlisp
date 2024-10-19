@@ -74,9 +74,9 @@ if_clause_no_body_error_test() ->
     {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(Cmd), Line),
     {ok, [Tree]} =els_parser:parse(Tokens),
     ?assertThrow(
-       [{error, no_body, {Line, 8},
+       [{error, {no_body, {Line, 8},
 	 [{item,"quote",{71,8},atom},
-	  {item,"true",{71,9},atom}]}],
+	  {item,"true",{71,9},atom}]}}],
        C = els_transpile:form(Tree, [])
-    ).
+      ).
     

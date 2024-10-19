@@ -36,3 +36,13 @@ case_with_multistatement_test() ->
                  erl_eval:expr(erl_syntax:revert(C), Binding)).
 
 
+case_no_body_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(case (== 1 1) ('true) )", Line),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    ?assertThrow(
+       [{error, {no_body, {Line, 2},
+	 [[[ {item,"quote",{Line,17},atom},
+	   {item,"true",{Line,18},atom} ]]] }}],
+       C = els_transpile:form(Tree, [])
+    ).

@@ -24,7 +24,7 @@ maybe_test() ->
 maybe_match_op_test() ->
     Line = ?LINE,
     Cmd = ["(maybe ",
-	   "  (?= (tuple 'ok A) (tuple 'ok 1))",
+	   "  (?= (tuple 'ok A) C)",
 	   "  (= 'true (> A  0))",
 	   "  (?= (tuple 'ok B) (tuple 'ok 2))",
 	   "  (+ A B))"],
@@ -34,8 +34,28 @@ maybe_match_op_test() ->
     C = els_transpile:form(Tree, []),
     io:format("TransForm ~p~n", [erl_syntax:revert(C)]),
 
-    Binding=erl_eval:add_binding('A1', undefined, erl_eval:new_bindings()),
+    Binding=erl_eval:add_binding('C', 1, erl_eval:new_bindings()),
     
-    ?assertEqual({value, 3, [{'A1', undefined}]},
+    ?assertEqual({value, 1, [{'C', 1}]},
+                 erl_eval:expr(erl_syntax:revert(C), Binding)).
+    
+maybe_match_else_test() ->
+    Line = ?LINE,
+    Cmd = ["(maybe ",
+	   "  (?= (tuple 'ok A) C)",
+	   "  (= 'true (> A  0))",
+	   "  (?= (tuple 'ok B) (tuple 'ok 2))",
+	   "  (+ A B)",
+	   " else ",
+	   "  (m 'ok))"],
+        {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(Cmd), Line),
+    io:format("tokens ~p~n", [Tokens]),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    io:format("TransForm ~p~n", [erl_syntax:revert(C)]),
+
+    Binding=erl_eval:add_binding('C', 1, erl_eval:new_bindings()),
+    
+    ?assertEqual({value, ok, [{'C', 1}, {m, 1}]},
                  erl_eval:expr(erl_syntax:revert(C), Binding)).
     
