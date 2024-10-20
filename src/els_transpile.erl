@@ -384,29 +384,18 @@ match_op(#item{value=_X, loc=Loc}, L, E) ->
     erl_syntax:set_pos(Me, Loc).
 
 
-list_op(#item{value=V} = Op, Loc, [Left, Right] = List, E) 
-  when V == "++", is_list(Left), is_list(Right) ->
-    infix_op(Op, Loc, List, E);
-list_op(#item{value=V} = Op, Loc, [Left, Right] = List, E) 
-  when V == "--", is_list(Left), is_list(Right) ->
-    infix_op(Op, Loc, List, E);
-list_op(_Op, Loc, [Left, Right], E) ->
-    ?THROW({error, {bad_arg, Loc, {Left, Right}}});
-list_op(_Op, Loc, List, E) ->
-    ?THROW({error, {bad_arity, Loc, {2, length(List)}}}).
-
 unary_op(Op, Loc, [Item]=List, E) ->
     io:format("error1 ~p~n", [{Op, List}]),
     unary_op_do(Op, Loc, Item, E);
-unary_op(Op, Loc, [Left, Right] = List, E) 
+unary_op(Op, Loc, [_Left, _Right] = List, E) 
   when Op == "+" ->
     io:format("error2 ~p~n", [{Op, List}]),
     infix_op(Op, Loc, List, E);
-unary_op(Op, Loc, [Left, Right] = List, E) 
+unary_op(Op, Loc, [_Left, _Right] = List, E) 
   when Op == "-" ->
     io:format("error3 ~p~n", [{Op, List}]),
     infix_op(Op, Loc, List, E);
-unary_op(Op, Loc, List, E) ->
+unary_op(Op, Loc, List, _E) ->
     io:format("error4 ~p~n", [{Op, List}]),
     ?THROW({error, {bad_arity, Loc, {Op, length(List)}}}).
 
@@ -419,11 +408,7 @@ unary_op_do(Op, Loc, Left, E) ->
     io:format("error6 ~p~n", [{Nexp, Loc}]),
     erl_syntax:copy_pos(OpType, Nexp).
 
-anary_op_do(Op, Left, _E) ->
-    Nexp = erl_syntax:prefix_expr(Op, Left),
-    erl_syntax:copy_pos(Op, Nexp).
-    
-infix_op(Op, Loc, [Left], E) ->
+infix_op(Op, Loc, [_Left], _E) ->
     %%io:format("TreeInfix~n", []),
     ?THROW({error, {bad_arity, Loc, {Op, 1}}});
 infix_op(Op, Loc, [Left|Right], E) ->
@@ -433,71 +418,21 @@ infix_op(Op, Loc, [Left|Right], E) ->
     %%io:format("TreeInfix ~p~nLoc ~p~n", [Xp, Loc]),
     erl_syntax:set_pos(Xp, Loc).
 
-
-op_arity(Op, A) -> 
-    V = erl_syntax:operator_literal(Op),
-    Loc = erl_syntax:get_pos(Op),
-    case {V, length(A)+1} of 
-	{"+", AL} when AL ==2;
-		       AL == 1->
-	    A;
-	{"-", AL} when AL ==2;
-		       AL == 1->
-	    A;
-	{"bnot", AL} when  AL == 1->
-	    A;
-	{"not", AL} when  AL == 1->
-	    A;
-	{_, AL} when AL ==2 ->
-	    A;
-	{V, AL} ->
-	    ?THROW({error, {bad_arity, Loc, {V, AL}}})
-    end.
-
-infix_op_do(Op, [Left|T], E) ->
+infix_op_do(Op, [_Left], _E) ->
+    ?THROW({error, {bad_arity, erl_syntax:get_pos(Op), {erl_syntax:atom_name(Op), 1}}});
+infix_op_do(Op, [Left,Right], E) ->
     %%io:format("infix L: ~p, R: ~p~n", [Left, T]),
     Pos = erl_syntax:get_pos(Left),
-%%%    case op_arity(Op,T) of
-    case T of
-        [] -> 
-	    ?THROW({error, {bad_arity, erl_syntax:get_pos(Op), {erl_syntax:atom_name(Op), 1}}});
-        [Right|Tail] ->
-            case Tail of
-                [] ->
-                    RightTerm = sterm(Right, Pos, E),
-                    Nexp = erl_syntax:infix_expr(Left, Op, RightTerm),
-                    Exp = erl_syntax:copy_pos(RightTerm, Nexp),
-                    Exp;
-                _ ->
-                    RightEx = sterm(Right, Pos, E),
-                    Nexp = erl_syntax:infix_expr(Left, Op, RightEx),
-                    Exp = erl_syntax:copy_pos(Right, Nexp),
-                    infix_op_do(Op, [Exp|Tail], E)
-            end
-    end.
-
-infix_op_do_old(Op, [Left|T], E) ->
-    %%io:format("infix L: ~p, R: ~p~n", [Left, T]),
+    RightTerm = sterm(Right, Pos, E),
+    Nexp = erl_syntax:infix_expr(Left, Op, RightTerm),
+    Exp = erl_syntax:copy_pos(RightTerm, Nexp),
+    Exp;
+infix_op_do(Op, [Left|[Right|Tail]], E) ->
     Pos = erl_syntax:get_pos(Left),
-    case op_arity(Op,T) of
-%%%    case T of
-        [] -> 
-            anary_op_do(Op, Left, E);
-        [Right|Tail] ->
-            case Tail of
-                [] ->
-                    RightTerm = sterm(Right, Pos, E),
-                    Nexp = erl_syntax:infix_expr(Left, Op, RightTerm),
-                    Exp = erl_syntax:copy_pos(RightTerm, Nexp),
-                    Exp;
-                _ ->
-                    RightEx = sterm(Right, Pos, E),
-                    Nexp = erl_syntax:infix_expr(Left, Op, RightEx),
-                    Exp = erl_syntax:copy_pos(Right, Nexp),
-                    infix_op_do(Op, [Exp|Tail], E)
-            end
-    end.
-
+    RightEx = sterm(Right, Pos, E),
+    Nexp = erl_syntax:infix_expr(Left, Op, RightEx),
+    Exp = erl_syntax:copy_pos(Right, Nexp),
+    infix_op_do(Op, [Exp|Tail], E).
 
 
 cons_(C, L, E) ->
@@ -520,7 +455,7 @@ cons_(C, L, E) ->
 
 
 -spec clause_(list(), term(), env()) -> erl_tree().
-clause_(L, Loc, E) when length(L) < 2 ->
+clause_(L, Loc, _E) when length(L) < 2 ->
     ?THROW({error, {no_body, Loc, L}} );
 clause_(L, Loc, E) ->
     [Args, WhenCandidate| BodyCandidate] = L,
@@ -552,7 +487,7 @@ class_qualifier(Args, Loc, E) when length(Args) =< 3, length(Args) >= 1 ->
 		     erl_syntax:class_qualifier(Class, Body, StackTrace)
 	     end,
     erl_syntax:set_pos(ClassQ, Loc);
-class_qualifier(Args, Loc, E) ->
+class_qualifier(Args, Loc, _E) ->
     ?THROW({error, {bad_class_qualifier, Loc, Args}}).
 
 
