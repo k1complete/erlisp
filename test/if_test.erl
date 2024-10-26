@@ -53,8 +53,8 @@ if_with_disjunctive_test() ->
 if_with_disjunctive2_test() ->
     Line = ?LINE,
     Cmd = ["(if ",
-           "  ((whend (whenc (== (hd x) 2))",
-	   "          (whenc (== x (list 3 2))) )",
+           "  ((whend (when (== (hd x) 2))",
+	   "          (when (== x (list 3 2))) )",
            "     (match y (* (hd (tl x)) 10))",
            "     (+ y (hd x)))",
            "  ('true  1))"],
@@ -67,6 +67,26 @@ if_with_disjunctive2_test() ->
     ?assertEqual({value, 23, [{x, [3,2]}, {y, 20}]},
                  erl_eval:expr(erl_syntax:revert(C), Binding)).
 
+if_with_disjunctive3_test() ->
+    Line = ?LINE,
+    Cmd = ["(if ",
+           "  ((whend (when (== (hd x) 1))",
+	   "          (when (== x (list 3 2))) )",
+           "     (match y (* (hd (tl x)) 10))",
+           "     (+ y (hd x)))",
+	   "  ((when (== (hd x) 2) (== (tl x) (list 3 4))) ",
+	   "     (= y (hd x))",
+	   "     (+ y (hd x)))",
+           "  ('true  1))"],
+    {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(Cmd), Line),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    io:format("if_with_dicjunctive_test2 ~p~n", [C]),
+    io:format("if_with_dicjunctive_test2 ~p~n", [erl_syntax:revert(C)]),
+    Binding=erl_eval:add_binding(x, [2, 3, 4], erl_eval:new_bindings()),
+    ?assertEqual({value, 4, [{x, [2, 3, 4]}, {y, 2}]},
+                 erl_eval:expr(erl_syntax:revert(C), Binding)).
+
 if_clause_no_body_error_test() ->
     Line = ?LINE,
     Cmd = ["(if ",
@@ -75,8 +95,8 @@ if_clause_no_body_error_test() ->
     {ok, [Tree]} =els_parser:parse(Tokens),
     ?assertThrow(
        [{error, {no_body, {Line, 8},
-	 [{item,"quote",{71,8},atom},
-	  {item,"true",{71,9},atom}]}}],
+	 [{item,"quote",{Line,8},atom},
+	  {item,"true",{Line,9},atom}]}}],
        C = els_transpile:form(Tree, [])
       ).
     

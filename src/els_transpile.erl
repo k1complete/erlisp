@@ -125,6 +125,7 @@ dispatch_special(A) ->
           "let" => fun let_/3,
           "list" => fun list_/3,
           "map" => fun map_/3,
+          "mapp" => fun mapp_/3,
 	  "=" => fun match_op/3,
 	  "?=" => fun maybe_match_/3,
 	  "match" => fun match_op/3,
@@ -460,7 +461,7 @@ clause_(L, Loc, _E) when length(L) < 2 ->
 clause_(L, Loc, E) ->
     [Args, WhenCandidate| BodyCandidate] = L,
     {When, Body} = case WhenCandidate of
-		       [#item{type=atom, value=V}|_] when V=="when"; V=="whend"; V=="whenc" ->
+		       [#item{type=atom, value=V}|_] when V=="when"; V=="whend" ->
 			   {WhenCandidate, BodyCandidate};
 		       _ ->
 			   {[], [WhenCandidate| BodyCandidate]}
@@ -494,7 +495,7 @@ class_qualifier(Args, Loc, _E) ->
 handler_(L, Loc, E) ->
     [Args, WhenCandidate| BodyCandidate] = L,
     {When, Body} = case WhenCandidate of
-		       [#item{type=atom, value=V}|_] when V=="when"; V=="whend"; V=="whenc" ->
+		       [#item{type=atom, value=V}|_] when V=="when"; V=="whend" ->
 			   {WhenCandidate, BodyCandidate};
 		       _ ->
 			   {[], [WhenCandidate| BodyCandidate]}
@@ -762,7 +763,7 @@ receive_(X, L, E) ->
 
 %%%
 %%% (if ((when (isatom a) (bb) ) true )
-%%% (if ((whend (whenc (isatom a) (bb)) (whenc (aaa).. )) true )
+%%% (if ((whend (when (isatom a) (bb)) (when (aaa).. )) true )
 %%% (if ((when (, (isatom a) (bb)) (, (aaa) )) true )
 %%%     (disjunctiive_form bod...)
 %%%     (disjunctiive_form bod...))
@@ -779,7 +780,7 @@ receive_(X, L, E) ->
 %%% (; (, | list) (, | list))
 %%% (; list) --> 
 %%% 
-conjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == "whenc"; A == "when"->
+conjunctive_form([#item{type = atom, value="when"}|Tail], Env) ->
     ?LOG_DEBUG(#{conjunctive_form => Tail}),
     L = lists:map(fun(V) ->
 		      sterm(V, Env)
@@ -805,7 +806,7 @@ conjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == "whenc"; A =
 %%% (if (whend (, (== 1 2) (== 2 2)) (a ) (b)  ) 'true) (when 'true 'ng))
 disjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == "whend" ->
     io:format("Disjuncti:: ~p~n", [Tail]),
-    R0 = lists:map(fun([#item{type = atom, value = "whenc"}|_]=V) -> 
+    R0 = lists:map(fun([#item{type = atom, value = "when"}|_]=V) -> 
 			   io:format("Disjuncti:::: ~p~n", [V]),
 			   R = conjunctive_form(V, Env),
 			   io:format("Disjuncti:::::: ~p ~n--> ~p~n", [V, R]),
@@ -818,6 +819,7 @@ disjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == "whend" ->
 disjunctive_form(L, Env) ->
     io:format("Disjunction_form Other: ~p~n"< [L]),
     [[sterm(L, Env)]].
+
 
 get_leastlefthand([#item{loc=G}|_], _) ->
     G;
@@ -878,9 +880,9 @@ clause_arg_guard_body(Args, Test, Body, GL, E) ->
 
 %
 %%%
-%%% (if ((whend (whenc a b c) (whenc a b c)) 
+%%% (if ((whend (when a b c) (when a b c)) 
 %%%        explist)
-%%%     ((whenc a b c) 
+%%%     ((when a b c) 
 %%%        explist)
 %%%     (guard explist))
 %%%
@@ -896,7 +898,7 @@ if_(X, L, E) ->
     C = erl_syntax:if_expr(ClauseAstList),
     R = erl_syntax:set_pos(C, erl_anno:new(Line)),
     io:format("if1 : ~p~n", [R]),
-    %io:format("if2 : ~p~n", [erl_syntax:revert(hd(R))]),
+    io:format("if2 : ~p~n", [erl_syntax:revert(R)]),
     R.
 
 
@@ -1179,6 +1181,20 @@ quote_(X, [E], _Env) ->
 
 unquote_(X, _L, _Env) ->    
     X.
+
+mapp_(#item{loc=Loc}, L, Env) ->
+    MapElem = lists:map(fun([#item{loc=VLoc, value="=>"}, K, V]) ->
+				R = erl_syntax:map_field_assoc(sterm(K, Env), sterm(V, Env)),
+				erl_syntax:set_pos(R, VLoc);
+			   ([#item{loc=VLoc, value=":="}, K, V]) ->
+				R = erl_syntax:map_field_exact(sterm(K, Env), sterm(V, Env)),
+				erl_syntax:set_pos(R, VLoc)
+			end, L),
+    erl_syntax:set_pos(erl_syntax:map_expr(MapElem), Loc).
+
+% (map k1 v1 k1 v1)
+% (map k1 v1 k1 v1)
+% (map k1 v1 k1 v1 (:= k3 v3))
 map_(#item{loc=Loc}, L, Env) ->
     LForm = lists:map(fun(E) ->
                               sterm(E, Env)

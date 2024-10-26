@@ -23,3 +23,29 @@ map_generator_test() ->
     ?assertEqual({value, #{d => c}, [{'A', 1}]},
                  erl_eval:expr(erl_syntax:revert(C), Binding)).
     
+map_generator_conjunction_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(mc|| v k (<- k v (map 'a 'b 'c 'd)) (== k 'c) (== v 'd))", Line),
+    io:format("tokens ~p~n", [Tokens]),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    io:format("TransForm ~p~n", [erl_syntax:revert(C)]),
+
+    Binding=erl_eval:add_binding('A', 1, erl_eval:new_bindings()),
+    ?assertEqual({value, #{d => c}, [{'A', 1}]},
+                 erl_eval:expr(erl_syntax:revert(C), Binding)).
+
+
+map_comp_with_binary_generator_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(mc|| x (* x x)  (<- x (list 1 2 3 4)))", Line),
+    io:format("tokens ~p~n", [Tokens]),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    io:format("TransForm ~p~n", [erl_syntax:revert(C)]),
+
+    Binding=erl_eval:add_binding('A', 1, erl_eval:new_bindings()),
+    Expected = #{ X => X*X || X <- [1,2,3,4]},
+    ?assertEqual({value, Expected, [{'A', 1}]},
+                 erl_eval:expr(erl_syntax:revert(C), Binding)).
+
