@@ -42,4 +42,15 @@ map_pattern_test() ->
     {value, Result, Binding2} = erl_eval:expr(erl_syntax:revert(C), Binding),
     ?assertEqual(#{k0 => 0, k1 => {1,2}, k2 => 2}, Result),
     ?assertEqual([ {a, #{k0 => 0, k1 => {1,2}, k2 => 2}}, {b, 2}], Binding2).
+
+map_empty_test() ->
+    Line=?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(map)", Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    Binding = erl_eval:add_binding(a, #{k0 => 0, k1 => {1, 2}, k2 => 2}, erl_eval:new_bindings()),
+    io:format("------ ~p ~n binding ~p~n", [C, Binding]),
+    {value, Result, Binding2} = erl_eval:expr(erl_syntax:revert(C), Binding),
+    ?assertEqual(#{}, Result),
+    ?assertEqual([ {a, #{k0 => 0, k1 => {1,2}, k2 => 2}}], Binding2).
     

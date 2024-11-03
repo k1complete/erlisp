@@ -16,6 +16,7 @@
 -define(MQP(L, T, B), merl:qquote(L, T, B)).
 
 -export([if_/3]).
+-export([type_rep/2, record_field_rep/2, record_/3]).
 
 -spec module_function(#item{}, erl_anno:pos()) -> erl_tree().
 module_function(A, Loc) ->
@@ -125,6 +126,7 @@ dispatch_special(A) ->
           "let" => fun let_/3,
           "list" => fun list_/3,
           "map" => fun map_/3,
+	  "named_fun" => fun named_fun_/3,
           "mapp" => fun mapp_/3,
 	  "=" => fun match_op/3,
 	  "?=" => fun maybe_match_/3,
@@ -323,7 +325,122 @@ macro_export_(X, L, E) ->
                    end, L),
     R = erl_syntax:attribute(erl_syntax:atom(export),[erl_syntax:list(Aq)]),
     erl_syntax:set_pos(R, Loc).
+
+make_module_qualifier(#item{loc=Loc} = MF) ->
+    case getmodfun(MF) of
+	{undef, FA} ->
+	    FA;
+	{MA, FA} ->
+	    erl_syntax:set_pos(erl_syntax:module_qualifier(MA, FA), Loc)
+    end.
+
+builtin_type_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
+    M = #{
+	  "any"=>0,
+	  "binary_range" => {"binary", Param},
+	  "binary" => {"binary", [nil, 8|Param]},
+	  "nonempty_binary" => {"binary", [8, 8|Param]},
+	  "bitstring" => {"binary", [nil, 1|Param]},
+	  "nonempty_bitstring" => {"binary", [1, 1|Param]},
+	  "term" =>0,
+	  "none"=>0,
+	  "dynamic"=>0,
+	  "pid"=>0,
+	  "integer" => 0,
+	  ".." =>"range", %% (.. L H) L..H,
+	  "port"=>0,
+	  "reference"=>0,
+	  "nil"=>nil,
+	  "float"=>0},
+    case maps:get(Name, M, userdefined) of
+	userdefined ->
+	    userdefined;
+	0 ->
+	    ArgumentsAst = lists:map(fun(A) -> type_rep(A, E) end, Param),
+	    MF = make_module_qualifier(T),
+	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc);
+	nil ->
+	    erl_syntax:set_pos(erl_syntax:nil(), Loc);
+	{"binary", ParamTerm} ->
+	    io:format("B ~p: ~p~n", [T, ParamTerm]),
+	    ArgumentsAst = lists:map(fun(A) -> type_rep(A, E) end, ParamTerm),
+	    MF = make_module_qualifier(T#item{value="binary"}),
+	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc);
+	X  ->
+	    ArgumentsAst = lists:map(fun(A) -> type_rep(A, E) end, Param),
+	    MF = make_module_qualifier(T#item{value=X}),
+	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc)
+    end.
+
+%% builtin type
+type_rep(#item{type=atom, loc=Loc} = T, E) ->
+    MF = term_make_atom(T);
+%% builtin parameterized type
+type_rep([#item{type=atom, loc=Loc}=T|Arguments], E) ->
+    io:format("in ~p~n~p~n", [T, Arguments]),
+    Type = case builtin_type_rep(T, Arguments, E) of
+	       userdefined ->
+		   %%userdefined(T, Arguments);
+		   io:format("T ~p~n Arguments~p~n", [T, Arguments]),
+		   userdefined;
+	       R -> R
+	   end;
+type_rep(nil, E) ->
+    io:format("inNILL ~n", []),
+    erl_syntax:nil();
+type_rep(#item{type=string, value=V}=L, E) ->
+    erl_syntax:abstract(V);
+type_rep(L, E) when is_integer(L) ->
+    erl_syntax:abstract(L).
+
+%%    ArgumentsAst = lists:map(fun(A) -> type_rep(A, E) end, Arguments),
+%%    MF = make_module_qualifier(T),
+%%    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc).
     
+%%% a
+%%% (= a term)
+%%% (a type)
+%%% ((= a term) type)
+%% a
+record_field_rep(#item{type=atom, loc=Loc} = Name, _Env) ->
+    NameAst = term_make_atom(Name),
+    R = erl_syntax:set_pos(erl_syntax:record_field(NameAst), Loc),
+    io:format("RF ~p~n", [erl_syntax:revert(R)]),
+    R;
+%% (= a expression)
+record_field_rep([#item{type=atom, value="=", loc=OpLoc}, #item{type=atom, loc=ALoc}=A, E], Env) ->
+    NameAst = term_make_atom(A),
+    ValueAst = sterm(E, Env),
+    R = erl_syntax:set_pos(erl_syntax:record_field(NameAst, ValueAst), OpLoc);
+record_field_rep([#item{type=atom, loc=ALoc}=A, T], Env) ->
+    RecordValue = record_field_rep(A, Env),
+    TypeValue = type_rep(T, Env),
+    R = erl_syntax:set_pos(erl_syntax:typed_record_field(RecordValue, TypeValue), ALoc),
+    %%io:format("R: ~p~n R2: ~p~n", [R, erl_syntax:revert(R)]),
+    R;
+%% ((= a expression) type)
+record_field_rep([[#item{type=atom, value="=", loc=OpLoc}, #item{type=atom, loc=ALoc}=A, E]=AE, T], Env) ->
+    RecordValue = record_field_rep(AE, Env),
+    TypeValue = type_rep(T, E),
+    R = erl_syntax:set_pos(erl_syntax:typed_record_field(RecordValue, TypeValue), OpLoc).
+    
+%%
+%% (defrecord name a b c)
+%% (defrecord name ((=a v) t) b c))
+%% (defrecord name (=a v) b c)
+%% (defrecord name (a t) b c)
+record_(#item{loc=Loc}=X, [#item{value=Name, type=atom, loc=Nloc} | Definitions], _E) ->    
+    Record = erl_syntax:set_pos(erl_syntax:atom("record"), Nloc),
+    NameAst = erl_syntax:set_pos(erl_syntax:atom(Name), Nloc),
+    RecordFieldsAst = lists:map(fun(D) ->
+					record_field_rep(D, Loc)
+				end, Definitions),
+    RecordFieldsAst2 = erl_syntax:set_pos(erl_syntax:list(RecordFieldsAst) , Nloc),
+    Body = erl_syntax:set_pos(erl_syntax:tuple(RecordFieldsAst), Nloc),
+    R = erl_syntax:attribute(Record, Body),
+    R2 = erl_syntax:set_pos(erl_syntax:attribute(Record, [NameAst, Body]), Nloc),
+    R2.
+
 module_(X, L, _E) ->
     Loc = X#item.loc,
     Module = hd(L),
@@ -1065,6 +1182,19 @@ generator_(#item{loc=Loc}=_X, [K, V, Rest]=_L, E) ->
     erl_syntax:set_pos(S, Loc).
 
 
+%% 
+%% (named_fun name ((arg...) (whend ...) body)
+%%                 ((arg...) (when  ...) body))
+%% 
+named_fun_(#item{loc=Loc}, [#item{type=atom, value=N, loc=NLoc}|Rest]=_L, E) ->
+    Name = erl_syntax:set_pos(erl_syntax:variable(N), NLoc),
+    Clauses = lists:map(fun(LE) ->
+				clause_(LE, Loc, E)
+			end, Rest),
+    NamedFun = erl_syntax:named_fun_expr(Name, Clauses),
+    io:format("NNNnamed_fun1: ~p~n~p~n", [erl_syntax:revert(NamedFun), Loc]),
+    R = erl_syntax:set_pos(NamedFun, Loc),
+    R.
 
 %%
 %% (lambda (a b)

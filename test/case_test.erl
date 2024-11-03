@@ -21,6 +21,33 @@ case_with_guard_test() ->
     ?assertEqual({value, ok, [{'A', 1}, {x, true}]},
                  erl_eval:expr(erl_syntax:revert(C), Binding)).
 
+case_with_conjunctive_guard_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(case (> 1 y) (x (when (== x 'true) (== y 0)) 'ok) ('false 'ng))", Line),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    Binding=erl_eval:add_binding('y', 0, erl_eval:new_bindings()),
+    ?assertEqual({value, ok, [{x, true}, {'y', 0}]},
+                 erl_eval:expr(erl_syntax:revert(C), Binding)).
+
+case_with_disjunctive_guard_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(case (> 1 y) (x (whend (== x 'true) (== y 1)) 'ok) ('false 'ng))", Line),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    Binding=erl_eval:add_binding('y', 1, erl_eval:new_bindings()),
+    ?assertEqual({value, ok, [{x, false}, {'y', 1}]},
+                 erl_eval:expr(erl_syntax:revert(C), Binding)).
+
+case_with_disjunctive2_guard_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(case (> 1 y) (x (whend (when (== x 'true) (== y 1)) (when (== x 'false) (=/= y 0))) 'ok) ('false 'ng))", Line),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    Binding=erl_eval:add_binding('y', 1, erl_eval:new_bindings()),
+    ?assertEqual({value, ok, [{x, false}, {'y', 1}]},
+                 erl_eval:expr(erl_syntax:revert(C), Binding)).
+
 case_with_multistatement_test() ->
     Line = ?LINE,
     Cmd = ["(case (tl param)",

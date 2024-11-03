@@ -36,6 +36,8 @@ Rules.
   {token, {'(', TokenLoc}}.
 \) :
   {token, {')', TokenLoc}}.
+\.\. :
+  {token, {symbol, TokenLoc, TokenChars}}.
 \. : 
   {token, {'.', TokenLoc}}.
 \,\@ :

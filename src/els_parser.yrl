@@ -7,7 +7,7 @@ term asymbol  lines.
 Terminals
 symbol module_function
 integer float string 
-underscore
+underscore integer_range_type
 '(' ')' 
 '\'' 
 '\.'.

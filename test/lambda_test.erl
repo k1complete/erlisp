@@ -63,3 +63,21 @@ case_with_multistatement_test() ->
                  erl_eval:expr(erl_syntax:revert(C), Binding)).
 
 
+named_fun_test() ->
+    Line = ?LINE,
+    Cmd = ["(match f ", 
+	   "   (named_fun frac ((0) 1) ",
+	   "                   ((n) (* n (apply frac `(,(- n 1)))))))",
+	   "(apply f '(10))"],
+    Cmd0 = lists:flatten(Cmd),
+    {ok, Tokens, _Line} = els_scan:from_string(Cmd0, Line),
+    {ok, Trees} =els_parser:parse(Tokens),
+    Binding=erl_eval:add_binding('A', 1, erl_eval:new_bindings()),
+    C = lists:foldl(fun(Tree, {_, B}) -> 
+                            C = els_transpile:form(Tree, []),
+                            io:format("Tree ~p~n", [C]),
+                            {value, Result, NewBinding} = erl_eval:expr(erl_syntax:revert(C), B),
+                            {Result, NewBinding}
+                    end, {[], Binding}, Trees),
+    ?assertEqual(3628800, element(1, C)).
+
