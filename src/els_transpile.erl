@@ -338,9 +338,9 @@ builtin_type_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
     M = #{
 	  "any"=>0,
 	  "binary_range" => {"binary", Param},
-	  "binary" => {"binary", [nil, 8|Param]},
+	  "binary" => {"binary", [[], 8|Param]},
 	  "nonempty_binary" => {"binary", [8, 8|Param]},
-	  "bitstring" => {"binary", [nil, 1|Param]},
+	  "bitstring" => {"binary", [[], 1|Param]},
 	  "nonempty_bitstring" => {"binary", [1, 1|Param]},
 	  "term" =>0,
 	  "none"=>0,
@@ -350,7 +350,7 @@ builtin_type_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
 	  ".." =>"range", %% (.. L H) L..H,
 	  "port"=>0,
 	  "reference"=>0,
-	  "nil"=>nil,
+	  "nil"=> [],
 	  "float"=>0},
     case maps:get(Name, M, userdefined) of
 	userdefined ->
@@ -359,7 +359,7 @@ builtin_type_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
 	    ArgumentsAst = lists:map(fun(A) -> type_rep(A, E) end, Param),
 	    MF = make_module_qualifier(T),
 	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc);
-	nil ->
+	[] ->
 	    erl_syntax:set_pos(erl_syntax:nil(), Loc);
 	{"binary", ParamTerm} ->
 	    io:format("B ~p: ~p~n", [T, ParamTerm]),
@@ -385,9 +385,12 @@ type_rep([#item{type=atom, loc=Loc}=T|Arguments], E) ->
 		   userdefined;
 	       R -> R
 	   end;
+type_rep([], E) ->
+    erl_syntax:nil();
 type_rep(nil, E) ->
     io:format("inNILL ~n", []),
-    erl_syntax:nil();
+    Nil= erl_syntax:atom("nil"),
+    erl_syntax:type_application(Nil, []);
 type_rep(#item{type=string, value=V}=L, E) ->
     erl_syntax:abstract(V);
 type_rep(L, E) when is_integer(L) ->
