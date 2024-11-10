@@ -6,7 +6,7 @@ this is a module
 """
 )
 (-export (main 1) (triple 1))
-(-spec (main (a integer)) integer)
+(-spec (main (a :: (integer))) (integer))
 (defun main (a)
 """
 main is double a

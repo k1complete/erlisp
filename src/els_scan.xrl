@@ -32,6 +32,8 @@ Rules.
   {token, {symbol, TokenLoc, TokenChars}}.
 {Symbols}:{Symbols} : 
   {token, {module_function, TokenLoc, TokenChars}}.
+\:\: : 
+  {token, {symbol, TokenLoc, TokenChars}}.
 \( :
   {token, {'(', TokenLoc}}.
 \) :

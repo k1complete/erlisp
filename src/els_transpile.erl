@@ -16,7 +16,7 @@
 -define(MQP(L, T, B), merl:qquote(L, T, B)).
 
 -export([if_/3]).
--export([type_rep/2, record_field_rep/2, record_/3]).
+-export([type_rep/2, record_field_rep/2, record_/3, spec_/3]).
 
 -spec module_function(#item{}, erl_anno:pos()) -> erl_tree().
 module_function(A, Loc) ->
@@ -292,6 +292,10 @@ form_trans([List| T], E) when is_list(List) ->
                      sterm(S, E) 
              end, 
              T)}]).
+
+term_make_variable(Term) ->
+    erl_syntax:set_pos(erl_syntax:variable(Term#item.value), Term#item.loc).
+    
 %% nested ではtransしたあとは、beam astになっているので、 trans_formsしてはいけない。
 %% これは、先頭要素をcallableとして残りの要素をtransしたあとで、callするのが正しい。
 
@@ -336,6 +340,7 @@ make_module_qualifier(#item{loc=Loc} = MF) ->
 
 builtin_type_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
     M = #{
+%%	  "::" => 0,
 	  "any"=>0,
 	  "binary_range" => {"binary", Param},
 	  "binary" => {"binary", [[], 8|Param]},
@@ -345,12 +350,13 @@ builtin_type_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
 	  "term" =>0,
 	  "none"=>0,
 	  "dynamic"=>0,
+	  "lambda"=> {"fun", Param},
 	  "pid"=>0,
 	  "integer" => 0,
 	  ".." =>"range", %% (.. L H) L..H,
 	  "port"=>0,
 	  "reference"=>0,
-	  "nil"=> [],
+	  "nil"=>0,
 	  "float"=>0},
     case maps:get(Name, M, userdefined) of
 	userdefined ->
@@ -359,13 +365,18 @@ builtin_type_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
 	    ArgumentsAst = lists:map(fun(A) -> type_rep(A, E) end, Param),
 	    MF = make_module_qualifier(T),
 	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc);
-	[] ->
-	    erl_syntax:set_pos(erl_syntax:nil(), Loc);
 	{"binary", ParamTerm} ->
 	    io:format("B ~p: ~p~n", [T, ParamTerm]),
 	    ArgumentsAst = lists:map(fun(A) -> type_rep(A, E) end, ParamTerm),
 	    MF = make_module_qualifier(T#item{value="binary"}),
 	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc);
+	{"fun", [ParamTerm, Return]} ->
+	    ArgumentsAst = case ParamTerm of
+			       [] -> any_arity;
+			       _ -> lists:map(fun(A) -> type_rep(A, E) end, ParamTerm)
+			   end,
+	    ReturnAst = type_rep(Return, E),
+	    erl_syntax:set_pos(erl_syntax:function_type(ArgumentsAst, ReturnAst), Loc);
 	X  ->
 	    ArgumentsAst = lists:map(fun(A) -> type_rep(A, E) end, Param),
 	    MF = make_module_qualifier(T#item{value=X}),
@@ -376,6 +387,17 @@ builtin_type_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
 type_rep(#item{type=atom, loc=Loc} = T, E) ->
     MF = term_make_atom(T);
 %% builtin parameterized type
+type_rep([#item{type=atom, loc=Loc}=N, #item{type=atom, value="::"}, [T | Arguments]], E) ->
+    Nast = term_make_atom(N),
+    io:format("anonted ~p~n~p~n", [T, Arguments]),
+    Type = case builtin_type_rep(T, Arguments, E) of
+	       userdefined ->
+		   %%userdefined(T, Arguments);
+		   io:format("T ~p~n Arguments~p~n", [T, Arguments]),
+		   userdefined;
+	       R -> R
+	   end,
+    erl_syntax:set_pos(erl_syntax:annotated_type(Nast, Type), Loc);
 type_rep([#item{type=atom, loc=Loc}=T|Arguments], E) ->
     io:format("in ~p~n~p~n", [T, Arguments]),
     Type = case builtin_type_rep(T, Arguments, E) of
@@ -469,7 +491,7 @@ module_(X, L, _E) ->
 %% (spec (functionname (argname1 type1) 
 %%           (or (argname1 type2) (argname3 type3)) ) (when (exp)) 
 %%         returntype)
-spec_(X, L, E) ->
+spec_old(X, L, E) ->
     Loc = X#item.loc,
     io:format("spec ~p~n", [hd( hd(L) ) ] ),
     FuncName = term_make_atom(hd(hd(L))),
@@ -485,6 +507,28 @@ spec_(X, L, E) ->
     _Spec = erl_syntax:atom("spec"),
     FuncArity = erl_syntax:integer(length(Args)),
     _SpecArg = erl_syntax:tuple([FuncName, FuncArity]),
+    FF = erl_syntax:revert(FFtype),
+    M = {attribute, Loc, spec, {{erl_syntax:concrete(FuncName),length(Args)}, [FF]}},
+    %%M = erl_syntax:attribute(Spec, [erl_syntax:tuple([SpecArg, Ftype])]),
+    io:format("Spec: ~p~n", [M]),
+    erl_syntax:revert(M),
+    M.
+%%
+spec_(X, L, E) ->
+    Loc = X#item.loc,
+    io:format("spec name ~p~n arg ~p~n return ~p~n", [hd(hd(L)), tl(hd(L)), hd(tl(L))]),
+    FuncName = term_make_atom(hd(hd(L))),
+    Return = type_rep(hd(tl(L)), E),
+    Args = lists:map(fun(Elem) ->
+			     io:format("argn: ~p~n", [Elem]),
+			     Type = type_rep(Elem, E)
+                     end, tl(hd(L))),
+    io:format("SpecArgs: ~p~n", [Args]),
+    FFtype = erl_syntax:set_pos(erl_syntax:function_type(Args, Return), Loc),
+    
+    FuncArity = erl_syntax:integer(length(Args)),
+    _SpecArg = erl_syntax:tuple([FuncName, FuncArity]),
+    io:format("SpecFFtype: ~p~n", [FFtype]),
     FF = erl_syntax:revert(FFtype),
     M = {attribute, Loc, spec, {{erl_syntax:concrete(FuncName),length(Args)}, [FF]}},
     %%M = erl_syntax:attribute(Spec, [erl_syntax:tuple([SpecArg, Ftype])]),

@@ -10,6 +10,8 @@ sexp_to_string(List) ->
     lists:flatten(["(", S, ")"]).
 
 fun_to_string(Name, Spec) ->
+    {type, Loc, 'fun', [ArgsSpec, ReturnSpec]} = Spec,
+    io:format("fun_to_string: ~nName: ~p~nSpec: ~p~n", [Name, Spec]),
     [Args, Return] = to_string(Spec),
     sexp_to_string([sexp_to_string([atom_to_list(Name)]++[Args]), 
                     Return]).
@@ -32,19 +34,23 @@ sexp_to_list(List, F) ->
 
 to_list({var, _, Arg}, F) ->
     F(Arg);
-to_list({ann_type, _, Args}, F) ->
+to_list({ann_type, _, [Name| Args]}, F) ->
     sexp_to_list(lists:map(fun(E) ->
                                      to_list(E, F)
-                             end, Args), F);
+                             end, [Name, {atom,0, "::"} |Args]), F);
 to_list({type, _, 'product', Args}, F) ->
+    ArgsM = [ hd(Args), {atom, 0, '::'}|tl(Args)],
     sexp_to_list(lists:map(fun(E) ->
                                      to_list(E, F)
-                             end, Args), F);
+                             end, ArgsM), F);
 to_list({type, _, 'fun', Args}, F) ->
     [A, Return] = lists:map(fun(E) ->
                           to_list(E, F)
                   end, Args),
     [A, Return];
 to_list({type, _, 'integer', []}, F) ->
-    F(integer).
-
+    F(integer);
+to_list({atom, _, A}, F)->
+    F(A);
+to_list({var, _, A}, F)->
+    F(A).

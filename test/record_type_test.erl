@@ -145,7 +145,7 @@ record_user_defiend_binary_type_test() ->
 
 record_list_nil_test() ->
     Line=?LINE,
-    {ok, Tokens, _Line} = els_scan:from_string("(defrecord r (a ()) (b  (nonempty_bitstring)))", Line),
+    {ok, Tokens, _Line} = els_scan:from_string("(defrecord r (a ()) (b  (nil)))", Line),
     {ok, Ret} = els_parser:parse(Tokens),
     Ast = els_transpile:record_(hd(hd(Ret)), tl(hd(Ret)), []),
     %%?assertEqual(a, erl_syntax:revert(Ast)).
@@ -158,8 +158,6 @@ record_list_nil_test() ->
                              {type,0,nil,[]}},
 	     {typed_record_field,
 	      {record_field,{Line,22},{atom,{Line,22},b}},
-	      {type,
-	       {Line,26},
-	       binary,
-	       [{integer,0,1},{integer,0,1}]}}]}},
+                             {type,{Line,26},nil,[]}}]}},
+
     ?assertEqual(Expected, erl_syntax:revert(Ast)).
