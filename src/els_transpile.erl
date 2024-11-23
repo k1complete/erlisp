@@ -16,7 +16,7 @@
 -define(MQP(L, T, B), merl:qquote(L, T, B)).
 
 -export([if_/3]).
--export([type_rep/2, record_field_rep/2, record_/3, spec_/3]).
+-export([type_rep/2, record_field_rep/2, record_/3, spec_/3, type_/3]).
 
 -spec module_function(#item{}, erl_anno:pos()) -> erl_tree().
 module_function(A, Loc) ->
@@ -143,6 +143,7 @@ dispatch_special(A) ->
           "-macro_export" => fun macro_export_/3,
           "-module" => fun module_/3,
           "-spec" => fun spec_/3,
+          "-type" => fun type_/3,
           "-require" => fun require_/3,
 	  "<-" => fun generator_/3,
 	  "<=" => fun binary_generator_/3,
@@ -353,6 +354,10 @@ builtin_type_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
 	  "lambda"=> {"fun", Param},
 	  "pid"=>0,
 	  "integer" => 0,
+	  "list" => {"list", Param},
+	  "nonempty_list" => {"nonempty_list", Param},
+	  "maybe_improper_list" => {"maybe_improper_list", Param},
+	  "nonempty_improper_list" => {"nonempty_improper_list", Param},
 	  ".." =>"range", %% (.. L H) L..H,
 	  "port"=>0,
 	  "reference"=>0,
@@ -360,10 +365,16 @@ builtin_type_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
 	  "float"=>0},
     case maps:get(Name, M, userdefined) of
 	userdefined ->
+	    io:format("Name: ~p~n", [Name]),
 	    userdefined;
 	0 ->
 	    ArgumentsAst = lists:map(fun(A) -> type_rep(A, E) end, Param),
 	    MF = make_module_qualifier(T),
+	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc);
+	{"list", ParamTerm} ->
+	    io:format("L ~p: ~p~n", [T, ParamTerm]),
+	    ArgumentsAst = lists:map(fun(A) -> type_rep(A, E) end, ParamTerm),
+	    MF = make_module_qualifier(T#item{value="list"}),
 	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc);
 	{"binary", ParamTerm} ->
 	    io:format("B ~p: ~p~n", [T, ParamTerm]),
@@ -376,6 +387,7 @@ builtin_type_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
 			       _ -> lists:map(fun(A) -> type_rep(A, E) end, ParamTerm)
 			   end,
 	    ReturnAst = type_rep(Return, E),
+	    io:format("fun: arg ~p ~n return ~p~n", [ArgumentsAst, ReturnAst]),
 	    erl_syntax:set_pos(erl_syntax:function_type(ArgumentsAst, ReturnAst), Loc);
 	X  ->
 	    ArgumentsAst = lists:map(fun(A) -> type_rep(A, E) end, Param),
@@ -388,7 +400,8 @@ type_rep(#item{type=atom, loc=Loc} = T, E) ->
     MF = term_make_atom(T);
 %% builtin parameterized type
 type_rep([#item{type=atom, loc=Loc}=N, #item{type=atom, value="::"}, [T | Arguments]], E) ->
-    Nast = term_make_atom(N),
+    %%Nast = term_make_atom(N),
+    Nast = term_make_variable(N),
     io:format("anonted ~p~n~p~n", [T, Arguments]),
     Type = case builtin_type_rep(T, Arguments, E) of
 	       userdefined ->
@@ -516,6 +529,7 @@ spec_old(X, L, E) ->
 %%
 spec_(X, L, E) ->
     Loc = X#item.loc,
+    io:format("spec raw ~p~n", [L]),
     io:format("spec name ~p~n arg ~p~n return ~p~n", [hd(hd(L)), tl(hd(L)), hd(tl(L))]),
     FuncName = term_make_atom(hd(hd(L))),
     Return = type_rep(hd(tl(L)), E),
@@ -535,8 +549,18 @@ spec_(X, L, E) ->
     io:format("Spec: ~p~n", [M]),
     erl_syntax:revert(M),
     M.
-
-
+%% (-type (typename var1 var2...) typespec)
+%%
+type_(X, L, E) ->
+    Loc = X#item.loc,
+    TypeName = term_make_atom(hd(hd(L))),
+    TypeArg = lists:map(fun(Elem) -> term_make_variable(Elem) end, tl(hd(L))),
+    TypeDef = type_rep(hd(tl(L)),Loc),
+    io:format("type_ ~p~n", [TypeDef]),
+    io:format("typerevert_ ~p~n", [erl_syntax:revert(TypeDef)]),
+    M = {attribute, Loc, 'type', 
+	 {erl_syntax:atom_value(TypeName), erl_syntax:revert(TypeDef)},
+	 TypeArg}.
 
 match_op(#item{value=_X, loc=Loc}, L, E) ->
     [Left, Right] = L,
