@@ -526,29 +526,46 @@ spec_old(X, L, E) ->
     io:format("Spec: ~p~n", [M]),
     erl_syntax:revert(M),
     M.
-%%
+%% (-spec Funname Arg1 Result1 Args2 Result2... When)
 spec_(X, L, E) ->
     Loc = X#item.loc,
     io:format("spec raw ~p~n", [L]),
-    io:format("spec name ~p~n arg ~p~n return ~p~n", [hd(hd(L)), tl(hd(L)), hd(tl(L))]),
-    FuncName = term_make_atom(hd(hd(L))),
-    Return = type_rep(hd(tl(L)), E),
-    Args = lists:map(fun(Elem) ->
-			     io:format("argn: ~p~n", [Elem]),
-			     Type = type_rep(Elem, E)
-                     end, tl(hd(L))),
-    io:format("SpecArgs: ~p~n", [Args]),
-    FFtype = erl_syntax:set_pos(erl_syntax:function_type(Args, Return), Loc),
+    io:format("spec name ~p~n arg ~p~n return ~p~n", [hd(L), hd(tl(L)), hd(tl(tl(L)))]),
+    FuncName = term_make_atom(hd(L)),
     
-    FuncArity = erl_syntax:integer(length(Args)),
+%%    Return = type_rep(hd(tl(tl(L))), E),
+%%    Args = lists:map(fun(Elem) ->
+%%			     io:format("argn: ~p~n", [Elem]),
+%%			     Type = type_rep(Elem, E)
+%%                     end, hd(tl(L))),
+%%    io:format("SpecArgs: ~p~n", [Args]),
+    
+
+%%    FFtype = erl_syntax:set_pos(erl_syntax:function_type(Args, Return), Loc),
+    #{f := FFtype, l := ArgsLen} = spec_fun_clause(tl(L),#{f=> []}, E, Loc),
+    FuncArity = erl_syntax:integer(ArgsLen),
     _SpecArg = erl_syntax:tuple([FuncName, FuncArity]),
     io:format("SpecFFtype: ~p~n", [FFtype]),
-    FF = erl_syntax:revert(FFtype),
-    M = {attribute, Loc, spec, {{erl_syntax:concrete(FuncName),length(Args)}, [FF]}},
+    %%FF = erl_syntax:revert(FFtype),
+
+    M = {attribute, Loc, spec, {{erl_syntax:concrete(FuncName),ArgsLen}, FFtype}},
     %%M = erl_syntax:attribute(Spec, [erl_syntax:tuple([SpecArg, Ftype])]),
     io:format("Spec: ~p~n", [M]),
     erl_syntax:revert(M),
     M.
+%%
+spec_fun_clause([], #{f:=Acc, l:=ArgLen}, _E, _Loc) ->
+    #{f => lists:reverse(Acc), l=>ArgLen};
+spec_fun_clause([Param, Ret|Rest], #{f := Acc}, E, Loc) ->
+    Return = type_rep(Ret, E),
+    Args = lists:map(fun(Elem) ->
+			     io:format("argn: ~p~n", [Elem]),
+			     Type = type_rep(Elem, E)
+                     end, Param),
+    FFtype = erl_syntax:set_pos(erl_syntax:function_type(Args, Return), Loc),
+    FF = erl_syntax:revert(FFtype),
+    spec_fun_clause(Rest, #{f => [FF|Acc], l=> length(Args)}, E, Loc).
+
 %% (-type (typename var1 var2...) typespec)
 %%
 type_(X, L, E) ->

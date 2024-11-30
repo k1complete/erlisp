@@ -5,7 +5,7 @@
 
 annon_type_spec_a_test() ->
     Line=?LINE,
-    {ok, Tokens, _Line} = els_scan:from_string("(-spec (foo (a :: (integer)) (integer)) (integer))", Line),
+    {ok, Tokens, _Line} = els_scan:from_string("(-spec foo ((a :: (integer)) (integer)) (integer))", Line),
     {ok, Ret} = els_parser:parse(Tokens),
     Ast = els_transpile:spec_(hd(hd(Ret)), tl(hd(Ret)), []),
     %%?assertEqual(a, erl_syntax:revert(Ast)).
@@ -26,7 +26,7 @@ annon_type_spec_a_test() ->
 
 annon_type_func_spec_a_test() ->
     Line=?LINE,
-    {ok, Tokens, _Line} = els_scan:from_string("(-spec (foo (a :: (lambda ((integer)) (integer)))) (integer))", Line),
+    {ok, Tokens, _Line} = els_scan:from_string("(-spec foo ((a :: (lambda ((integer)) (integer)))) (integer))", Line),
 %%    {ok, Tokens, _Line} = els_scan:from_string("(-spec (foo ((a :: (integer)) (integer)) (integer)))", Line),
     {ok, Ret} = els_parser:parse(Tokens),
     Ast = els_transpile:spec_(hd(hd(Ret)), tl(hd(Ret)), []),
@@ -49,10 +49,9 @@ annon_type_func_spec_a_test() ->
                       {type,{Line,53},integer,[]}]}]}},
     ?assertEqual(Expected, erl_syntax:revert(Ast)).
 
-nil_type_test() ->
+spec_type_test() ->
     Line=?LINE,
-    {ok, Tokens, _Line} = els_scan:from_string("(-spec (foo (list) (integer)) (integer))", Line),
-%%    {ok, Tokens, _Line} = els_scan:from_string("(-spec (foo ((a :: (integer)) (integer)) (integer)))", Line),
+    {ok, Tokens, _Line} = els_scan:from_string("(-spec foo ((list) (integer)) (integer))", Line),
     {ok, Ret} = els_parser:parse(Tokens),
     Ast = els_transpile:spec_(hd(hd(Ret)), tl(hd(Ret)), []),
     %%?assertEqual(a, erl_syntax:revert(Ast)).
@@ -69,6 +68,42 @@ nil_type_test() ->
                                 [{type,{Line,14},list,[]},
                                  {type,{Line,21},integer,[]}]},
                             {type,{Line,32},integer,[]}]}]}},
+    ?assertEqual(Expected, erl_syntax:revert(Ast)).
+
+multi_clause_type_test() ->
+    Src = [ "-spec m (list()) -> integer();",
+	    "        (integer()) -> list()."],
+    Expected0 = {attribute,{2,2},
+		spec,
+		{{m,1},
+		 [{type,{2,8},
+		   'fun',
+		   [{type,{2,8},product,[{type,{2,9},list,[]}]},
+		    {type,{2,20},integer,[]}]},
+		  {type,{3,8},
+		   'fun',
+		   [{type,{3,8},product,[{type,{3,9},integer,[]}]},
+		    {type,{3,23},list,[]}]}]}},
+    Line=?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(-spec foo ((list)) (integer) ((integer)) (list))", Line),
+%%    {ok, Tokens, _Line} = els_scan:from_string("(-spec (foo ((a :: (integer)) (integer)) (integer)))", Line),
+    {ok, Ret} = els_parser:parse(Tokens),
+    Ast = els_transpile:spec_(hd(hd(Ret)), tl(hd(Ret)), []),
+    %%?assertEqual(a, erl_syntax:revert(Ast)).
+    Expected = {attribute,
+                     {Line,2},
+                     spec,
+                     {{foo,1},
+                      [{type,
+                           {Line,2},
+                           'fun',
+                           [{type, {Line,2}, product,[{type,{Line,14},list,[]}]}, 
+			    {type,{Line,22},integer,[]}]},
+		       {type,
+                           {Line,2},
+                           'fun',
+                           [{type, {Line,2}, product,[{type,{Line,33},integer,[]}]}, 
+			    {type,{Line,44},list,[]}]}]}},
     ?assertEqual(Expected, erl_syntax:revert(Ast)).
     
     
