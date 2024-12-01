@@ -2,6 +2,7 @@
 -include_lib("els.hrl").
 -include_lib("els_scan.hrl").
 -export([eq/2, scanitem/3, scanlist/5, scanlist/2]).
+-export([getmodfun/1, term_make_variable/1, term_make_atom/1, term_make_atom/2]).
 
 eq(#item{value=V}, V) ->
     true;
@@ -37,3 +38,32 @@ scanlist(L, K) ->
     LocH = #{hd(K) => hd(L)},
     io:format("scanlisthead ~p~n", [LocH]),
     scanlist(tl(L), tl(K), {hd(K), []}, #{}, LocH).
+
+term_make_variable(Term) ->
+    erl_syntax:set_pos(erl_syntax:variable(Term#item.value), Term#item.loc).
+
+term_make_atom(Term) ->
+    erl_syntax:set_pos(erl_syntax:atom(Term#item.value), Term#item.loc).
+term_make_atom(Term, Prefix) ->
+    erl_syntax:set_pos(erl_syntax:atom(Prefix++Term#item.value), Term#item.loc).
+
+split(F) ->
+    case string:split(F, ":") of
+        S when length(S) > 1 ->
+            {module_function, list_to_tuple(S)};
+        S -> 
+            {atom, hd(S)}
+    end.
+
+
+getmodfun(#item{type=Type, value=X, loc=Loc}) when Type == atom; Type== module_function->
+    {NType, NX} = split(X),
+    case NType of
+        atom ->
+            {undef, erl_syntax:set_pos(erl_syntax:atom(NX), Loc)};
+        module_function ->
+            {M, F} = NX,
+            MA=erl_syntax:set_pos(erl_syntax:atom(M), Loc),
+            FA=erl_syntax:set_pos(erl_syntax:atom(F), Loc),
+            {MA, FA}
+    end.
