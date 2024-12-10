@@ -353,7 +353,8 @@ record_field_rep([#item{type=atom, loc=ALoc}=A, T], Env) ->
 %% ((= a expression) type)
 record_field_rep([[#item{type=atom, value="=", loc=OpLoc}, #item{type=atom}, E]=AE, T], Env) ->
     RecordValue = record_field_rep(AE, Env),
-    TypeValue = els_typespec:rep(T, E),
+    %%TypeValue = els_typespec:rep(T, E),
+    TypeValue = els_typespec:rep(T, Env),
     erl_syntax:set_pos(erl_syntax:typed_record_field(RecordValue, TypeValue), OpLoc).
     
 %%
@@ -412,7 +413,7 @@ spec_(X, L, E) ->
     
 
 %%    FFtype = erl_syntax:set_pos(erl_syntax:function_type(Args, Return), Loc),
-    #{f := FFtype, l := ArgsLen} = spec_fun_clause(tl(L),#{f=> []}, E, Loc),
+    #{funtype := FFtype, arity := ArgsLen} = els_typespec:fun_clause_arity(tl(L), E, Loc),
     FuncArity = erl_syntax:integer(ArgsLen),
     _SpecArg = erl_syntax:tuple([FuncName, FuncArity]),
     io:format("SpecFFtype: ~p~n", [FFtype]),
@@ -424,25 +425,11 @@ spec_(X, L, E) ->
     erl_syntax:revert(M),
     M.
 %%
-spec_fun_clause([], #{f:=Acc, l:=ArgLen}, _E, _Loc) ->
-    #{f => lists:reverse(Acc), l=>ArgLen};
-spec_fun_clause([Param, Ret|Rest], #{f := Acc}, E, Loc) ->
-    Return = els_typespec:rep(Ret, E),
-    Args = lists:map(fun(Elem) ->
-			     io:format("argn: ~p~n", [Elem]),
-			     els_typespec:rep(Elem, E)
-                     end, Param),
-    FFtype = erl_syntax:set_pos(erl_syntax:function_type(Args, Return), Loc),
-    FF = erl_syntax:revert(FFtype),
-    spec_fun_clause(Rest, #{f => [FF|Acc], l=> length(Args)}, E, Loc).
-
-%% (-type (typename var1 var2...) typespec)
-%%
-type_(X, L, _E) ->
+type_(X, L, E) ->
     Loc = X#item.loc,
     TypeName = els_util:term_make_atom(hd(hd(L))),
     TypeArg = lists:map(fun(Elem) -> els_util:term_make_variable(Elem) end, tl(hd(L))),
-    TypeDef = els_typespec:rep(hd(tl(L)),Loc),
+    TypeDef = els_typespec:rep(hd(tl(L)),E),
     io:format("type_ ~p~n", [TypeDef]),
     io:format("typerevert_ ~p~n", [erl_syntax:revert(TypeDef)]),
     {attribute, Loc, 'type', 

@@ -2,7 +2,7 @@
 -include_lib("els.hrl").
 -export([to_string/1, to_list/1, fun_to_string/2,
         to_binary/1]).
--export([rep/2]).
+-export([rep/2, fun_clause_arity/3]).
 
 
 to_binary(L) ->
@@ -66,8 +66,8 @@ make_module_qualifier(#item{loc=Loc} = MF) ->
 
 builtin_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
     M = #{
-%%	  "::" => 0,
 	  "any"=>0,
+	  "atom"=>0,
 	  "binary_range" => {"binary", Param},
 	  "binary" => {"binary", [[], 8|Param]},
 	  "nonempty_binary" => {"binary", [8, 8|Param]},
@@ -79,53 +79,116 @@ builtin_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
 	  "lambda"=> {"fun", Param},
 	  "pid"=>0,
 	  "integer" => 0,
-	  "list" => {"list", Param},
+	  "list" => 0,
 	  "nonempty_list" => {"nonempty_list", Param},
 	  "maybe_improper_list" => {"maybe_improper_list", Param},
 	  "nonempty_improper_list" => {"nonempty_improper_list", Param},
 	  ".." =>"range", %% (.. L H) L..H,
+	  "map" => {"map", Param},
 	  "port"=>0,
 	  "reference"=>0,
-	  "nil"=>0,
+	  "*" => {op, Param},
+	  "div" => {op, Param},
+	  "rem" => {op, Param},
+	  "band" => {op, Param},
+	  "+" => {op, Param},
+	  "-" => {op, Param},
+	  "bor" => {op, Param},
+	  "bxor" => {op, Param},
+	  "bsl" => {op, Param},
+	  "bsr" => {op, Param},
+	  "bnot" => {op, Param},
+	  "record" => {"record", Param},
+	  "tuple" => {"tuple", Param},
+	  "|" => {"|", Param},
+	  "nil"=>0, 
 	  "float"=>0},
     case maps:get(Name, M, userdefined) of
 	userdefined ->
 	    io:format("Name: ~p~n", [Name]),
-	    userdefined;
-	0 ->
-	    ArgumentsAst = lists:map(fun(A) -> rep(A, E) end, Param),
-	    MF = make_module_qualifier(T),
-	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc);
-	{"list", ParamTerm} ->
-	    io:format("L ~p: ~p~n", [T, ParamTerm]),
-	    ArgumentsAst = lists:map(fun(A) -> rep(A, E) end, ParamTerm),
-	    MF = make_module_qualifier(T#item{value="list"}),
-	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc);
+	    case els_util:getmodfun(T) of
+		{undef, FA} ->
+		    ArgumentsAst = lists:map(fun(A) -> rep(A, E) end, Param),
+		    erl_syntax:set_pos(erl_syntax:user_type_application(FA, ArgumentsAst), Loc);
+		{MA, FA} ->
+		    ArgumentsAst = lists:map(fun(A) -> rep(A, E) end, Param),
+		    erl_syntax:set_pos(erl_syntax:type_application(MA, FA, ArgumentsAst), Loc)
+	    end;
 	{"binary", ParamTerm} ->
 	    io:format("B ~p: ~p~n", [T, ParamTerm]),
 	    ArgumentsAst = lists:map(fun(A) -> rep(A, E) end, ParamTerm),
 	    MF = make_module_qualifier(T#item{value="binary"}),
 	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc);
-	{"fun", [ParamTerm, Return]} ->
-	    ArgumentsAst = case ParamTerm of
-			       [] -> any_arity;
-			       _ -> lists:map(fun(A) -> rep(A, E) end, ParamTerm)
-			   end,
+	{"fun", []} ->
+	    erl_syntax:set_pos(erl_syntax:fun_type(), Loc);
+	{"fun", [any_arity, Return]} ->
 	    ReturnAst = rep(Return, E),
-	    io:format("fun: arg ~p ~n return ~p~n", [ArgumentsAst, ReturnAst]),
-	    erl_syntax:set_pos(erl_syntax:function_type(ArgumentsAst, ReturnAst), Loc);
+	    erl_syntax:set_pos(erl_syntax:function_type(any_arity, ReturnAst), Loc);
+	{"fun", Rest} ->
+	    #{funtype := Ftype, arity := Arity}  = fun_clause_arity(Rest, E, Loc),
+	    case length(Ftype) of
+		1 ->
+		    hd(Ftype);
+		_ ->
+		    throw({error, {fun_multiple_clause_not_allowd, Loc, Rest}})
+	    end;
+	{"map", []} ->
+	    erl_syntax:set_pos(erl_syntax:map_type(), Loc);
+	{"map", Params} ->
+	    FieldAst = lists:map(fun(A) -> map_field_rep(A, E) end, Params),
+	    erl_syntax:set_pos(erl_syntax:map_type(FieldAst), Loc);
+	{op, Param} ->
+	    Ops = els_transpile:form_trans([T| Param], E),
+	    erl_syntax:revert(Ops);
+	{"record", Param} ->
+	    NameAst = els_util:term_make_atom(hd(Param)),
+	    ParamAst = lists:map(fun(F) ->
+					record_field_rep(F, E)
+				end, tl(Param)),
+	    erl_syntax:set_pos(erl_syntax:record_type(NameAst, ParamAst), Loc);
+	{"tuple", Param} ->
+	    ParamAst = case Param of
+			   [] -> any_size;
+			   _ ->
+			       lists:map(fun(F) ->
+						 rep(F, E)
+					 end, Param)
+		       end,
+	    erl_syntax:set_pos(erl_syntax:tuple_type(ParamAst), Loc);
+	{"|", Param} ->
+	    ParamAst = case Param of
+			   [] -> any_size;
+			   _ ->
+			       lists:map(fun(F) ->
+						 rep(F, E)
+					 end, Param)
+		       end,
+	    erl_syntax:set_pos(erl_syntax:type_union(ParamAst), Loc);
+	0 ->
+	    ArgumentsAst = lists:map(fun(A) -> rep(A, E) end, Param),
+	    MF = make_module_qualifier(T),
+	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc);
 	X  ->
+	    io:format("X : ~p~n", [X]),
 	    ArgumentsAst = lists:map(fun(A) -> rep(A, E) end, Param),
 	    MF = make_module_qualifier(T#item{value=X}),
 	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc)
     end.
 
+
+map_field_rep([#item{value="=>", loc=Loc}, K, V], E) ->
+    erl_syntax:set_pos(erl_syntax:map_type_assoc(rep(K, E), rep(V, E)), Loc);
+map_field_rep([#item{value=":=", loc=Loc}, K, V], E) ->
+    erl_syntax:set_pos(erl_syntax:map_type_exact(rep(K, E), rep(V, E)), Loc).
+
+record_field_rep([#item{type=atom} = Name, #item{value="::", loc=Loc}, Type], E) ->
+    NameAst = els_util:term_make_atom(Name),
+    TypeAst = rep(Type, E),
+    erl_syntax:set_pos(erl_syntax:record_type_field(NameAst, TypeAst), Loc).
+
 -spec rep(#item{}, []) -> erl_syntax:tree().
 
-%% builtin type
-rep(#item{type=atom} = T, _E) ->
-    els_util:term_make_atom(T);
-%% builtin parameterized type
+%% annoteted type A :: T_0 type
 rep([#item{type=atom, loc=Loc}=N, #item{type=atom, value="::"}, [T | Arguments]], E) ->
     %%Nast = term_make_atom(N),
     Nast = els_util:term_make_variable(N),
@@ -134,10 +197,34 @@ rep([#item{type=atom, loc=Loc}=N, #item{type=atom, value="::"}, [T | Arguments]]
 	       userdefined ->
 		   %%userdefined(T, Arguments);
 		   io:format("T ~p~n Arguments~p~n", [T, Arguments]),
+		   
 		   userdefined;
 	       R -> R
 	   end,
     erl_syntax:set_pos(erl_syntax:annotated_type(Nast, Type), Loc);
+%% atom literal
+rep(#item{type=atom, value=V} = T, _E) ->
+    case hd(V) of
+	X when X >= $A, X =< $Z ->
+	    els_util:term_make_variable(T);
+	_ ->
+	    els_util:term_make_atom(T)
+    end;
+%% integer literal
+rep(T, _E) when is_integer(T) ->
+    erl_syntax:integer(T);
+%% builtin types and (bitstring M N), (nil), 
+%%         (lambda), (lambda any_arity T_0), (lamnbda (a b) T_0)
+%%         (lamnbda (a b) T_0 (when type))
+%%         (.. M N) 
+%%         (map) (map (=> k v)) (map (:= k v)
+%%         (Op integer integer)
+%%         (record name (fname :: type) ...)
+%%         (Mod:Type ...)
+%%         (tuple) 
+%%         (tuple T_1 T_2 ...)
+%%         (| T1 T2 ...) 
+%%         else... userdefined type
 rep([#item{type=atom}=T|Arguments], E) ->
     io:format("in ~p~n~p~n", [T, Arguments]),
     case builtin_rep(T, Arguments, E) of
@@ -157,3 +244,40 @@ rep(#item{type=string, value=V}, _E) ->
     erl_syntax:abstract(V);
 rep(L, _E) when is_integer(L) ->
     erl_syntax:abstract(L).
+
+fun_clause_arity(Param, E, Loc) ->
+    fun_clause_arity(Param, #{funtype => []}, E, Loc).
+   
+fun_clause_arity([], #{funtype := Acc, arity := ArgLen}, _E, _Loc) ->
+    #{funtype => lists:reverse(Acc), arity => ArgLen};
+fun_clause_arity([Param, Ret|Rest], #{funtype := Acc}, E, Loc) ->
+    Return = els_typespec:rep(Ret, E),
+    Args = lists:map(fun(Elem) ->
+			     io:format("argn: ~p~n", [Elem]),
+			     els_typespec:rep(Elem, E)
+                     end, Param),
+    FFtype = erl_syntax:set_pos(erl_syntax:function_type(Args, Return), Loc),
+    io:format("fun_clause_arity ~p~n", [Rest]),
+    {FT, Rest3} = case Rest of 
+		      [[#item{value="when"} | WhenValue]| Rest2] ->
+			  Constraint = function_constraint(WhenValue, E),
+			  {erl_syntax:set_pos(erl_syntax:constrained_function_type(FFtype, Constraint), Loc), 
+			   Rest2};
+		       _ ->
+			   {FFtype, Rest}
+		  end,
+    io:format("fun_clause_arity Result ~p~n", [FT]),
+    FF = erl_syntax:revert(FT),
+    io:format("fun_clause_arity RFF ~p~n", [FF]),
+    fun_clause_arity(Rest3, #{funtype => [FF|Acc], arity => length(Args)}, E, Loc).
+
+function_constraint(When, Env) ->
+    lists:map(fun([N, #item{value="::", type=atom, loc=Loc}, T ]) ->
+		      Name = rep(N, Env),
+		      Subtype = erl_syntax:set_pos(erl_syntax:atom("is_subtype"), Loc),
+		      Type = rep(T, Env),
+		      erl_syntax:set_pos(erl_syntax:constraint(Subtype, [Name, Type]), Loc)
+	      end, When).
+
+%% (-type (typename var1 var2...) typespec)
+%%
