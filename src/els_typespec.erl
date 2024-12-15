@@ -1,6 +1,6 @@
 -module(els_typespec).
 -include_lib("els.hrl").
--export([to_string/1, to_list/1, fun_to_string/2,
+-export([to_string/1, to_list/1, fun_to_string/2, fun_to_list/3, fun_to_list/2,
         to_binary/1]).
 -export([rep/2, fun_clause_arity/3]).
 
@@ -12,7 +12,61 @@ sexp_to_string(List) ->
     S=lists:join(" ", List),
     lists:flatten(["(", S, ")"]).
 
+from_ast({ann_type, Loc, [A, T]}) ->
+    [from_ast(A), #item{value="::", loc=Loc, type=atom}, from_ast(T)];
+from_ast({type, _, 'bounded_fun', [Ft, Fcs]}) ->
+    io:format("Bounded: ~p~n~p~n", [Ft, Fcs]),
+    [FtM, RetM] = from_ast(Ft),
+    io:format("BoundedRet: ~p~n~p~n", [FtM, RetM]),
+    FcM0= lists:map(fun(E) -> from_ast(E) end, Fcs),
+    FcM = [#item{type=atom, value="when"} | FcM0],
+    [FtM, RetM, FcM];
+from_ast({type, _, 'fun', [{type, _, product, Args}, Ret]}) ->
+    ArgM = lists:map(fun(E) -> from_ast(E) end, Args),
+    io:format("RetIn: ~p~n", [Ret]),
+    RetM =  from_ast(Ret),
+    [ArgM, RetM];
+from_ast({type, Loc, constraint, [{atom, Loc2, is_subtype}, [V, T]]}) ->
+    [from_ast(V), #item{type=atom, value="::"}, from_ast(T)];
+from_ast(L) when is_list(L) ->
+    lists:map(fun(E) -> from_ast(E) end, L);
+from_ast({var, Loc, Arg}) ->
+    #item{type=variable, value=atom_to_list(Arg), loc=Loc};
+from_ast({atom, Loc, Arg}) ->
+    #item{type=atom, value=atom_to_list(Arg), loc=Loc};
+from_ast({type, Loc, Fun, Arg}) ->
+    io:format("Toast: ~p~n~p~n", [Fun, Loc]),
+    ArgTerms = lists:map(fun(E) -> from_ast(E) end, Arg),
+    R = [#item{type=function, value=atom_to_list(Fun), loc=Loc}| ArgTerms],
+    io:format("ToastR: ~p~n", [R]),
+    R;
+from_ast({atom, Loc, L}) ->
+    #item{type=atom, value=L, loc=Loc};
+from_ast({float, Loc, L}) ->
+    #item{type=float, value=L, loc=Loc};
+from_ast({integer, Loc, L}) ->
+    #item{type=integer, value=L, loc=Loc}.
+
+
+    
+    
+
+
+
+
+fun_to_list(Name, Spec) when is_list(Spec) ->
+    fun_to_list(Name, Spec, fun (E) -> E end).
+
+fun_to_list(Name, Spec, F) when is_list(Spec) ->
+    Clauses = lists:foldl(fun(E, A) -> A++from_ast(E) end, [], Spec),
+    M = [#item{value=atom_to_list(Name), type=function, loc=nil}| Clauses],
+    io:format("FTL: ~p", [M]),
+    M2 = lists:foldl(fun(E, A) -> A ++ binary:bin_to_list(E) end, "", lists:flatten(els_pp:pp(M))),
+    M2.
+
 fun_to_string(Name, Spec) ->
+    fun_to_list(Name, Spec).
+fun_to_string_old(Name, Spec) ->
     {type, _Loc, 'fun', [_ArgsSpec, _ReturnSpec]} = Spec,
     io:format("fun_to_string: ~nName: ~p~nSpec: ~p~n", [Name, Spec]),
     [Args, Return] = to_string(Spec),
@@ -46,13 +100,40 @@ to_list({type, _, 'product', Args}, F) ->
     sexp_to_list(lists:map(fun(E) ->
                                      to_list(E, F)
                              end, ArgsM), F);
+to_list({type, _, 'bounded_fun', [Ft, Fc]}, F) ->
+    Constraint = lists:map(fun(E) -> to_list(E, F) end, Fc),
+    Ftype = to_list(Ft, F),
+    sexp_to_list([Ftype,Constraint], F);
+to_list({type, _, 'bounded_fun', Args}, F) ->
+    ArgsM = [ hd(Args), {atom, 0, '::'}|tl(Args)],
+    sexp_to_list(lists:map(fun(E) ->
+                                     to_list(E, F)
+                             end, ArgsM), F);
+to_list({type, _, 'constraint', [{atom, _, 'is_subtype'}, [V, T]]}, F) ->
+    Exp = ['when', to_list(V, F), '::', to_list(T, F)];
+
+to_list({type, _, 'fun', [{type, _, product, Args}, Ret]}, F) ->
+    io:format("FUNPRO: ~p~n", [Args]),
+    Return = to_list(Ret, F),
+    A = lists:map(fun(E) ->
+                          to_list(E, F)
+                  end, Args),
+    io:format("FUNRET: ~p~n", [[A, Return]]),
+    [A, Return];
 to_list({type, _, 'fun', Args}, F) ->
+    io:format("FUN: ~p~n", [Args]),
     [A, Return] = lists:map(fun(E) ->
                           to_list(E, F)
                   end, Args),
+    io:format("FUNRET: ~p~n", [[A, Return]]),
     [A, Return];
+to_list({type, _, 'list', Args}, F) ->
+    ArgsM = lists:map(fun(E) -> to_list(E, F) end, Args),
+    ['list', ArgsM];
 to_list({type, _, 'integer', []}, F) ->
     F(integer);
+to_list({type, _, 'atom', []}, F) ->
+    F('atom');
 to_list({atom, _, A}, F)->
     F(A).
 
@@ -201,6 +282,11 @@ rep([#item{type=atom, loc=Loc}=N, #item{type=atom, value="::"}, [T | Arguments]]
 		   userdefined;
 	       R -> R
 	   end,
+    erl_syntax:set_pos(erl_syntax:annotated_type(Nast, Type), Loc);
+rep([#item{type=atom, loc=Loc}=N, #item{type=atom, value="::"}, L], E) ->
+    %%Nast = term_make_atom(N),
+    Nast = els_util:term_make_variable(N),
+    Type = rep(L, E),
     erl_syntax:set_pos(erl_syntax:annotated_type(Nast, Type), Loc);
 %% atom literal
 rep(#item{type=atom, value=V} = T, _E) ->

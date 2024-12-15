@@ -168,7 +168,7 @@ extract_specs(Trees) ->
                                         case erl_syntax:atom_name(erl_syntax:attribute_name(E)) of
                                             "spec" ->
                                                 {attribute, _, spec, {FA, S}} = E,
-                                                {true, {FA, hd(S)}};
+                                                {true, {FA, S}};
                                             _ ->
                                                 false
                                         end;
