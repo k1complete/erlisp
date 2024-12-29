@@ -38,6 +38,8 @@ file(File, Opt) ->
     {ok, Module, Binary}.
 
 
+
+
 -spec compile_macro(sexp(), env()) -> sexp().
 %% フォーム一つをトランスパイル
 %% ASTをコンパイルしてmoduleに追加
@@ -131,6 +133,9 @@ compile_and_write_beam(Ast, Options) ->
     code:ensure_loaded(Module),
     {module, Module, Binary2}.
 
+				      
+    
+    
 -spec file_ast(string, options()) -> {module, module(), binary(), sexp()}.
 file_ast(File, Opt) ->
     io:format("cwd ~p", [file:get_cwd()]),

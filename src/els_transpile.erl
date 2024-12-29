@@ -69,6 +69,8 @@ term_to_ast(A, Loc, Env, Quote) ->
             term_to_ast(F, Aloc, Env, Quote);
         _ when is_list(A), Quote == false ->
             form_trans(A, Env);
+        nil ->
+            erl_syntax:set_pos(erl_syntax:nil(), Loc);
         [] when is_list(A) ->
             erl_syntax:set_pos(erl_syntax:nil(), Loc);
         [H|T] when is_list(A) ->
@@ -649,10 +651,20 @@ defmacro_(X, L, E) ->
     Line = X#item.loc,
     [Name, Args | Rest] = L,
     Macro = Name#item{value="MACRO_" ++ Name#item.value},
+    L2 = [Macro, Args | Rest],
+    defun_(X, L2, E).
+
+old_defmacro_(X, L, E) ->
+    io:format("defmacro_ : ~p~n", [X]),
+    Line = X#item.loc,
+    [Name, Args | Rest] = L,
+    Macro = Name#item{value="MACRO_" ++ Name#item.value},
+    
     io:format("Name, Args | Rest =~n  ~p~n ~p~n ~p ~n", [Macro, Args, Rest]),
     case hd(Args) of
         A when is_list(A) ->
-            match_defun_(Macro, [Args|Rest], E);
+            %%match_defun_(Macro, [Args|Rest], E);
+            defun_comment(Macro, Args, Rest, E);
         _  ->
             Body = lists:map(fun(A) -> form(A, E) end, Rest),
             io:format("simpleArgs ~p ~n", [Args]),
