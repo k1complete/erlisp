@@ -12,6 +12,54 @@ file(File) ->
 -spec file(string(), list()) -> {ok, module(), binary()}.
 file(File, Opt) ->
     io:format("cwd ~p~n", [file:get_cwd()]),
+    Module = list_to_atom(filename:basename(File, ".elisp")),
+    {ok, Tokens} = els_scan:file(File, Opt),
+    io:format("scan ~p~n", [Tokens]),
+    {ok, Forms} = els_parser:parse(Tokens),
+    Env=[{macros, #{}}],
+    {Ast0, {Errors, Env2}} = lists:mapfoldl(fun(F, {A, E}) ->
+					  try
+					      io:format("PRE: ~p~nEnv:(~p)~n", [F, E]),
+					      R = els_transpile:form(F, E),
+					      M = proplists:get_value(macros, E),
+					      case els_localfun:register_local_func(R, M) of
+						  {FunDic, Name, Arity} ->
+						      LocalF = els_localfun:create_valuefun(FunDic),
+						      MName = els_localfun:strip_macroname_string(Name),
+						      io:format("NName(~p):Name(~p)~n", [MName, Name]),
+						      AName = atom_to_list(Name),
+						      NewMacros = if AName =/= MName ->
+									  maps:put(
+									    {MName, Arity},
+									    {{local},  LocalF}, M);
+								     true ->
+									  M
+								  end,
+						      OEnv = proplists:delete(macros, E),
+						      NewEnv = [{macros, NewMacros}|OEnv],
+						      {R, {A, NewEnv}};
+						  _ ->
+						      {R, {A, E}}
+					      end
+					  catch
+					      throw:Error when is_list(Error) ->
+						  io:format("catched : ~p~n", [Error]),
+						  {[],  {A ++ Error, E}}
+					  end
+				  end, {[], Env}, Forms),
+    
+    Ast = case Errors of
+	      [] -> Ast0;
+	      _ ->
+		  throw(Errors)
+	  end,
+    io:format("Ast ~p~n Err ~p~n", [Ast, Errors]),
+    {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
+    io:format("compiled ~p~n", [Binary]),
+    {ok, Module, Binary, Ast}.
+
+old_file(File, Opt) ->
+    io:format("cwd ~p~n", [file:get_cwd()]),
     Module = m,
     {ok, Tokens} = els_scan:file(File, Opt),
     io:format("scan ~p~n", [Tokens]),
@@ -38,7 +86,41 @@ file(File, Opt) ->
     {ok, Module, Binary}.
 
 
+    
+    
+create_local_func(Name, Arity, Ast, FunDic) ->
+    maps:put({Name, Arity}, Ast, FunDic).
 
+			
+merge_macro_env(MacroMap, Env) ->
+    yal_util:proplists_replace(local, MacroMap, Env).
+
+%%
+%% defmacro/defunを処理して、新しいlocalfunマップを返す。
+%% 
+%% 
+%%interprete_to_ast([#item{value=Keyword, type=atom}|T] = A, Acc, Env)
+%%  when Keyword == "defmacro"; Keyword == "defun" ->
+%%    Locals = prpplists:get_value(localfun, Env),
+%%    LocalFun = fun() -> 
+%%interprete_to_ast([#item{value=Keyword, type=atom}|T] = A, Acc, Env) ->
+%%    #{value=> els_transpile:form(A, E), binding => Acc, environment => Env}.
+%%
+%%new_compile_macro([#item{value=Keyword, type=atom}|T] = A, Acc, E) 
+%%  when Keyword == "defmacro"; Keyword == "defun" ->
+%%    [#item{type=atom, value=Name}, Args|_Body] = T,
+%%    Arity = length(Args),
+%%    NewEnv = merge_macro_env(Acc, E),
+%%    Dic = proplist:get_value(local, NewEnv, #{}),
+%%    Ast = els_transpile:form(A, E),
+%%    NewLocalFunMap = case els_localfun:create_local_func(Ast, Acc) of
+%%			 {{Name, Arity}, Def} ->
+%%			     maps:put({Name, Arity}, Def, Dic};
+%%			 undef ->
+%%			     Dic
+%%		     end,
+%%new_compile_macro(_, Acc, E) ->
+%%    Acc.
 
 -spec compile_macro(sexp(), env()) -> sexp().
 %% フォーム一つをトランスパイル
@@ -135,20 +217,25 @@ compile_and_write_beam(Ast, Options) ->
 
 				      
     
-    
 -spec file_ast(string, options()) -> {module, module(), binary(), sexp()}.
 file_ast(File, Opt) ->
+    {ok, Module, Binary, Ast} = file(File, Opt),
+    {ok, Module, Binary, Ast}.
+
+old_file_ast(File, Opt) ->
     io:format("cwd ~p", [file:get_cwd()]),
     {ok, Tokens} = els_scan:file(File, Opt),
     io:format("scan ~p", [Tokens]),
     {ok, Forms} = els_parser:parse(Tokens),
     io:format("parsed ~p~n", [Forms]),
+    
     Compiled = compile_macro(Forms, []),
     io:format("compiled ~p~n", [Forms]),
     {_, _, NEnv} = Compiled,
     io:format("compiled ~p", [NEnv]),
     MR = Forms,
     Env=NEnv,
+
     ?LOG_DEBUG(#{macro_compiled => MR, nenv => NEnv}),
     Ast = lists:map(fun(F) ->
 			    els_transpile:form(F, Env) 

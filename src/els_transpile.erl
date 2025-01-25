@@ -169,13 +169,25 @@ atom_to_module_function(F) ->
             F
     end.
 
+    
+
 walk(F, Env, Fun) when is_list(F) ->
     io:format("ww ~p~n", [F]),
     [H|T] = F,
     Arity = length(T),
+    Macros = proplists:get_value(macros, Env, #{}),
     case atom_to_module_function(H) of
         #item{type=atom, value=V} ->
-            case maps:get({V, Arity},  Env, undefined)  of
+	    %%--
+            case maps:get({V, Arity},  Macros, undefined)  of
+		{{local}, Macro} ->
+		    io:format("local ~p(~p)~n", [F, V]),
+		    io:format("local-Macro ~p~n", [Macro]),
+		    A = Macro(list_to_atom(V), T),
+		    io:format("localafter ~p~n", [A]),
+		    A2 = atom_to_item(A, Env),
+		    io:format("localafter2 ~p~n", [A2]),
+		    walk(A2, Env, Fun);
                 {M, Macro} ->
                     io:format("call-M: ~p~n", [F]),
                     A = Fun(M, Macro, tl(F)),
@@ -187,7 +199,7 @@ walk(F, Env, Fun) when is_list(F) ->
                                    end, T)]
             end;
         #item{type=module_function, value={Module, Function}} ->
-            case maps:get({Module, Function, Arity},  Env, undefined)  of
+            case maps:get({Module, Function, Arity},  Macros, undefined)  of
                 {M, Macro} ->
                     io:format("call2: ~p~n", [F]),
                     A = Fun(M, Macro, T),
@@ -216,6 +228,9 @@ atom_to_item(A, _Env) when is_list(A) ->
               end, A);
 atom_to_item(List, _Env) ->
     List.
+
+    
+%%% expand macroではマクロ実行のしかたがlocalと違う
 expand_macro(A, E, Macros) ->
     R2 = proplists:get_value(require, E, require),
     In = maps:merge(#{{"backquote",  1} => {yal_macro, 'MACRO_backquote'},
@@ -227,7 +242,8 @@ expand_macro(A, E, Macros) ->
               Tid ->
                   maps:from_list(ets:tab2list(Tid))
           end,
-    Env = maps:merge(In, Out),
+    NewMacros = maps:merge(In, Out),
+    Env = yal_util:proplists_replace(macros, NewMacros, E),
     %Env = In,
     io:format("Map ~p~n", [Env]),
     Result = walk(A, Env, fun(Module, Function, Arguments) -> 
@@ -254,7 +270,10 @@ merge_into_env(Env, Key, Value) ->
 
 -spec form(sexp(), any()) -> erl_tree().
 form(A, E) ->
-    Macros = proplists:get_value(macros, E, maps:new()),
+    M = proplists:get_value(macros, E, maps:new()),
+    %NFundic = els_localfun:get_nfundic(),
+    %Macros = maps:merge(NFundic, M),
+    Macros = M,
     B = expand_macro(A, E, Macros),
     io:format("form-E ~p ~nFrom ~p ~n To ~p~n", [E, A, B]),
     R = form_trans(B, E),

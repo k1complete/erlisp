@@ -3,8 +3,13 @@
 -export([make_symbol/2, make_symbol/1,
          required_macros/1,
          getmacros/1,
-         make_macro_funcname/1
+         make_macro_funcname/1,
+	 proplists_replace/3
         ]).
+
+proplists_replace(Key, Value, Prop) ->
+    [{Key, Value} | proplists:delete(Key, Prop)].
+
 make_macro_funcname(Name) ->
     list_to_atom("MACRO_" ++ Name).
 
