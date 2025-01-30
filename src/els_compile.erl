@@ -17,7 +17,7 @@ file(File, Opt) ->
     io:format("scan ~p~n", [Tokens]),
     {ok, Forms} = els_parser:parse(Tokens),
     Env=[{macros, #{}}],
-    {Ast0, {Errors, Env2}} = lists:mapfoldl(fun(F, {A, E}) ->
+    {Ast0, {Errors, _Env}} = lists:mapfoldl(fun(F, {A, E}) ->
 					  try
 					      io:format("PRE: ~p~nEnv:(~p)~n", [F, E]),
 					      R = els_transpile:form(F, E),
@@ -205,7 +205,9 @@ compile_and_write_beam(Ast, Options) ->
     ?LOG_DEBUG(#{compile2 => erl_syntax:revert_forms(Ast), options=>Options, ss => SS}),
     {ok, Binary} =SS,
     Specs = extract_specs(Ast),
+    io:format("before make_doc ~p~nAst ~p~n", [Specs, Ast]),
     {ok, DocsV1} = make_docs(Ast, Specs),
+    io:format("after make_doc ~p~n", [DocsV1]),
     {ok, Module, Chunks} = beam_lib:all_chunks(Binary),
     ChunksAdded = lists:append(Chunks, [{"Docs", term_to_binary(DocsV1)}]),
     {ok, Binary2} = beam_lib:build_module(ChunksAdded),
@@ -220,7 +222,9 @@ compile_and_write_beam(Ast, Options) ->
 -spec file_ast(string, options()) -> {module, module(), binary(), sexp()}.
 file_ast(File, Opt) ->
     {ok, Module, Binary, Ast} = file(File, Opt),
-    {ok, Module, Binary, Ast}.
+    {module, Module, Binary2} = compile_and_write_beam(Ast, Opt),
+    {ok, Module, Binary2, Ast}.
+%    {ok, Module, Binary, Ast}.
 
 old_file_ast(File, Opt) ->
     io:format("cwd ~p", [file:get_cwd()]),
@@ -313,15 +317,18 @@ make_function_signature(Tree, Specs) ->
 
 -spec extract_comment(erl_syntax:tree(), kind(), map()) -> doc_entry().
 extract_comment(Tree, Kind, Specs) ->
+    io:format("CommentTree: ~p~n", [Tree]),
     case erl_syntax:has_comments(Tree) of
         true ->
+	    CommentList = lists:flatten(erl_syntax:comment_text(erl_syntax:get_precomments(Tree))),
+	    io:format("Comments: ~p~n", [CommentList]),
             els_docs:make_docentry(Kind, 
                                      erl_syntax:atom_value(erl_syntax:function_name(Tree)),
                                      erl_syntax:function_arity(Tree),
                                      erl_syntax:get_pos(Tree),
                                      make_function_signature(Tree, Specs),
                                      #{<<"en">> => 
-                                           list_to_binary(erl_syntax:get_precomments(Tree))}, 
+                                           list_to_binary(CommentList)},
                                      #{});
         false ->
             none
@@ -330,10 +337,16 @@ extract_comment(Tree, Kind, Specs) ->
 make_docs(AstList, Specs) ->
     S=lists:foldr(fun(Ast, Acc) ->
                           Doc=maps:get(docs, Acc),
+			  io:format("make_docs ~p~n", [Ast]),
                           case erl_syntax:type(Ast) of
                             function ->
                                   E = extract_comment(Ast, function, Specs),
-                                  Acc#{docs=> els_docs:add_docentry(Doc, E)};
+				  case E of
+				      none ->
+					  Acc;
+				      _ ->
+					  Acc#{docs=> els_docs:add_docentry(Doc, E)}
+				  end;
                             attribute  ->
                                 case erl_syntax:atom_value(erl_syntax:attribute_name(Ast)) of
                                     module ->

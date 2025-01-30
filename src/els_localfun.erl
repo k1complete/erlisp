@@ -28,11 +28,11 @@ put_nfundic(NFunDic) ->
 -spec create_local_func(list(), erl_syntax:syntaxTree(), localfundict()) -> localfundict().
 create_local_func(Name, C, FunDic) ->
     case erl_syntax:revert(C) of 
-	{function, Anno, FName, Arity, Ast} ->
+	{function, Anno, _FName, Arity, Ast} ->
 	    LocalFunc = {'named_fun', Anno, Name, Ast},
 	    LocalFunAst = erl_syntax:revert(LocalFunc),
 	    io:format("create_local_func: ~p=n", [LocalFunAst]),
-	    M=maps:put({Name, Arity}, {{local}, LocalFunAst}, FunDic)
+	    maps:put({Name, Arity}, {{local}, LocalFunAst}, FunDic)
     end.
 
 

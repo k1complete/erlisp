@@ -8,9 +8,9 @@
 to_binary(L) ->
     list_to_binary(to_string(L)).
 
-sexp_to_string(List) ->
-    S=lists:join(" ", List),
-    lists:flatten(["(", S, ")"]).
+%sexp_to_string(List) ->
+%    S=lists:join(" ", List),
+%    lists:flatten(["(", S, ")"]).
 
 from_ast({ann_type, Loc, [A, T]}) ->
     [from_ast(A), #item{value="::", loc=Loc, type=atom}, from_ast(T)];
@@ -26,7 +26,7 @@ from_ast({type, _, 'fun', [{type, _, product, Args}, Ret]}) ->
     io:format("RetIn: ~p~n", [Ret]),
     RetM =  from_ast(Ret),
     [ArgM, RetM];
-from_ast({type, Loc, constraint, [{atom, Loc2, is_subtype}, [V, T]]}) ->
+from_ast({type, _Loc, constraint, [{atom, _Loc2, is_subtype}, [V, T]]}) ->
     [from_ast(V), #item{type=atom, value="::"}, from_ast(T)];
 from_ast(L) when is_list(L) ->
     lists:map(fun(E) -> from_ast(E) end, L);
@@ -40,38 +40,35 @@ from_ast({type, Loc, Fun, Arg}) ->
     R = [#item{type=function, value=atom_to_list(Fun), loc=Loc}| ArgTerms],
     io:format("ToastR: ~p~n", [R]),
     R;
-from_ast({atom, Loc, L}) ->
-    #item{type=atom, value=L, loc=Loc};
 from_ast({float, Loc, L}) ->
     #item{type=float, value=L, loc=Loc};
 from_ast({integer, Loc, L}) ->
+    L;
+from_ast({integer, Loc, L}) ->
     #item{type=integer, value=L, loc=Loc}.
-
-
-    
-    
-
-
 
 
 fun_to_list(Name, Spec) when is_list(Spec) ->
     fun_to_list(Name, Spec, fun (E) -> E end).
 
-fun_to_list(Name, Spec, F) when is_list(Spec) ->
+fun_to_list(Name, Spec, _F) when is_list(Spec) ->
     Clauses = lists:foldl(fun(E, A) -> A++from_ast(E) end, [], Spec),
     M = [#item{value=atom_to_list(Name), type=function, loc=nil}| Clauses],
     io:format("FTL: ~p", [M]),
+    io:format("FTLPP: ~p", [els_pp:pp(M)]),
     M2 = lists:foldl(fun(E, A) -> A ++ binary:bin_to_list(E) end, "", lists:flatten(els_pp:pp(M))),
     M2.
 
 fun_to_string(Name, Spec) ->
     fun_to_list(Name, Spec).
-fun_to_string_old(Name, Spec) ->
-    {type, _Loc, 'fun', [_ArgsSpec, _ReturnSpec]} = Spec,
-    io:format("fun_to_string: ~nName: ~p~nSpec: ~p~n", [Name, Spec]),
-    [Args, Return] = to_string(Spec),
-    sexp_to_string([sexp_to_string([atom_to_list(Name)]++[Args]), 
-                    Return]).
+
+%fun_to_string_old(Name, Spec) ->
+%    {type, _Loc, 'fun', [_ArgsSpec, _ReturnSpec]} = Spec,
+%    io:format("fun_to_string: ~nName: ~p~nSpec: ~p~n", [Name, Spec]),
+%    [Args, Return] = to_string(Spec),
+%    sexp_to_string([sexp_to_string([atom_to_list(Name)]++[Args]), 
+%                    Return]).
+
 ss(S) when is_atom(S) ->
     atom_to_list(S);
 ss(S) when is_list(S) ->
@@ -110,7 +107,7 @@ to_list({type, _, 'bounded_fun', Args}, F) ->
                                      to_list(E, F)
                              end, ArgsM), F);
 to_list({type, _, 'constraint', [{atom, _, 'is_subtype'}, [V, T]]}, F) ->
-    Exp = ['when', to_list(V, F), '::', to_list(T, F)];
+    ['when', to_list(V, F), '::', to_list(T, F)];
 
 to_list({type, _, 'fun', [{type, _, product, Args}, Ret]}, F) ->
     io:format("FUNPRO: ~p~n", [Args]),
@@ -206,7 +203,7 @@ builtin_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
 	    ReturnAst = rep(Return, E),
 	    erl_syntax:set_pos(erl_syntax:function_type(any_arity, ReturnAst), Loc);
 	{"fun", Rest} ->
-	    #{funtype := Ftype, arity := Arity}  = fun_clause_arity(Rest, E, Loc),
+	    #{funtype := Ftype, arity := _Arity}  = fun_clause_arity(Rest, E, Loc),
 	    case length(Ftype) of
 		1 ->
 		    hd(Ftype);
