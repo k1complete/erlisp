@@ -53,10 +53,12 @@ fun_to_list(Name, Spec) when is_list(Spec) ->
 
 fun_to_list(Name, Spec, _F) when is_list(Spec) ->
     Clauses = lists:foldl(fun(E, A) -> A++from_ast(E) end, [], Spec),
-    M = [#item{value=atom_to_list(Name), type=function, loc=nil}| Clauses],
+    M = [#item{value="-spec", type=function, loc=nil}, 
+	 #item{value=atom_to_list(Name), type=function, loc=nil}| Clauses],
     io:format("FTL: ~p", [M]),
     io:format("FTLPP: ~p", [els_pp:pp(M)]),
-    M2 = lists:foldl(fun(E, A) -> A ++ binary:bin_to_list(E) end, "", lists:flatten(els_pp:pp(M))),
+    %%M2 = lists:foldl(fun(E, A) -> A ++ binary:bin_to_list(E) end, "", lists:flatten(els_pp:pp(M))),
+    M2 = lists:flatten(io_lib:format("~s", [els_pp:pp(M)])),
     M2.
 
 fun_to_string(Name, Spec) ->

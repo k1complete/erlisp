@@ -289,6 +289,7 @@ extract_module_comment(Tree) ->
 make_function_signature(Tree, Specs) ->
     Name=erl_syntax:atom_value(erl_syntax:function_name(Tree)),
     Cs = erl_syntax:function_clauses(Tree),
+    Arity = length(erl_syntax:clause_patterns(hd(Cs))),
     R = lists:map(fun(C) ->
                           Patterns = 
                               lists:map(fun(E) ->
@@ -299,21 +300,23 @@ make_function_signature(Tree, Specs) ->
                                       X -> X
                                   end,
                           S = 
-                              unicode:characters_to_binary(els_pp:pp(els_pp:erl_to_ast([Name, Patterns, Guard])), utf8),
-                          case maps:get({Name, length(Patterns)}, Specs, none) of
-                              none ->
-                                  S;
-                              Spec ->
-                                  N = [list_to_binary(els_typespec:fun_to_string(Name, Spec))],
-                                  case N of
-                                      [] ->
-                                          S;
-                                      N ->
-                                          [S| N]
-                                  end
-                          end
+                              unicode:characters_to_binary(els_pp:pp(els_pp:erl_to_ast([Name, Patterns, Guard])), utf8)
                   end, Cs),
-    lists:flatten(R).
+    Sp = case maps:get({Name, Arity}, Specs, none) of
+	     none ->
+		 [];
+	     SpecAst ->
+		 N = [list_to_binary(els_typespec:fun_to_string(Name, SpecAst))],
+		 case N of
+		     [] ->
+			 [];
+		     N ->
+			 %%[S| N]
+			 N
+		 end
+	   end,
+
+    lists:flatten(R++Sp).
 
 -spec extract_comment(erl_syntax:tree(), kind(), map()) -> doc_entry().
 extract_comment(Tree, Kind, Specs) ->

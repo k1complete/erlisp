@@ -130,7 +130,7 @@ multi_clause_when_type_test() ->
     Line=?LINE,
     Spec = ["(-spec foo ((list X)) (integer) (when (X :: (atom)))",
 	    "           ((integer)) (list))"],   
-    LSrc = "(foo ((list X)) (integer) (when (X :: (atom))) ((integer)) (list))",
+    LSrc = "(-spec foo ((list X)) (integer) (when (X :: (atom))) ((integer)) (list))",
     {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(Spec), Line),
     {ok, Ret} = els_parser:parse(Tokens),
     Ast = els_transpile:spec_(hd(hd(Ret)), tl(hd(Ret)), []),

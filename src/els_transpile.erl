@@ -372,7 +372,7 @@ record_field_rep([#item{type=atom, loc=ALoc}=A, T], Env) ->
     %%io:format("R: ~p~n R2: ~p~n", [R, erl_syntax:revert(R)]),
     R;
 %% ((= a expression) type)
-record_field_rep([[#item{type=atom, value="=", loc=OpLoc}, #item{type=atom}, E]=AE, T], Env) ->
+record_field_rep([[#item{type=atom, value="=", loc=OpLoc}, #item{type=atom}, _E]=AE, T], Env) ->
     RecordValue = record_field_rep(AE, Env),
     %%TypeValue = els_typespec:rep(T, E),
     TypeValue = els_typespec:rep(T, Env),
@@ -590,19 +590,41 @@ handler_(L, Loc, E) ->
 match_defun_(Name, Clauses, E) ->
     io:format("match-defun ~p~n", [Name]),
     FuncName = erl_syntax:set_pos(erl_syntax:atom(Name#item.value), Name#item.loc),
-    Md = erl_syntax:function(FuncName, 
-                             lists:map(fun(A) ->
-                                               io:format("AST ~p~n", [A]),
-                                               clause_(A, Name#item.loc, E)
-                                       end, Clauses)),
-    Ret=erl_syntax:copy_pos(FuncName, Md),
+    ClauseAst0 = lists:map(fun(A) ->
+				   io:format("AST ~p~n", [A]),
+				   clause_(A, Name#item.loc, E)
+			   end, Clauses),
+    Md = erl_syntax:function(FuncName, ClauseAst0),
+    io:format("Md ~p~n", [Md]),
+    {MdTree, Comment} = erl_syntax_lib:mapfold_subtrees(
+			      fun(Tree, Acc) ->
+				      case erl_syntax:type(Tree) of
+					  clause -> 
+					      case erl_syntax:has_comments(Tree) of
+						  true ->
+						      C = erl_syntax:get_precomments(Tree),
+						      io:format("Md precomments ~p~n", [C]),
+						      NC = erl_syntax:comment_text(C),
+						      {erl_syntax:set_precomments(Tree, []), Acc++ NC};
+						  false ->
+						      {Tree, Acc}
+					      end;
+					  _  -> {Tree, Acc}
+				      end
+			      end, [], Md),
+    CommentNode = erl_syntax:comment(Comment),
+    io:format("~nmatch_defun_comment ~p~n", [CommentNode]),
+    MdTreeComment = erl_syntax:set_precomments(MdTree, CommentNode),
+    Ret=erl_syntax:copy_pos(FuncName, MdTreeComment),
+    
     io:format("~nmatch_defun_output ~p~n", [erl_syntax:get_pos(Ret)]),
-    merl:print(Ret),
+    io:format("~nmatch_defun_outputbody ~p~n", [Ret]),
+    %%merl:print(Ret),
     io:format("~n ", []),
     Ret.
 
 match_defun_comment(Name, Com, Clauses, E) ->
-    %%io:format(standard_error, "match-defun-comment ~p~n", [Com]),
+    io:format("match-defun-comment ~p~n", [Com]),
     Tree = match_defun_(Name, Clauses, E),
     case Com of 
         #item{type=string, value=""} ->
@@ -618,9 +640,12 @@ match_defun_comment(Name, Com, Clauses, E) ->
 defun_comment(Name, A, [#item{type=string} = Com | Rest], E) ->
     match_defun_comment(Name, Com, [A|Rest], E);
 defun_comment(Name, A, Rest, E) ->
+    io:format("defun_comment: A ~p~n Rest: ~p~n", [A, Rest]),
     match_defun_comment(Name, #item{type=string, value="", loc=Name#item.loc}, [A|Rest], E).
 make_comment({Line, Column}, Value) ->
     {Line, Column, 0, Value};
+make_comment(0, Value) ->
+    {1, 1, 0, Value};
 make_comment(undefined, Value) ->
     {1, 1, 0, Value}.
 getcomment([#item{type=string}=Com|Rest], Pos) ->
@@ -633,7 +658,8 @@ defun_(X, L, E) ->
     [Name, Args | Rest] = L,
     io:format("Name, Args | Rest =~n  ~p~n ~p~n ~p ~n", [Name, Args, Rest]),
     case hd(Args) of
-        A when is_list(A) ->
+        A when is_list(A) -> 
+	    %%% match defun
             %match_defun_(Name, [Args|Rest], E);
             defun_comment(Name, Args, Rest, E);
         _  ->
@@ -656,7 +682,10 @@ defun_(X, L, E) ->
                       {_,_,_, []} ->
                           MQ;
                       {_, _, _, Comment} ->
-                          R = erl_syntax:set_precomments(MQ, Comment),
+			  Com = erl_syntax:comment(Comment),
+			  io:format("PreComment ~p~n", [Com]),
+                          R = erl_syntax:set_precomments(MQ,Com), 
+			  io:format("PreCommentAfter ~p~n", [R]),
                           %%io:format(standard_error, "PreComment ~p~n", [R]),
                           R
                   end,
@@ -667,7 +696,6 @@ defun_(X, L, E) ->
 
 defmacro_(X, L, E) ->
     io:format("defmacro_ : ~p~n", [X]),
-    Line = X#item.loc,
     [Name, Args | Rest] = L,
     Macro = Name#item{value="MACRO_" ++ Name#item.value},
     L2 = [Macro, Args | Rest],
@@ -950,15 +978,24 @@ detect_guard(Test, _Body, E) ->
 clause_ast_guard_body(Pattern, Test, Body, GL, E) ->
 %%    GLine = get_leastlefthand(lists:flatten([Test|Body]), GL),
     GLine = GL,
-    io:format("#{clause_mono_least => ~p~n~p~n", [Test, Body]),
     G = detect_guard(Test, Body, E),
+    io:format("#{clause_mono_least => ~p~nBody: ~p~nGline: ~p~n", [Test, Body,GLine]),
+    [DocItem|Body2] = getcomment(Body, GLine),
     B = lists:map(fun(V) -> 
 			  io:format("#{clause_elem => ~p~n", [V]),
 			  sterm(V, E) 
-		  end, Body),
+		  end, Body2),
     S = erl_syntax:clause(Pattern, G, B),
     ?LOG_DEBUG(#{clause_mono => S}),
-    erl_syntax:set_pos(S, erl_anno:new(GLine)).
+    R = erl_syntax:set_pos(S, erl_anno:new(GLine)),
+    case DocItem of
+	{_,_,_,[]} ->
+	    R;
+	{_,_,_,Comment} ->
+	    C = erl_syntax:comment(0, Comment),
+	    R2 = erl_syntax:set_precomments(R, C),
+	    R2
+    end.
 
 clause_arg_guard_body(Args, Test, Body, GL, E) ->
     GLine = get_leastlefthand(lists:flatten([[Args],Test|Body]), GL),
