@@ -7,7 +7,8 @@ annon_type_spec_a_test() ->
     Line=?LINE,
     {ok, Tokens, _Line} = els_scan:from_string("(-spec foo ((a :: (integer)) (integer)) (integer))", Line),
     {ok, Ret} = els_parser:parse(Tokens),
-    Ast = els_transpile:spec_(hd(hd(Ret)), tl(hd(Ret)), []),
+    Tree = hd(Ret),
+    Ast = els_transpile:spec_(hd(Tree), tl(Tree), []),
     %%?assertEqual(a, erl_syntax:revert(Ast)).
     Expected = 
 	{attribute,
@@ -23,6 +24,7 @@ annon_type_spec_a_test() ->
 	       {type,{Line,31},integer,[]}]},
 	     {type,{Line,42},integer,[]}]}]}},
     ?assertEqual(Expected, erl_syntax:revert(Ast)).
+
 
 annon_type_func_spec_a_test() ->
     Line=?LINE,
@@ -48,6 +50,8 @@ annon_type_func_spec_a_test() ->
 		   {type,{Line,40},integer,[]}]}]}]},
                       {type,{Line,53},integer,[]}]}]}},
     ?assertEqual(Expected, Ast).
+
+
 
 spec_type_test() ->
     Line=?LINE,
