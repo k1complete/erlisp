@@ -45,9 +45,14 @@ npp({H}, Left, Right, both) ->
 npp({H}, _Left, _Right, none) ->
     {H}.
     
+%%pp(S) ->
+%%    io:format("~p~n", [S]),
+%%    pps(S).
 pp(S) ->
-    io:format("~p~n", [S]),
-    pps(S).
+    R = pptr(S, {0, "("}, {0, ")"}, none),
+    B = ppsexp(R),
+    prettypr:format(B).
+
 ppliteral(Value, {LLevel, LChar}, {_RLevel, _RChar}, open) ->
     Chars = lists:foldl(fun(_E, A) -> A++LChar end, [], lists:seq(1,LLevel)),
     io:format("ppliteral-l: ~p ~p~n", [Value, Chars]),
@@ -67,6 +72,10 @@ pptr(#item{type=integer, value=V}=S, L, R, Direction) ->
     S#item{value=ppliteral(V, L, R, Direction)};
 pptr(#item{type=atom, value=V}=S, L, R, Direction) ->
     S#item{value=ppliteral(V, L, R, Direction)};
+pptr(#item{type=variable, value=V}=S, L, R, Direction) ->
+    S#item{value=ppliteral(V, L, R, Direction)};
+pptr(#item{type=function, value=V}=S, L, R, Direction) ->
+    S#item{value=ppliteral(V, L, R, Direction)};
 pptr(#item{type=string, value=V}=S, L, R, Direction) ->
     S#item{value=ppliteral("\""++escape(V)++"\"", L, R, Direction)};
 pptr(V, L, R, Direction) when is_integer(V)  ->
@@ -78,7 +87,7 @@ pptr([S], {LLevel, LChar}, {RLevel, RChar}, Direction) ->
     {NL, NR} = {LLevel, RLevel},
     io:format("pptr1-1: ~p, levell: ~p Dir: ~p~n", [[S], {NL, NR}, Direction]),
     R = pptr(S, {NL+1, LChar}, {NR+1, RChar}, both),
-    R;
+    [R];
 pptr(S, {LLevel, LChar}, {RLevel, RChar}, Direction) when is_list(S) ->
     io:format("pptr: ~p, levell: ~p Dir: ~p~n", [S, {LLevel, RLevel}, Direction]),
     Head =  pptr(hd(S), {LLevel+1, LChar} ,{0, RChar}, open),
@@ -119,16 +128,26 @@ ppclause([Pattern | Body]) ->
 pparg_returntype([], Acc) ->
     io:format("returntype[~p] ~p~n", [length(Acc), Acc]),
     lists:reverse(Acc);
+pparg_returntype([Arg, Return, When=[#item{value="("++W}|_]|Rest], Acc) when W=:="when" ->
+    io:format("When: ~p~n", [When]),
+    E = prettypr:par([ppsexp(Arg), ppsexp(Return), ppsexp(When)], 0),
+    pparg_returntype(Rest, [E|Acc]);
 pparg_returntype([Arg, Return|Rest], Acc) ->
     io:format("Arg: ~p~n", [Arg]),
+    io:format("Return: ~p~n", [Return]),
     E = prettypr:par([ppsexp(Arg), ppsexp(Return)], 0),
+    pparg_returntype(Rest, [E|Acc]);
+pparg_returntype([Arg|Rest], Acc) ->
+    io:format("Arg: ~p~n", [Arg]),
+    E = prettypr:par([ppsexp(Arg)], 0),
     pparg_returntype(Rest, [E|Acc]).
 
 pparg_returntype(A) ->    
     pparg_returntype(A, []).
 
-ppsexp([#item{value="(-spec"}=H1, #item{} = H2, Args=[#item{type=atom, value="(("++N}|_], Return |  Body]) 
-  when N=/=$( ->
+ppsexp([#item{value="(-spec"}=H1, #item{} = H2, Args=[[#item{value="(("++N}|_]|_], Return |  Body]) 
+%%  when hd(N)=/=$( ->
+  ->
     io:format("spec ~p ~n", [Args]),
     H1S = ppsexp(H1),
     H2S = ppsexp(H2),
@@ -159,7 +178,7 @@ ppsexp([#item{value="(defun"}=H1, #item{}=H2 | Clauses]) ->
 	      end, Clauses),
     prettypr:par([H1S, H2S | C], 2);
 ppsexp(S) when is_list(S), length(S) > 2 ->
-    io:format("ppsexp ~p ~n", [S]),
+    io:format("ppsexp ~p (~p)~n", [S, length(S)]),
     [H1,H2|T] = S,
     H1S = ppsexp(H1),
     Indent = length("("++prettypr:format(H1S)),
@@ -170,6 +189,12 @@ ppsexp(S) when is_list(S), length(S) > 2 ->
     prettypr:par([H1S, H2S, prettypr:sep(Seps)], Indent);
 ppsexp(S) when is_list(S) andalso length(S) == 2 ->
     io:format("ppsexp2 ~p ~n", [S]),
+    Pars = lists:map(fun(E) ->
+                             ppsexp(E)
+                     end, S),
+    prettypr:par(Pars);
+ppsexp(S) when is_list(S) andalso length(S) == 1 ->
+    io:format("ppsexp1 ~p ~n", [S]),
     Pars = lists:map(fun(E) ->
                              ppsexp(E)
                      end, S),

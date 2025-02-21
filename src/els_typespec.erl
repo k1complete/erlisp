@@ -58,6 +58,7 @@ fun_to_list(Name, Spec, _F) when is_list(Spec) ->
     io:format("FTL: ~p", [M]),
     io:format("FTLPP: ~p", [els_pp:pp(M)]),
     %%M2 = lists:foldl(fun(E, A) -> A ++ binary:bin_to_list(E) end, "", lists:flatten(els_pp:pp(M))),
+    %%M2 = lists:flatten(io_lib:format("~s", [els_pp:pp(M)])),
     M2 = lists:flatten(io_lib:format("~s", [els_pp:pp(M)])),
     M2.
 

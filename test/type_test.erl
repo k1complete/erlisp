@@ -112,8 +112,6 @@ multi_clause_type_test() ->
     ?assertEqual(Expected, erl_syntax:revert(Ast)).
 
 multi_clause_when_type_test() ->
-    Src = [ "-spec m (list(X)) -> integer() when X :: atom();",
-	    "        (integer()) -> list()."],
     Esrc =["attribute,{4,2},",
            " spec,",
            "{{m,1},",
@@ -134,7 +132,12 @@ multi_clause_when_type_test() ->
     Line=?LINE,
     Spec = ["(-spec foo ((list X)) (integer) (when (X :: (atom)))",
 	    "           ((integer)) (list))"],   
-    LSrc = "(-spec foo ((list X)) (integer) (when (X :: (atom))) ((integer)) (list))",
+    Src = """
+(-spec foo
+    ((list X)) (integer) (when (X :: (atom)))
+    ((integer)) (list))
+
+""",
     {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(Spec), Line),
     {ok, Ret} = els_parser:parse(Tokens),
     Ast = els_transpile:spec_(hd(hd(Ret)), tl(hd(Ret)), []),
@@ -160,7 +163,7 @@ multi_clause_when_type_test() ->
     {attribute, _, spec, A}=erl_syntax:revert(Ast),
     {{Name, Arity}, FunTypes} = A,
     D = els_typespec:fun_to_list(Name, FunTypes),
-    ?assertEqual(LSrc, D).
+    ?assertEqual(Src, D).
     
     
 type_attr_test() ->

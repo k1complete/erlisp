@@ -40,7 +40,12 @@ pp_multi_spec_test() ->
                           {0, "("}, {0, ")"}, none)),
     ?assertEqual([A], io_lib:format("~s", [prettypr:format(B)])).
 pp_multi_spec2_test() ->
-    A="(-spec m ((a::1)) (integer) ((list)) (list))",
+    A="""
+(-spec m
+    ((a :: 1)) (integer)
+    ((list)) (list))
+
+""",
     B = els_pp:ppsexp(els_pp:pptr(hd(element(2, els_parser:parse( element(2, els_scan:from_string(A))))), 
                           {0, "("}, {0, ")"}, none)),
     ?assertEqual([A], io_lib:format("~s", [prettypr:format(B)])).
