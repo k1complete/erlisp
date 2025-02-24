@@ -3,6 +3,8 @@
 -export([to_string/1, to_list/1, fun_to_string/2, fun_to_list/3, fun_to_list/2,
         to_binary/1]).
 -export([rep/2, fun_clause_arity/3]).
+-export([fun_to_string2/3]).
+-export([variable_titled/1]).
 
 
 to_binary(L) ->
@@ -64,6 +66,34 @@ fun_to_list(Name, Spec, _F) when is_list(Spec) ->
 
 fun_to_string(Name, Spec) ->
     fun_to_list(Name, Spec).
+
+fun_to_string2(Name, Arity, Specs) ->
+    SpecName = erl_syntax:atom("sepc"),
+    LSpecs = lists:map(
+	      fun(Spec) ->
+		      variable_titled(Spec)
+	      end, Specs),
+    Attribute = {attribute, 0, spec, {{Name,Arity}, LSpecs}},
+    
+    %%Attribute = erl_syntax:attribute(SpecName, [Name, Spec]),
+    S = erl_prettypr:format(Attribute),
+    io:format("FuntoString2: ~p~n", [S]),
+    S.
+
+variable_titled(A) ->
+    R = erl_syntax_lib:map(
+	  fun(E) ->
+		  case erl_syntax:type(E) of
+		      'variable' ->
+			  N = erl_syntax:variable_literal(E),
+			  erl_syntax:variable(string:titlecase(N));
+		      _ ->
+			  E
+		  end
+	  end, A),
+    erl_syntax:revert(R).
+
+		   
 
 %fun_to_string_old(Name, Spec) ->
 %    {type, _Loc, 'fun', [_ArgsSpec, _ReturnSpec]} = Spec,

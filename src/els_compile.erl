@@ -285,10 +285,28 @@ extract_module_comment(Tree) ->
             none
     end.
 
+make_function_spec(Tree, Specs) ->
+    FName = erl_syntax:function_name(Tree),
+    Name=erl_syntax:atom_value(FName),
+    Cs = erl_syntax:function_clauses(Tree),
+    io:format("make_function_signature ~p~nCs: ~p~n", [Specs, Cs]),
+    Arity = length(erl_syntax:clause_patterns(hd(Cs))),
+    case maps:get({Name, Arity}, Specs, none) of
+	none ->
+	    [];
+	SpecAsts ->
+	    A = lists:map(fun(E) ->
+				  els_typespec:variable_titled(E)
+			  end, SpecAsts),
+	    [{attribute, 0, spec, {{Name, Arity}, A}}]
+    end.
+    
 -spec make_function_signature(erl_syntax:tree(), map()) -> signature().
 make_function_signature(Tree, Specs) ->
-    Name=erl_syntax:atom_value(erl_syntax:function_name(Tree)),
+    FName = erl_syntax:function_name(Tree),
+    Name=erl_syntax:atom_value(FName),
     Cs = erl_syntax:function_clauses(Tree),
+    io:format("make_function_signature ~p~nCs: ~p~n", [Specs, Cs]),
     Arity = length(erl_syntax:clause_patterns(hd(Cs))),
     R = lists:map(fun(C) ->
                           Patterns = 
@@ -299,14 +317,19 @@ make_function_signature(Tree, Specs) ->
                                       none -> [];
                                       X -> X
                                   end,
+			  Tc = els_typespec:variable_titled(C),
                           S = 
-                              unicode:characters_to_binary(els_pp:pp(els_pp:erl_to_ast([Name, Patterns, Guard])), utf8)
+                              %%unicode:characters_to_binary(els_pp:pp(els_pp:erl_to_ast([Name, Patterns, Guard])), utf8)
+                              unicode:characters_to_binary(els_pp:erlast_to_str(FName, Tc), utf8)
                   end, Cs),
+    io:format("make_function_signatureR ~p~n", [R]),
     Sp = case maps:get({Name, Arity}, Specs, none) of
 	     none ->
 		 [];
 	     SpecAst ->
-		 N = [list_to_binary(els_typespec:fun_to_string(Name, SpecAst))],
+		 io:format("fun_to_string2 ~p, ~p, ~p~n", [Name, Arity, SpecAst]),
+		 N = [list_to_binary(els_typespec:fun_to_string2(Name, Arity, SpecAst))],
+		 %N = [list_to_binary(els_typespec:fun_to_string(Name, SpecAst))],
 		 case N of
 		     [] ->
 			 [];
@@ -315,8 +338,8 @@ make_function_signature(Tree, Specs) ->
 			 N
 		 end
 	   end,
-
-    lists:flatten(R++Sp).
+    io:format("signature: ~p~n", [R]),
+    lists:flatten(R).
 
 -spec extract_comment(erl_syntax:tree(), kind(), map()) -> doc_entry().
 extract_comment(Tree, Kind, Specs) ->
@@ -325,14 +348,23 @@ extract_comment(Tree, Kind, Specs) ->
         true ->
 	    CommentList = lists:flatten(erl_syntax:comment_text(erl_syntax:get_precomments(Tree))),
 	    io:format("Comments: ~p~n", [CommentList]),
+	    io:format("Tree: ~p~n", [{erl_syntax:function_name(Tree),
+				     erl_syntax:function_arity(Tree)
+				     }]),
+	    MetaData = case make_function_spec(Tree, Specs) of 
+			   [] -> #{};
+			   SpecAst ->
+			       #{signature => SpecAst}
+		       end,
             els_docs:make_docentry(Kind, 
-                                     erl_syntax:atom_value(erl_syntax:function_name(Tree)),
-                                     erl_syntax:function_arity(Tree),
-                                     erl_syntax:get_pos(Tree),
-                                     make_function_signature(Tree, Specs),
-                                     #{<<"en">> => 
-                                           list_to_binary(CommentList)},
-                                     #{});
+				   erl_syntax:atom_value(erl_syntax:function_name(Tree)),
+				   erl_syntax:function_arity(Tree),
+				   erl_syntax:get_pos(Tree),
+				   make_function_signature(Tree, Specs),
+				   #{<<"en">> => 
+					 list_to_binary(CommentList)},
+				   MetaData
+				  );
         false ->
             none
     end.
@@ -343,26 +375,28 @@ make_docs(AstList, Specs) ->
 			  io:format("make_docs ~p~n", [Ast]),
                           case erl_syntax:type(Ast) of
                             function ->
+				  io:format("before ~p~n", [Ast]),
                                   E = extract_comment(Ast, function, Specs),
+				  io:format("extracted comment ~p~n", [E]),
 				  case E of
 				      none ->
 					  Acc;
 				      _ ->
 					  Acc#{docs=> els_docs:add_docentry(Doc, E)}
 				  end;
-                            attribute  ->
-                                case erl_syntax:atom_value(erl_syntax:attribute_name(Ast)) of
-                                    module ->
-                                        E = els_docs:make_docs_v1(erl_syntax:get_pos(Ast),
-                                                                     <<"text/markdown">>,
-                                                                     extract_module_comment(Ast),
-                                                                     #{},
-                                                                     []),
-                                        Acc#{docs=> els_docs:set_moduledoc(Doc, E)};
-                                    _Other -> 
-                                        %%[{_Other, Ast}|Acc]
-                                        Acc
-                                end;
+			      attribute  ->
+				  case erl_syntax:atom_value(erl_syntax:attribute_name(Ast)) of
+				      module ->
+					  E = els_docs:make_docs_v1(erl_syntax:get_pos(Ast),
+								    <<"text/markdown">>,
+								    extract_module_comment(Ast),
+								    #{},
+								    []),
+					  Acc#{docs=> els_docs:set_moduledoc(Doc, E)};
+				      _Other -> 
+					  %%[{_Other, Ast}|Acc]
+					  Acc
+				  end;
                               _  ->
                                   O=maps:get(other, Acc),
                                   Acc#{other=>[{s,Ast}|O]}

@@ -8,6 +8,7 @@
 -export([erl_to_ast/1]).
 -export([format/2]).
 -export([npp/4]).
+-export([erlast_to_str/2]).
 
 pps(S) when is_list(S) ->
     [<<"(">>, lists:join(<<" ">>, lists:map(fun(E) ->
@@ -264,6 +265,10 @@ erl_to_ast(T) when is_atom(T) ->
     
 -define(T(X), prettypr:text(X)).
 
+erlast_to_str(Name, Clause) ->
+    Args = erl_syntax:clause_patterns(Clause),
+    FunCall = erl_syntax:application(Name, Args),
+    erl_prettypr:format(FunCall).
     
 
 test(S) ->
