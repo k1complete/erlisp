@@ -147,6 +147,9 @@ dispatch_special(A) ->
           "-spec" => fun spec_/3,
           "-type" => fun type_/3,
           "-require" => fun require_/3,
+          "defrecord" => fun record_/3,
+          "#." => fun record_access_/3,
+          "#r" => fun record_expr_/3,
 	  "<-" => fun generator_/3,
 	  "<=" => fun binary_generator_/3,
 	  ":=" => fun map_field_exact_/3
@@ -349,7 +352,8 @@ macro_export_(X, L, E) ->
 %%    ArgumentsAst = lists:map(fun(A) -> type_rep(A, E) end, Arguments),
 %%    MF = make_module_qualifier(T),
 %%    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc).
-    
+%%% record field
+%%%     
 %%% a
 %%% (= a term)
 %%% (a type)
@@ -378,7 +382,7 @@ record_field_rep([[#item{type=atom, value="=", loc=OpLoc}, #item{type=atom}, _E]
     TypeValue = els_typespec:rep(T, Env),
     erl_syntax:set_pos(erl_syntax:typed_record_field(RecordValue, TypeValue), OpLoc).
     
-%%
+
 %% (defrecord name a b c)
 %% (defrecord name ((=a v) t) b c))
 %% (defrecord name (=a v) b c)
@@ -392,6 +396,37 @@ record_(#item{loc=Loc}, [#item{value=Name, type=atom, loc=Nloc} | Definitions], 
     Body = erl_syntax:set_pos(erl_syntax:tuple(RecordFieldsAst), Nloc),
     R2 = erl_syntax:set_pos(erl_syntax:attribute(Record, [NameAst, Body]), Nloc),
     R2.
+
+
+%% record access
+%% (#. Exp recordName field)
+%%  Exp#recordName.field
+%% record expression
+%% (#r recordName field1 fieild2....)
+%% (# nil recordName field1 fieild2....))
+%% (# Exp recordName field1 fieild2....))
+
+record_access_(#item{loc=Loc}, [Exp, #item{type=atom}=RecordName,RecordField], E) ->
+    Argument = sterm(Exp, E),
+    Type = els_util:term_make_atom(RecordName),
+    Field = els_util:term_make_atom(RecordField),
+    R = erl_syntax:set_pos(erl_syntax:record_access(Argument, Type, Field), Loc),
+    io:format("record_access: ~p~n~p~n", [R, erl_syntax:revert(R)]),
+    R.
+
+record_expr_do(Loc, Argument, [#item{type=atom}=RecordName |RecordFields], E) ->
+    Type = els_util:term_make_atom(RecordName),
+    Fields = lists:map(fun(F) -> record_field_rep(F, E) end, RecordFields),
+    R = erl_syntax:set_pos(erl_syntax:record_expr(Argument, Type, Fields), Loc),
+    io:format("record_expr0: ~p~n", [R]),
+    io:format("record_expr: ~p~n~p~n", [R, erl_syntax:revert(R)]),
+    R.
+
+record_expr_(#item{loc=Loc}, [Exp, #item{type=atom}=RecordName |RecordFields], E) ->
+    Argument = sterm(Exp, E),
+    record_expr_do(Loc, Argument, [RecordName|RecordFields], E);
+record_expr_(#item{loc=Loc}, [#item{type=atom}=RecordName|RecordFields], E) ->
+    record_expr_do(Loc, none, [RecordName|RecordFields], E).
 
 module_(X, L, _E) ->
     Loc = X#item.loc,

@@ -5,7 +5,7 @@ doctest module
 this is a module
 """
 )
-(-export (main 1) (triple 1))
+(-export (main 1) (triple 1) (getdoc 3))
 (-spec main ((a :: 1)) 2 ((integer)) (integer))
 (defun main ((1)
 """
@@ -26,3 +26,11 @@ Example:
 
 """
 (+ (main a) a))
+
+(defun getdoc (module func arity)
+   (case (code:get_doc module) 
+     ((tuple 'ok Res)
+         Res)
+     (_ 'ng)))
+     
+   	

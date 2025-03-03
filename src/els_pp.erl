@@ -84,17 +84,12 @@ pptr(V, L, R, Direction) when is_integer(V)  ->
 pptr(V, L, R, Direction) when is_float(V)  ->
     #item{value=ppliteral(float_to_list(V), L, R, Direction), type=float};
 pptr([S], {LLevel, LChar}, {RLevel, RChar}, Direction) ->
-    io:format("pptr1: ~p, levell: ~p Dir: ~p~n", [[S], {LLevel, RLevel}, Direction]),
     {NL, NR} = {LLevel, RLevel},
-    io:format("pptr1-1: ~p, levell: ~p Dir: ~p~n", [[S], {NL, NR}, Direction]),
     R = pptr(S, {NL+1, LChar}, {NR+1, RChar}, both),
     [R];
 pptr(S, {LLevel, LChar}, {RLevel, RChar}, Direction) when is_list(S) ->
-    io:format("pptr: ~p, levell: ~p Dir: ~p~n", [S, {LLevel, RLevel}, Direction]),
     Head =  pptr(hd(S), {LLevel+1, LChar} ,{0, RChar}, open),
-    io:format("pptr-head: ~p ~n", [Head]),
     Last =  pptr(lists:last(S), {0, LChar} ,{RLevel+1, RChar}, close),
-    io:format("pptr-af: ~p~n", [Head]),
     Middle = lists:map(fun(E) ->
                                pptr(E, {0, LChar}, {0, RChar}, none)
                        end,
@@ -117,12 +112,10 @@ ppbody(Body) ->
     prettypr:nest(2, Sep).
 
 ppclause([Pattern, When=[#item{value="("++W}|_] | Body]) when W=:="whenc"; W=:="whend"; W=:="when" ->
-    io:format("A ~n", []),
     prettypr:par([ppsexp(Pattern),
 		  ppsexp(When),
 		  ppbody(Body)], 2);
 ppclause([Pattern | Body]) ->
-    io:format("B ~n", []),
     prettypr:par([ppsexp(Pattern),
 		  ppbody(Body)], 2).
 
@@ -164,14 +157,12 @@ ppsexp([#item{value="(-spec"}=H1, #item{} = H2, Args=[[#item{value="(("++N}|_]|_
     prettypr:par([H1S, H2S, ReturnType],2);
 ppsexp([#item{value="(defun"}=H1, #item{}=H2, Args=[#item{type=atom, value="("++[N|_]}|_] |  Body]) 
   when N=/=$( ->
-    io:format("normaldefun ~p ~n", [Args]),
     H1S = ppsexp(H1),
     H2S = ppsexp(H2),
     AS = ppsexp(Args),
     BS = ppbody(Body),
     prettypr:par([H1S, H2S, AS, BS], 2);
 ppsexp([#item{value="(defun"}=H1, #item{}=H2 | Clauses]) ->
-    io:format("clausedefun ~p ~n", [Clauses]),
     H1S = ppsexp(H1),
     H2S = ppsexp(H2),
     C = lists:map(fun(E) ->
@@ -179,7 +170,6 @@ ppsexp([#item{value="(defun"}=H1, #item{}=H2 | Clauses]) ->
 	      end, Clauses),
     prettypr:par([H1S, H2S | C], 2);
 ppsexp(S) when is_list(S), length(S) > 2 ->
-    io:format("ppsexp ~p (~p)~n", [S, length(S)]),
     [H1,H2|T] = S,
     H1S = ppsexp(H1),
     Indent = length("("++prettypr:format(H1S)),
@@ -189,13 +179,11 @@ ppsexp(S) when is_list(S), length(S) > 2 ->
                      end, T),
     prettypr:par([H1S, H2S, prettypr:sep(Seps)], Indent);
 ppsexp(S) when is_list(S) andalso length(S) == 2 ->
-    io:format("ppsexp2 ~p ~n", [S]),
     Pars = lists:map(fun(E) ->
                              ppsexp(E)
                      end, S),
     prettypr:par(Pars);
 ppsexp(S) when is_list(S) andalso length(S) == 1 ->
-    io:format("ppsexp1 ~p ~n", [S]),
     Pars = lists:map(fun(E) ->
                              ppsexp(E)
                      end, S),

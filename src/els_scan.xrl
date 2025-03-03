@@ -32,6 +32,12 @@ Rules.
   {token, {symbol, TokenLoc, TokenChars}}.
 {Symbols}:{Symbols} : 
   {token, {module_function, TokenLoc, TokenChars}}.
+#\. :
+  {token, {symbol, TokenLoc, TokenChars}}.
+#r :
+  {token, {symbol, TokenLoc, TokenChars}}.
+# :
+  {token, {symbol, TokenLoc, TokenChars}}.
 \:\: : 
   {token, {symbol, TokenLoc, TokenChars}}.
 \( :

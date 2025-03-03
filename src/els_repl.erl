@@ -22,6 +22,8 @@ init() ->
 
 is_ddl({function, _, Fun, Arity, _}) ->
     {ok, Fun, Arity};
+is_ddl({attribute, _, record, {Name, Body}}) ->
+    {ok, record, {Name, Body}};
 is_ddl(_) ->
     false.
 
@@ -63,7 +65,7 @@ repl(Tab, IN, _OUT, Line, Env) ->
                                    Exp = els_transpile:sterm(S, Env),
                                    Revert = erl_syntax:revert(Exp),
                                    {value, Result, NEnv} = execute(Tab, Revert, CEnv),
-                                   io:format("~s~n", [els_pp:format(Result, 60)]),
+                                   io:format("~s~n", [els_pp:format(Result, 80)]),
                                    {Result, NEnv}
                            end, Env, 
                            Forms),

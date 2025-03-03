@@ -285,7 +285,7 @@ extract_module_comment(Tree) ->
             none
     end.
 
-make_function_spec(Tree, Specs) ->
+make_function_spec(Tree, Specs, MetaData) ->
     FName = erl_syntax:function_name(Tree),
     Name=erl_syntax:atom_value(FName),
     Cs = erl_syntax:function_clauses(Tree),
@@ -293,12 +293,12 @@ make_function_spec(Tree, Specs) ->
     Arity = length(erl_syntax:clause_patterns(hd(Cs))),
     case maps:get({Name, Arity}, Specs, none) of
 	none ->
-	    [];
+	    MetaData;
 	SpecAsts ->
 	    A = lists:map(fun(E) ->
 				  els_typespec:variable_titled(E)
 			  end, SpecAsts),
-	    [{attribute, 0, spec, {{Name, Arity}, A}}]
+	    maps:put(spec, [{attribute, 0, spec, {{Name, Arity}, A}}], MetaData)
     end.
     
 -spec make_function_signature(erl_syntax:tree(), map()) -> signature().
@@ -318,27 +318,9 @@ make_function_signature(Tree, Specs) ->
                                       X -> X
                                   end,
 			  Tc = els_typespec:variable_titled(C),
-                          S = 
-                              %%unicode:characters_to_binary(els_pp:pp(els_pp:erl_to_ast([Name, Patterns, Guard])), utf8)
-                              unicode:characters_to_binary(els_pp:erlast_to_str(FName, Tc), utf8)
+                          unicode:characters_to_binary(els_pp:erlast_to_str(FName, Tc), utf8)
                   end, Cs),
     io:format("make_function_signatureR ~p~n", [R]),
-    Sp = case maps:get({Name, Arity}, Specs, none) of
-	     none ->
-		 [];
-	     SpecAst ->
-		 io:format("fun_to_string2 ~p, ~p, ~p~n", [Name, Arity, SpecAst]),
-		 N = [list_to_binary(els_typespec:fun_to_string2(Name, Arity, SpecAst))],
-		 %N = [list_to_binary(els_typespec:fun_to_string(Name, SpecAst))],
-		 case N of
-		     [] ->
-			 [];
-		     N ->
-			 %%[S| N]
-			 N
-		 end
-	   end,
-    io:format("signature: ~p~n", [R]),
     lists:flatten(R).
 
 -spec extract_comment(erl_syntax:tree(), kind(), map()) -> doc_entry().
@@ -351,11 +333,7 @@ extract_comment(Tree, Kind, Specs) ->
 	    io:format("Tree: ~p~n", [{erl_syntax:function_name(Tree),
 				     erl_syntax:function_arity(Tree)
 				     }]),
-	    MetaData = case make_function_spec(Tree, Specs) of 
-			   [] -> #{};
-			   SpecAst ->
-			       #{signature => SpecAst}
-		       end,
+	    MetaData = make_function_spec(Tree, Specs, #{}),
             els_docs:make_docentry(Kind, 
 				   erl_syntax:atom_value(erl_syntax:function_name(Tree)),
 				   erl_syntax:function_arity(Tree),
