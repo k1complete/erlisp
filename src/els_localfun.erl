@@ -31,7 +31,7 @@ create_local_func(Name, C, FunDic) ->
 	{function, Anno, _FName, Arity, Ast} ->
 	    LocalFunc = {'named_fun', Anno, Name, Ast},
 	    LocalFunAst = erl_syntax:revert(LocalFunc),
-	    io:format("create_local_func: ~p=n", [LocalFunAst]),
+	    %io:format("create_local_func: ~p=n", [LocalFunAst]),
 	    maps:put({Name, Arity}, {{local}, LocalFunAst}, FunDic)
     end.
 
@@ -40,12 +40,12 @@ create_valuefun(Locals) ->
     fun(Name, Arg) ->
 	    io:format("value fun ~p(~p)~nMap[~p]~n", [Name, length(Arg), Locals]),
 	    {{local}, Func} = maps:get({Name, length(Arg)}, Locals),
-	    io:format("value fun ~p~n", [Name]),
+	    %io:format("value fun ~p~n", [Name]),
 	    QArg = erl_syntax:revert(erl_syntax:abstract(Arg)),
-	    io:format("---Func: ~p~nArg: ~p~n", [Func, QArg]),
+	    %io:format("---Func: ~p~nArg: ~p~n", [Func, QArg]),
 	    Q = merl:qquote(?LINE, "apply(_@Func, _@Arg)", [{'Func', Func}, {'Arg', QArg}]),
 	    QQ = erl_syntax:revert(Q),
-	    io:format("Q: ~p~n", [QQ]),
+	    %io:format("Q: ~p~n", [QQ]),
 	    {value, Value, _NewWEnv} = erl_eval:expr(QQ, [], {value, create_valuefun(Locals)}),
 	    Value
     end.
@@ -74,7 +74,7 @@ register_local_func(Node, FunDic) ->
 valuefun(Name, Arg) ->
     {{local}, Func} = maps:get({Name, length(Arg)}, get_nfundic()),
     QArg = erl_syntax:revert(erl_syntax:abstract(Arg)),
-    io:format("---Func: ~p~nArg: ~p~n", [Func, QArg]),
+    %io:format("---Func: ~p~nArg: ~p~n", [Func, QArg]),
     Q = merl:qquote(?LINE, "apply(_@Func, _@Arg)", [{'Func', Func}, {'Arg', QArg}]),
     QQ = erl_syntax:revert(Q),
     io:format("Q: ~p~n", [QQ]),

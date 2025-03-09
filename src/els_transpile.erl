@@ -692,7 +692,7 @@ defun_(X, L, E) ->
     Line = X#item.loc,
     [Name, Args | Rest] = L,
     io:format("Name, Args | Rest =~n  ~p~n ~p~n ~p ~n", [Name, Args, Rest]),
-    case hd(Args) of
+    case Args =/=nil andalso hd(Args) of
         A when is_list(A) -> 
 	    %%% match defun
             %match_defun_(Name, [Args|Rest], E);
@@ -703,7 +703,12 @@ defun_(X, L, E) ->
             %% io:format(standard_error, "GetBody ~p~n", [RRest]),
             Body = lists:map(fun(A) -> form(A, E) end, RRest),
             %% io:format("simpleArgs ~p ~n", [Args]),
-            ArgList = lists:map(fun(A) -> sterm(A, E) end, Args),
+	    ArgList = case Args of
+			  nil ->
+			      [];
+			  _ ->
+			      lists:map(fun(A) -> sterm(A, E) end, Args)
+		      end,
             %%  Register argument into environment.
             %%  replace body from environment(argment)
             FunName = erl_syntax:atom(Name#item.value),

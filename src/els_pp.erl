@@ -98,7 +98,7 @@ pptr(S, {LLevel, LChar}, {RLevel, RChar}, Direction) when is_list(S) ->
 
 form(S) ->
     S1 = ?MODULE:erl_to_ast(S),
-    S2 = pptr(S1, {0, "("}, {0, ")"}, 0),
+    S2 = pptr(S1, {0, "("}, {0, ")"}, none),
     ?MODULE:ppsexp(S2).
 
 format(S, Column) ->
