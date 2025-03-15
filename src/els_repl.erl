@@ -68,22 +68,29 @@ execute(Tab, Revert, Env) ->
             erl_eval:expr(Revert, Env, {value, Fun})
     end.
 
+eval(List, Ctab, Env) ->
+    ErlTree = els_transpile:sterm(List, Env),
+    Reverted = erl_syntax:revert(ErlTree),
+    {{value, Result, NewEnv}, NewTab}  = new_execute(Ctab, Reverted, Env),
+    {{value, Result, NewEnv}, NewTab}.
+
 repl(IN, OUT, Line, Env) ->
     Table = init(),
     repl(Table, IN, OUT, Line, Env).
 
-repl(Tab, IN, _OUT, Line, Env) ->
+repl(Tab, IN, OUT, Line, Env) ->
     {ok, Tokens, NextLine, _Rest} = els_scan:read(IN, "erlisp[~B]> ", Line, [], 0),
     %?LOG_DEBUG(#{nextline=> NextLine}),
     {ok, Forms}  = els_parser:parse(Tokens),
     %%
     {_Results, {NextEnv, NextTab}} = lists:mapfoldl(
                            fun(S, {CEnv, CTab}) -> 
-                                   Exp = els_transpile:sterm(S, Env),
-                                   Revert = erl_syntax:revert(Exp),
+				   {{value, Result, NEnv}, NewTab} = eval(S, CTab, CEnv),
+                                   %Exp = els_transpile:sterm(S, Env),
+                                   %Revert = erl_syntax:revert(Exp),
                                    %{value, Result, NEnv, NewTab} = execute(CTab, Revert, CEnv),
-                                   {{value, Result, NEnv}, NewTab} = new_execute(CTab, Revert, CEnv),
-                                   io:format("~s~n", [els_pp:format(Result, 80)]),
+                                   %{{value, Result, NEnv}, NewTab} = new_execute(CTab, Revert, CEnv),
+                                   io:format(OUT, "~s~n", [els_pp:format(Result, 80)]),
                                    {Result, {NEnv, NewTab}}
                            end, {Env, Tab}, 
                            Forms),
@@ -93,7 +100,7 @@ repl(Tab, IN, _OUT, Line, Env) ->
     %io:format("~p~n", [Revert]),
     %{value, Result, NextEnv} = execute(Tab, Revert, Env),
     %io:format("~s~n", [pp:format(Results, 60)]),
-    repl(NextTab, IN, _OUT, NextLine, NextEnv).
+    repl(NextTab, IN, OUT, NextLine, NextEnv).
 
 local_function_hander(Name, Arg) ->
     ?LOG_DEBUG(#{local_function => {Name, Arg}}),
