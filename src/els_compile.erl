@@ -33,7 +33,9 @@ file(File, Opt) ->
 									    {MName, Arity},
 									    {{local},  LocalF}, M);
 								     true ->
-									  M
+									  io:format("LocalFDic ~p~n",
+										    [FunDic]),
+									  FunDic
 								  end,
 						      OEnv = proplists:delete(macros, E),
 						      NewEnv = [{macros, NewMacros}|OEnv],

@@ -1,10 +1,10 @@
 -module(els_repl).
 -include_lib("els.hrl").
--export([repl/5, 
+-export([
          repl/4,
          init/0,
          tty/0,
-         execute/3,
+         execute/2,
         local_function_hander/2]).
 -define(TABLE(), lobby).
 -define(DEFAULT_MODULE(), lobby).
@@ -48,59 +48,65 @@ add_function(Tab, Fun, Arity, Revert) ->
     io:format("locals: ~p~n", [NewTab]),
     NewTab.
 
-new_execute(Tab, Revert, Env) ->
-    case is_ddl(Revert) of
-        {ok, Fun, Arity} ->
-            NewTab = add_function(Tab, Fun, Arity, Revert),
-            {{value, [ok, Fun, Arity], Env}, NewTab};
-        false ->
-            Fun = els_localfun:create_valuefun(Tab),
-            {erl_eval:expr(Revert, Env, {value, Fun}), Tab}
+register_function(Ast, Env) ->
+    Macros = proplists:get_value(macros, Env, #{}),
+    case els_localfun:register_local_func(Ast, Macros) of
+	{FunDic, Name, Arity} ->
+	    %% io:format("registerd ~p: ~p: in ~p~n", [Name,Arity, FunDic]),
+	    OldEnv = proplists:delete(macros, Env),
+	    NewEnv = [{macros, FunDic} | OldEnv],
+	    {Ast, NewEnv};
+	_  ->
+	    {Ast, Env}
     end.
 
-execute(Tab, Revert, Env) ->
+execute(Revert, Env) ->
     case is_ddl(Revert) of
-        {ok, Fun, Arity} ->
-            {ok, M, _B} = recompile(Tab, ?DEFAULT_MODULE(), Fun, Arity, Revert),
-            {value, [ok, M, b], Env};
+        {ok, FunName, Arity} ->
+	    {NewAst, NewEnv} = register_function(Revert, Env),
+	    %% io:format("executed ~p~n", [NewEnv]),
+            {value, [ok, FunName, Arity], NewEnv};
         false ->
-            Fun = fun(N, A) -> local_function_hander(N, A) end,
+	    Fun = els_localfun:create_valuefun(proplists:get_value(macros, Env, #{})),
             erl_eval:expr(Revert, Env, {value, Fun})
     end.
 
-eval(List, Ctab, Env) ->
-    ErlTree = els_transpile:sterm(List, Env),
+eval(List, Env) when is_list(List) -> 
+    ErlTree = els_transpile:form(List, Env),
     Reverted = erl_syntax:revert(ErlTree),
-    {{value, Result, NewEnv}, NewTab}  = new_execute(Ctab, Reverted, Env),
-    {{value, Result, NewEnv}, NewTab}.
+    {value, Result, NewEnv} = execute(Reverted, Env),
+    {value, Result, NewEnv};
+eval(Term, Env) ->
+    ErlTree = els_transpile:sterm(Term, Env),
+    Reverted = erl_syntax:revert(ErlTree),
+    {value, Result, NewEnv} = execute(Reverted, Env),
+    {value, Result, NewEnv}.
+    
 
 repl(IN, OUT, Line, Env) ->
-    Table = init(),
-    repl(Table, IN, OUT, Line, Env).
-
-repl(Tab, IN, OUT, Line, Env) ->
     {ok, Tokens, NextLine, _Rest} = els_scan:read(IN, "erlisp[~B]> ", Line, [], 0),
     %?LOG_DEBUG(#{nextline=> NextLine}),
     {ok, Forms}  = els_parser:parse(Tokens),
     %%
-    {_Results, {NextEnv, NextTab}} = lists:mapfoldl(
-                           fun(S, {CEnv, CTab}) -> 
-				   {{value, Result, NEnv}, NewTab} = eval(S, CTab, CEnv),
+    io:format(OUT, "~p~n", [NextLine]),
+    {_Results, NextEnv} = lists:mapfoldl(
+                           fun(S, CEnv) -> 
+				   {value, Result, NEnv} = eval(S, CEnv),
                                    %Exp = els_transpile:sterm(S, Env),
                                    %Revert = erl_syntax:revert(Exp),
                                    %{value, Result, NEnv, NewTab} = execute(CTab, Revert, CEnv),
                                    %{{value, Result, NEnv}, NewTab} = new_execute(CTab, Revert, CEnv),
                                    io:format(OUT, "~s~n", [els_pp:format(Result, 80)]),
-                                   {Result, {NEnv, NewTab}}
-                           end, {Env, Tab}, 
+                                   {Result, NEnv}
+                           end, Env, 
                            Forms),
     %%Exp = erl_syntax:list(Exps),
     %%Exp = transpile:form(hd(Forms), Env),
     %Revert = erl_syntax:revert(Exp),
     %io:format("~p~n", [Revert]),
     %{value, Result, NextEnv} = execute(Tab, Revert, Env),
-    %io:format("~s~n", [pp:format(Results, 60)]),
-    repl(NextTab, IN, OUT, NextLine, NextEnv).
+    io:format("~p~n", [NextLine]),
+    repl(IN, OUT, NextLine, NextEnv).
 
 local_function_hander(Name, Arg) ->
     ?LOG_DEBUG(#{local_function => {Name, Arg}}),
@@ -109,7 +115,6 @@ local_function_hander(Name, Arg) ->
 tty() ->
     S = logger:get_primary_config(),
     logger:update_primary_config(S#{level => debug}),
-    Table = init(),
-    repl(Table, standard_io, standard_io, 1, []).
+    repl(standard_io, standard_io, 1, []).
 
     

@@ -5,6 +5,7 @@
 	 create_local_func/3,
 	 register_local_func/2,
 	 create_valuefun/1,
+	 create_localvaluefun/1,
 	 strip_macroname_string/1,
 	 valuefun/2
 	]).
@@ -35,19 +36,39 @@ create_local_func(Name, C, FunDic) ->
 	    maps:put({Name, Arity}, {{local}, LocalFunAst}, FunDic)
     end.
 
+create_localvaluefun(Locals) ->
+    fun(Name, Arg) ->
+	    {{local}, Func} = maps:get({Name, length(Arg)}, Locals),
+	    {value, Value, NewBinding} = erl_eval:expr(Func, Arg, {value, create_localvaluefun(Locals)}),
+	    Value
+    end.
 
 create_valuefun(Locals) ->
     fun(Name, Arg) ->
-	    io:format("value fun ~p(~p)~nMap[~p]~n", [Name, length(Arg), Locals]),
+	    %%io:format("value fun ~p(~p)~nMap[~p]~n", [Name, length(Arg), Locals]),
 	    {{local}, Func} = maps:get({Name, length(Arg)}, Locals),
 	    %io:format("value fun ~p~n", [Name]),
-	    QArg = erl_syntax:revert(erl_syntax:abstract(Arg)),
-	    %io:format("---Func: ~p~nArg: ~p~n", [Func, QArg]),
-	    Q = merl:qquote(?LINE, "apply(_@Func, _@Arg)", [{'Func', Func}, {'Arg', QArg}]),
-	    QQ = erl_syntax:revert(Q),
-	    %io:format("Q: ~p~n", [QQ]),
-	    {value, Value, _NewWEnv} = erl_eval:expr(QQ, [], {value, create_valuefun(Locals)}),
-	    Value
+	    case Func of
+		Func when is_function(Func) ->
+		    QArg = erl_syntax:revert(erl_syntax:abstract(Arg)),
+		    %%io:format("called localfunc ~p~nQArg ~p~nArg ~p~n ~p~n", [Name, QArg, Arg, Func]),
+		    Q = merl:qquote(?LINE, "apply(_@Func, _@Arg)", [{'Func', Func}, {'Arg', Arg}]),
+		    %%io:format("quoted ast ~p~n", [Q]),
+		    QQ = erl_syntax:revert(Q),
+		    %%io:format("quoted localfunc ~p~n", [QQ]),
+		    {value, Value, _NewEnv} = erl_eval:expr(Q, Arg, create_valuefun(Locals)),
+		    %%io:format("Q: ~p~n", [Q]),
+		    Value;
+		_ ->
+		    QArg = erl_syntax:revert(erl_syntax:abstract(Arg)),
+		    %%io:format("---Func: ~p~nQArg: ~p~nArg ~p~n", [Func, QArg, Arg]),
+		    Q = merl:qquote(?LINE, "apply(_@Func, _@Arg)", [{'Func', Func}, {'Arg', QArg}]),
+		    %%io:format("Q: ~p~n", [Q]),
+		    QQ = erl_syntax:revert(Q),
+		    {value, Value, _NewWEnv} = erl_eval:expr(QQ, [], {value, create_valuefun(Locals)}),
+		    %%{value, Value, _NewWEnv} = erl_eval:expr(QQ, [], {value, create_localvaluefun(Locals)}),
+		    Value
+	    end
     end.
 
 strip_macroname_string(Name) ->
@@ -59,14 +80,18 @@ strip_macroname_string(Name) ->
     end.
 
 register_local_func(Node, FunDic) ->
+    io:format("in register_local_func ~p~n", [FunDic]),
     case erl_syntax:revert(Node) of
 	{function, Anno, Name, Arity, Ast} ->
+	    io:format("in register_local_func2 ~p~n", [Name]),
 	    FName = list_to_atom(strip_macroname_string(Name)),
 	    LocalFunc = {'named_fun', Anno, FName, Ast},
 	    LocalFunAst = erl_syntax:revert(LocalFunc),
+	    io:format("register_local_func ~p~n", [FunDic]),
 	    NewFunDic = maps:put({FName, Arity}, {{local}, LocalFunAst}, FunDic),
 	    {NewFunDic, Name, Arity};
 	_ ->
+	    io:format("in register_local_funcA ~p~n", [erl_syntax:revert(Node)]),
 	    FunDic
     end.
 
@@ -77,6 +102,6 @@ valuefun(Name, Arg) ->
     %io:format("---Func: ~p~nArg: ~p~n", [Func, QArg]),
     Q = merl:qquote(?LINE, "apply(_@Func, _@Arg)", [{'Func', Func}, {'Arg', QArg}]),
     QQ = erl_syntax:revert(Q),
-    io:format("Q: ~p~n", [QQ]),
+    %%io:format("Q: ~p~n", [QQ]),
     {value, Value, _NewWEnv} = erl_eval:expr(QQ, [], {value, fun valuefun/2}),
     Value.

@@ -37,6 +37,14 @@ compile_with_macro_test() ->
     ?assertEqual(true , macrotest:main(3,2)),
     ?assertEqual('it' , macrotest:main(1,2)).
 
+compile_with_macro2_test() ->
+    {ok, Module, _Binary, _Ast} = els_compile:file_ast("test/testdata/macrotest.elisp", []),
+    ?assertEqual({module, macrotest}, code:ensure_loaded(macrotest)),
+    %%error_logger:info_report(Ast).
+    %% {file, _File} = code:is_loaded(Module),
+    ?assertEqual(18 , macrotest:main2(3,2)),
+    ?assertEqual(18 , macrotest:main2(2,3)).
+
 compile_with_macrofunccall_test() ->
     {ok, Module, _Binary, Ast} = els_compile:file_ast("test/testdata/macrofunccall.elisp", []),
     ?assertEqual({module, macrofunccall}, code:ensure_loaded(macrofunccall)),

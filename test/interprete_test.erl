@@ -19,6 +19,32 @@ local_fun_test() ->
     Ret2 = erl_eval:expr(S2, [], {value, LocalF}),
     ?assertEqual({value, 5, []}, Ret2).
 
+local_fun_call_test() ->
+    Line = ?LINE,
+    S = ["(defun fib ((0) 1) ",
+	 "  ((1) 1)",
+	 "  ((n) (io:format \"aa\" ()) (+ (fib (- n 1)) (fib (- n 2))) )",
+	 ")"],
+    S2 = [
+	 "(+ (fib 4) 5)"
+	],
+    {ok, Tokens, Line2} = els_scan:from_string(lists:flatten(lists:join("\n", S)), Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    io:format("Zero Line: ~p ~n To  ~p~n", [S, C]),
+    {NFunDic, Name, Arity} = 
+	els_localfun:register_local_func(C, #{}),
+    io:format("Zero2 Line ~p ~n", [NFunDic]),
+    LocalF = els_localfun:create_valuefun(NFunDic),
+    NewEnv = [{macros, NFunDic}],
+    io:format("First Line~n", []),
+    {ok, Tokens2, _Line} = els_scan:from_string(lists:flatten(lists:join("\n", S2)), Line2),
+    {ok, [Tree2]} = els_parser:parse(Tokens2),
+    C2 = els_transpile:form(Tree2, NewEnv),
+    C2_1 = erl_syntax:revert(C2),
+    Ret2 = erl_eval:expr(C2_1, [], {value, LocalF}),
+    ?assertEqual({value, 10, []}, Ret2).
+
 local_macro_test() ->
     Line = ?LINE,
     S = ["(defmacro strlen (s) ",

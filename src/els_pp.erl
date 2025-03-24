@@ -56,14 +56,14 @@ pp(S) ->
 
 ppliteral(Value, {LLevel, LChar}, {_RLevel, _RChar}, open) ->
     Chars = lists:foldl(fun(_E, A) -> A++LChar end, [], lists:seq(1,LLevel)),
-    io:format("ppliteral-l: ~p ~p~n", [Value, Chars]),
+    %%io:format("ppliteral-l: ~p ~p~n", [Value, Chars]),
     Chars ++ Value;
 ppliteral(Value, {_LLevel, _LChar}, {RLevel, RChar}, close) ->
     Chars = lists:foldl(fun(_E, A) -> A++RChar end, [], lists:seq(1,RLevel)),
-    io:format("ppliteral-r: ~p ~p~n", [Value, Chars]),
+    %%io:format("ppliteral-r: ~p ~p~n", [Value, Chars]),
     Value ++ Chars;
 ppliteral(Value, {LLevel, LChar}, {RLevel, RChar}, both) ->
-    io:format("ppliteral-b: ~p ~p~n", [Value, {LLevel, RLevel}]),
+    %%io:format("ppliteral-b: ~p ~p~n", [Value, {LLevel, RLevel}]),
     R = ppliteral(Value, {LLevel, LChar}, {RLevel, RChar}, open),
     ppliteral(R, {LLevel, LChar}, {RLevel, RChar}, close);
 ppliteral(Value, _, _, none) ->

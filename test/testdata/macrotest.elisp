@@ -1,6 +1,14 @@
 (-module macrotest "test")
 (-export (main 2))
+(-export (main2 2))
+(-export (strlen 1 ))
 (-macro_export (aif 3))
+(-macro_export (alen 2))
+(defun strlen (str)
+   (length str))
+(defmacro alen (n str)
+   `(* ,n ,(strlen (element 2 str))))
+      
 (defmacro aif (bool istrue else)
   `(case (match it ,bool)
      ('true ,istrue)
@@ -10,5 +18,5 @@
        it
        'it))
 
-
-
+(defun main2 (a b)
+   (alen (* a b) "abc"))

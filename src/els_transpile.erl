@@ -175,7 +175,7 @@ atom_to_module_function(F) ->
     
 
 walk(F, Env, Fun) when is_list(F) ->
-    io:format("ww ~p~n", [F]),
+    %% io:format("ww ~p~n", [F]),
     [H|T] = F,
     Arity = length(T),
     Macros = proplists:get_value(macros, Env, #{}),
@@ -184,17 +184,17 @@ walk(F, Env, Fun) when is_list(F) ->
 	    %%--
             case maps:get({V, Arity},  Macros, undefined)  of
 		{{local}, Macro} ->
-		    io:format("local ~p(~p)~n", [F, V]),
-		    io:format("local-Macro ~p~n", [Macro]),
+		    %%io:format("local ~p(~p)~n", [F, V]),
+		    %%io:format("local-Macro ~p~n", [Macro]),
 		    A = Macro(list_to_atom(V), T),
-		    io:format("localafter ~p~n", [A]),
+		    %%io:format("localafter ~p~n", [A]),
 		    A2 = atom_to_item(A, Env),
-		    io:format("localafter2 ~p~n", [A2]),
+		    %% io:format("localafter2 ~p~n", [A2]),
 		    walk(A2, Env, Fun);
                 {M, Macro} ->
-                    io:format("call-M: ~p~n", [F]),
+                    %% io:format("call-M: ~p~n", [F]),
                     A = Fun(M, Macro, tl(F)),
-                    io:format("call-M-Result: ~p~n", [A]),
+                    %% io:format("call-M-Result: ~p~n", [A]),
                     walk(A, Env, Fun);
                 undefined ->
                     [H | lists:map(fun (E) -> 
@@ -204,9 +204,9 @@ walk(F, Env, Fun) when is_list(F) ->
         #item{type=module_function, value={Module, Function}} ->
             case maps:get({Module, Function, Arity},  Macros, undefined)  of
                 {M, Macro} ->
-                    io:format("call2: ~p~n", [F]),
+                    %% io:format("call2: ~p~n", [F]),
                     A = Fun(M, Macro, T),
-                    io:format("call-Result: ~p~n", [A]),
+                    %% io:format("call-Result: ~p~n", [A]),
                     walk(A, Env, Fun);
                 undefined ->
                     [H | lists:map(fun (E) -> 
@@ -248,16 +248,16 @@ expand_macro(A, E, Macros) ->
     NewMacros = maps:merge(In, Out),
     Env = yal_util:proplists_replace(macros, NewMacros, E),
     %Env = In,
-    io:format("Map ~p~n", [Env]),
+    %% io:format("Map ~p~n", [Env]),
     Result = walk(A, Env, fun(Module, Function, Arguments) -> 
                                   R = apply(Module, Function, Arguments),
-                                  io:format("result ~p~n", [R]),
+                                  %%io:format("result ~p~n", [R]),
                                   R3 = atom_to_item(R, Env),
                                   %%R4 = expand_macro(R3, Env, Macros),
-                                  io:format("resultR4 ~p~n", [R3]),
+                                  %% io:format("resultR4 ~p~n", [R3]),
                                   R3
                           end),
-    io:format("Expanded ~p~n", [Result]),
+    %% io:format("Expanded ~p~n", [Result]),
     Result.
 
 merge_into_env(Env, Key, Value) ->
@@ -278,19 +278,27 @@ form(A, E) ->
     %Macros = maps:merge(NFundic, M),
     Macros = M,
     B = expand_macro(A, E, Macros),
-    io:format("form-E ~p ~nFrom ~p ~n To ~p~n", [E, A, B]),
-    R = form_trans(B, E),
+    %% io:format("form-E ~p ~nFrom ~p ~n To ~p~n", [E, A, B]),
+    R = case is_list(B) of
+	    true -> 
+		Ret = form_trans(B, E),
+		%%io:format("form output: ~p ~n to ~p~n", [B, Ret]),
+		Ret;
+	    false -> 
+		sterm(B, E)
+	end,
     R
     .
 
 form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
+    %%io:format("Form Trans Input ~p~n", [[XT, T]]),
     R=case Inf=dispatch_infix_op(X) of
           undef ->
             case Spf=dispatch_special(X) of
                 undef ->
                     call_function(XT, T, E);
                 Spf ->
-                    io:format("special XT ~p~n", [[XT, T]]),
+                    %%io:format("special XT ~p~n", [[XT, T]]),
                     R1=Spf(XT, T, E),
                     %%io:format("specialform: ~p~n", [R1]),
                     R1
@@ -300,13 +308,14 @@ form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
               Args = T,
               Inf(Op, Loc, Args, E)
       end,
+    %%io:format("Form Trans Input-[~p]~n to Output ~p~n", [[XT|T], R]),
     R
     ;
 %form_trans([List| T], E) when is_list(List) ->
 %    io:format("nested ~p~n", [List]),
 %    form_trans([form_trans(List, E)| T], E).
 form_trans([List| T], E) when is_list(List) ->
-    io:format("nested ~p~n", [List]),
+    %% io:format("nested ~p~n", [List]),
     Callable = form_trans(List, E),
     Loc = erl_syntax:get_pos(Callable),
     ?MQP(Loc, "_@F(_@Args)", 
@@ -504,27 +513,27 @@ match_op(#item{value=_X, loc=Loc}, L, E) ->
 
 
 unary_op(Op, Loc, [Item]=List, E) ->
-    io:format("error1 ~p~n", [{Op, List}]),
+    %%io:format("error1 ~p~n", [{Op, List}]),
     unary_op_do(Op, Loc, Item, E);
 unary_op(Op, Loc, [_Left, _Right] = List, E) 
   when Op == "+" ->
-    io:format("error2 ~p~n", [{Op, List}]),
+    %% io:format("error2 ~p~n", [{Op, List}]),
     infix_op(Op, Loc, List, E);
 unary_op(Op, Loc, [_Left, _Right] = List, E) 
   when Op == "-" ->
-    io:format("error3 ~p~n", [{Op, List}]),
+    %% io:format("error3 ~p~n", [{Op, List}]),
     infix_op(Op, Loc, List, E);
 unary_op(Op, Loc, List, _E) ->
-    io:format("error4 ~p~n", [{Op, List}]),
+    %% io:format("error4 ~p~n", [{Op, List}]),
     ?THROW({error, {bad_arity, Loc, {Op, length(List)}}}).
 
 unary_op_do(Op, Loc, Left, E) ->
     OpType = erl_syntax:set_pos(erl_syntax:operator(Op), Loc),
     Operand = sterm(Left, E),
     Operand2 = erl_syntax:set_pos(Operand, Loc),
-    io:format("error5 ~p~n", [{OpType, Operand2, Loc}]),
+    %% io:format("error5 ~p~n", [{OpType, Operand2, Loc}]),
     Nexp = erl_syntax:prefix_expr(OpType, Operand2),
-    io:format("error6 ~p~n", [{Nexp, Loc}]),
+    %% io:format("error6 ~p~n", [{Nexp, Loc}]),
     erl_syntax:copy_pos(OpType, Nexp).
 
 infix_op(Op, Loc, [_Left], _E) ->
@@ -688,15 +697,17 @@ getcomment([#item{type=string}=Com|Rest], Pos) ->
 getcomment(Rest, Pos) ->
     [make_comment(Pos, "")|Rest].
 defun_(X, L, E) ->
-    io:format("defun_ : ~p~n", [X]),
+    %% io:format("defun_ : ~p~n", [X]),
     Line = X#item.loc,
     [Name, Args | Rest] = L,
-    io:format("Name, Args | Rest =~n  ~p~n ~p~n ~p ~n", [Name, Args, Rest]),
+    %% io:format("Name, Args | Rest =~n  ~p~n ~p~n ~p ~n", [Name, Args, Rest]),
     case Args =/=nil andalso hd(Args) of
         A when is_list(A) -> 
 	    %%% match defun
             %match_defun_(Name, [Args|Rest], E);
-            defun_comment(Name, Args, Rest, E);
+            Ret = defun_comment(Name, Args, Rest, E),
+	    %% io:format("defun_output: ~p~n", [Ret]),
+            Ret;
         _  ->
             Pos = Line,
             [Comm|RRest]  = getcomment(Rest, Pos),
@@ -717,20 +728,20 @@ defun_(X, L, E) ->
                  [{'name', FunName}, 
                   {'args', ArgList},
                   {'body', Body}]),
-            io:format("MMQ1: ~p~n~p~n", [MQ, [Comm]]),
+            %% io:format("MMQ1: ~p~n~p~n", [MQ, [Comm]]),
             MMQ = case Comm of 
                       {_,_,_, []} ->
                           MQ;
                       {_, _, _, Comment} ->
 			  Com = erl_syntax:comment(Comment),
-			  io:format("PreComment ~p~n", [Com]),
+			  %%io:format("PreComment ~p~n", [Com]),
                           R = erl_syntax:set_precomments(MQ,Com), 
-			  io:format("PreCommentAfter ~p~n", [R]),
+			  %%io:format("PreCommentAfter ~p~n", [R]),
                           %%io:format(standard_error, "PreComment ~p~n", [R]),
                           R
                   end,
             %%MMQ=MQ,
-            io:format("MMQ2: ~p~n", [erl_syntax:revert(MMQ)]),
+            %% io:format("MMQ2: ~p~n", [erl_syntax:revert(MMQ)]),
             MMQ
     end.
 
@@ -1290,14 +1301,14 @@ locline(F) ->
                        end, F).
 
 call_function(Fun=#item{value=_X, loc=Loc}, T, E) ->
-    io:format("call X ~p~nT ~p~nFun ~p~n", [_X, T, Fun]),
+    %% io:format("call X ~p~nT ~p~nFun ~p~n", [_X, T, Fun]),
     FHead = lists:map(fun(Elem) ->
-                              io:format("Term ~p~n", [Elem]),
+                              %% io:format("Term ~p~n", [Elem]),
 %                              A = lists:map(fun(Arg) ->
 %                                                    sterm(Arg, E)
 %                                            end, Elem),
                               A = sterm(Elem, E),
-                              io:format("TermAfter ~p~n", [A]),
+                              %% io:format("TermAfter ~p~n", [A]),
                               A
                       end, T),
     %%io:format("call X2 ~p~nT ~p~n", [sterm(Fun,E, Loc), FHead]),

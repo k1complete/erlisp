@@ -90,6 +90,8 @@ defun_test() ->
     {ok, _Binary} = merl:compile_and_load(C, [debug_info]),
     Result = apply(c, add, [2, 3]),
     ?assertEqual(25, Result).
+
+
 defmacro_test() ->
     Line=?LINE,
     Cmd = ["(-module cc1)",
