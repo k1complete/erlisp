@@ -14,6 +14,7 @@ start_link(String) ->
 
 init(String) ->
     {ok, Fd} = file:open(String, [read, ram]),
+    %% io:format("Inited: <~p>~n", [String]),
     ?MODULE:loop(#state{fd = Fd, mode=list}).
 
 stop(Pid) ->
@@ -150,7 +151,7 @@ get_until(Encoding, Mod, Func, As,
         {error, {eof, Loc}} ->
             {ok, {eof, Loc}, State};
 	Error ->
-            io:format("getloop: ~p~n ", [Error]),
+            %% io:format("getloop: ~p~n ", [Error]),
 	    {error, Error, State}
     end.
 
@@ -224,11 +225,11 @@ getc(Fd, []) ->
         eof ->
             {ok, eof};
         Rest ->
-            %io:format(standard_error, "[getc '~p']~n", [Rest]),
+	    %%io:format(standard_error, "[getc '~p']~n", [Rest]),
             Rest
     end;
 getc(_Fd, LookAhead) ->
-    io:format("[getc ahead '~p']~n", [LookAhead]),
+    %% io:format("[getc ahead '~p']~n", [LookAhead]),
     {ok, LookAhead}.
 
 my_split(0,Left,Acc) ->

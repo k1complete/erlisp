@@ -5,6 +5,7 @@
          init/0,
          tty/0,
          execute/2,
+	 eval/2,
         local_function_hander/2]).
 -define(TABLE(), lobby).
 -define(DEFAULT_MODULE(), lobby).

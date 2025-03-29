@@ -101,5 +101,24 @@ local_macro_form_test() ->
     Ret2 = erl_eval:expr(S2, [], {value, LocalF2}),
     ?assertEqual({value, 3, []}, Ret2).
 
+interprete_test() ->
+    Line = ?LINE,
+    S = "(defun add (a b)
+              (+ a b))
+         (add 2 3)
+
+        ",
+    io:format("~s", [S]),
+    {Ret, Tokens, _Line} = els_scan:from_string(S, Line),
+    {ok, Trees} = els_parser:parse(Tokens),
+    Env = [],
+    {Results, NEnv}  = lists:foldl(fun(I, {Acc, E}) ->
+					   io:format("eval ~p~n", [I]),
+					   {value, Result, NewEnv} = els_repl:eval(I, E),
+					   {[Result|Acc], NewEnv}
+				  end, {[], Env}, Trees),
+    ?assertEqual([5, [ok, add, 2]], Results ).
+
+	 
     
 

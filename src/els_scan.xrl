@@ -82,10 +82,11 @@ Erlang code.
 -export([reads/5]).
 -export([from_string/2]).
 -export([from_string/1]).
+-export([from_string_rest/4]).
 %%-export([replace/5]).
 -export([read/5]).
 -export([replace/5]).
--export([remove_nl/1]).
+
 
   
 calclevel(IO, Prompt0, Tokens, GLevel, Line) ->
@@ -229,37 +230,33 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
                       "Error! sss ~p, ~p, ~p ~n",[Error, PrevTokens, PrevLevel]),
             Error
     end.
-from_string(String) ->
-    from_string(String, 0).
+
 
 from_string_rest(IO, Line, Rest, Acc) ->
     case read(IO, [], Line, Rest, 0) of
-        {ok, Acc2, NewLine, []} ->
-            %io:format("from_string_rest ~p -> ~n ~p~n", [Rest, Acc2]),
-            {ok, Acc ++ Acc2, NewLine};
         {ok, Acc2, NewLine, Rest2} ->
-            %%from_string_rest(IO, Line, Rest2, Acc++Acc2);
+	    %%io:format("Rest ~p~n", [Rest2]),
             from_string_rest(IO, NewLine, Rest2, Acc++Acc2);
         {eof, Acc2, Line2, []} ->
-            {eof, Acc2, Line2};
-        _ ->
-            {ok, Acc, Line}
+            {eof, Acc++Acc2, Line2};
+        {X, Acc2, Line2, []} ->
+	    %% io:format("rest ~p~n", [X]),
+            {X, Acc2, Line2}
     end.
+	    
+from_string(String) ->
+    from_string(String, 0).
 
-remove_nl(Tokens) ->    
-    lists:filter(fun({'\n', _}) -> 
-                         false;
-                    (_) -> true 
-                 end, Tokens).
-
-from_string(String, Line) ->
-%%    io:format(standard_error, "~p~n", [length(erlang:processes())]),
+from_string(String, Line) ->            
     IO = tiny_io_server:start_link(String),
-    {R, Acc , NewLine} = from_string_rest(IO, Line, [], []),
+    {R, Acc, NewLine} = from_string_rest(IO, Line, [], []),
     tiny_io_server:stop(IO),
-%%    io:format(standard_error, "~p~n", [length(erlang:processes())]),
-    {R, remove_nl(Acc), NewLine}.
-            
+    case R of 
+	eof ->
+	    {ok, Acc, NewLine};
+	X ->
+	    {X, Acc, NewLine}
+    end.
 
 reads(IO, File, Line, PrevTokens, Acc) ->
     case read(IO, [], Line, PrevTokens, 0) of
