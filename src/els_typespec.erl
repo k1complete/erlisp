@@ -44,10 +44,10 @@ from_ast({type, Loc, Fun, Arg}) ->
     R;
 from_ast({float, Loc, L}) ->
     #item{type=float, value=L, loc=Loc};
-from_ast({integer, Loc, L}) ->
-    L;
-from_ast({integer, Loc, L}) ->
-    #item{type=integer, value=L, loc=Loc}.
+from_ast({integer, _Loc, L}) ->
+    L.
+%% from_ast({integer, Loc, L}) ->
+%%    #item{type=integer, value=L, loc=Loc}.
 
 
 fun_to_list(Name, Spec) when is_list(Spec) ->
@@ -68,7 +68,7 @@ fun_to_string(Name, Spec) ->
     fun_to_list(Name, Spec).
 
 fun_to_string2(Name, Arity, Specs) ->
-    SpecName = erl_syntax:atom("sepc"),
+    %% SpecName = erl_syntax:atom("sepc"),
     LSpecs = lists:map(
 	      fun(Spec) ->
 		      variable_titled(Spec)

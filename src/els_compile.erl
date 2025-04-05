@@ -60,43 +60,9 @@ file(File, Opt) ->
     io:format("compiled ~p~n", [Binary]),
     {ok, Module, Binary, Ast}.
 
-old_file(File, Opt) ->
-    io:format("cwd ~p~n", [file:get_cwd()]),
-    Module = m,
-    {ok, Tokens} = els_scan:file(File, Opt),
-    io:format("scan ~p~n", [Tokens]),
-    {ok, Forms} = els_parser:parse(Tokens),
-    Env=[],
-    {Ast0, Errors} = lists:mapfoldl(fun(F, A) ->
-					  try
-					      R = els_transpile:form(F, Env),
-					      {R, A}
-					  catch
-					      throw:Error when is_list(Error) ->
-						  io:format("catched : ~p~n", [Error]),
-						  {[],  A++ Error}
-					  end
-				  end, [], Forms),
-    Ast = case Errors of
-	      [] -> Ast0;
-	      _ ->
-		  throw(Errors)
-	  end,
-    io:format("Ast ~p~n Err ~p~n", [Ast, Errors]),
-    {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
-    io:format("compiled ~p~n", [Binary]),
-    {ok, Module, Binary}.
-
-
     
-    
-create_local_func(Name, Arity, Ast, FunDic) ->
-    maps:put({Name, Arity}, Ast, FunDic).
 
 			
-merge_macro_env(MacroMap, Env) ->
-    yal_util:proplists_replace(local, MacroMap, Env).
-
 %%
 %% defmacro/defunを処理して、新しいlocalfunマップを返す。
 %% 
@@ -124,83 +90,6 @@ merge_macro_env(MacroMap, Env) ->
 %%new_compile_macro(_, Acc, E) ->
 %%    Acc.
 
--spec compile_macro(sexp(), env()) -> sexp().
-%% フォーム一つをトランスパイル
-%% ASTをコンパイルしてmoduleに追加
-%%  > macroはマクロリストに登録
-%% 終りまでいったら、終了
-%% 
-compile_macro(A, E) ->
-    io:format("pre-compiled ~p~n", [A]),
-    [{MS, ModuleForm}] = lists:filtermap(fun([#item{type=atom, value="-module"}|R]=L) -> 
-                                                 {true, 
-                                                  {L, [#item{type=atom, value="quote"},  hd(R)]}};
-                                            (_) -> false 
-                                         end, A),
-    [MS21,MS22 | _] = MS,
-    ModuleName = erl_syntax:atom_value(els_transpile:form(ModuleForm, E)),
-    io:format("modulename ~p ~p~n", [ModuleName, is_atom(ModuleName)]),
-    M = lists:filtermap(fun([#item{type=atom, value="defmacro"}|R]) -> 
-                                [#item{type=atom, value=MacroName}, Args| _Body] = R,
-                                Macro = MacroName,
-                                MacroFunc = yal_util:make_macro_funcname(Macro),
-                                {true, {{Macro, length(Args)}, {ModuleName, MacroFunc}}};
-                           (_) -> 
-                                false 
-                        end, A),
-    io:format("compile-macro: ~p~n", [M]),
-    Forms2 = lists:filter(fun([#item{type=atom, value="-export"}|_]) -> 
-                                  false;
-                             ([#item{type=atom, value="-macro_export"}|_]) -> 
-                                  false;
-                             ([#item{type=atom, value="-module"}|_]) -> 
-                                  false;
-                             ([#item{type=atom, value="-spec"}|_]) -> 
-                                  false;
-                             (_) -> 
-                                  true
-                          end, A),
-    IEnv = els_transpile:merge_into_env(E, macros, maps:from_list(M)),
-    io:format("merge_env ~p ~p~n", [ModuleName, IEnv]),
-
-    Ret = lists:foldl(fun(S, {_Ret, [], EnvAct}) ->
-                              Forms = [[MS21, MS22]]++[S], 
-                              Ast = lists:map(fun(F) ->
-						      io:format("merge_form ~p~n", [F]),
-                                                      Asst = els_transpile:form(F, EnvAct),
-						      io:format("merge_ast ~p~n", [Asst]),
-						      Asst
-                                              end, Forms),
-                              io:format("2222 ~p~n~p", [Forms, erl_syntax:revert_forms(Ast)]),
-                              {module, _Module, Binary} = 
-                                  compile_and_write_beam(Ast, [debug_info, export_all]),
-                              R = catch apply(ModuleName, main, [2,3]),
-                              ?LOG_DEBUG(#{module_info => R, length => length(Forms2)}),
-                              {Binary, Forms, EnvAct};
-                          (S, {_Ret, Acc, EnvAcc}) ->
-                              Macros = els_transpile:getmacros_from_module(ModuleForm, EnvAcc),
-                              io:format("merged macro1 ~p ~p", 
-                                        [EnvAcc, maps:from_list(Macros)]),
-                              NEnv = els_transpile:merge_into_env(EnvAcc, macros, maps:from_list(Macros)),
-                              io:format("merged macro2 ~p", [NEnv]),
-                              Forms = Acc++[S], 
-                              io:format("merged macro3 ~p~n", [NEnv]),
-                              Ast = lists:map(fun(F) ->
-                                                      els_transpile:form(F, NEnv)
-                                              end, Forms),
-                              io:format("transpiled ~p~n", [Ast]),
-                              {module, _Module, Binary} = 
-                                  compile_and_write_beam(Ast, [debug_info, export_all]),
-                              R = catch apply(ModuleName, module_info, [exports]),
-                              ?LOG_DEBUG(#{module_info2 => R}),
-                              {Binary, Forms, NEnv};
-			 (S, AA) ->
-			      io:format("error!!: ~p ~n~pn", [S, AA])
-                  end, {[], [], IEnv}, Forms2),
-    io:format("compiled-macro: ~p ~n", [Ret]),
-    ?LOG_DEBUG(#{maros_list => IEnv}),
-    Ret.
-
 -spec compile_and_write_beam(sexp(), options()) -> {module, module(), binary()}.
 compile_and_write_beam(Ast, Options) ->
     SS = merl:compile_and_load(Ast, Options),
@@ -223,40 +112,11 @@ compile_and_write_beam(Ast, Options) ->
     
 -spec file_ast(string, options()) -> {module, module(), binary(), sexp()}.
 file_ast(File, Opt) ->
-    {ok, Module, Binary, Ast} = file(File, Opt),
+    {ok, Module, _Binary, Ast} = file(File, Opt),
     {module, Module, Binary2} = compile_and_write_beam(Ast, Opt),
     {ok, Module, Binary2, Ast}.
 %    {ok, Module, Binary, Ast}.
 
-old_file_ast(File, Opt) ->
-    io:format("cwd ~p", [file:get_cwd()]),
-    {ok, Tokens} = els_scan:file(File, Opt),
-    io:format("scan ~p", [Tokens]),
-    {ok, Forms} = els_parser:parse(Tokens),
-    io:format("parsed ~p~n", [Forms]),
-    
-    Compiled = compile_macro(Forms, []),
-    io:format("compiled ~p~n", [Forms]),
-    {_, _, NEnv} = Compiled,
-    io:format("compiled ~p", [NEnv]),
-    MR = Forms,
-    Env=NEnv,
-
-    ?LOG_DEBUG(#{macro_compiled => MR, nenv => NEnv}),
-    Ast = lists:map(fun(F) ->
-			    els_transpile:form(F, Env) 
-                          end, Forms),
-    io:format("Ast ~p~n", [Ast]),
-%    {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
-    {ok, Module, Binary} = merl:compile(Ast, [debug_info]),
-    Specs = extract_specs(Ast),
-    {ok, DocsV1} = make_docs(Ast, Specs),
-    io:format("compiled ~p", [Binary]),
-    {ok, Module, Chunks} = beam_lib:all_chunks(Binary),
-    ChunksAdded = lists:append(Chunks, [{"Docs", term_to_binary(DocsV1)}]),
-    io:format("Beam ~p", [ChunksAdded]),
-    {ok, Binary2} = beam_lib:build_module(ChunksAdded),
-    {ok, Module, Binary2, Ast}.
 
 -spec extract_specs(list(erl_syntax:tree())) -> map().
 extract_specs(Trees) ->
@@ -306,19 +166,11 @@ make_function_spec(Tree, Specs, MetaData) ->
 -spec make_function_signature(erl_syntax:tree(), map()) -> signature().
 make_function_signature(Tree, Specs) ->
     FName = erl_syntax:function_name(Tree),
-    Name=erl_syntax:atom_value(FName),
+    %% Name=erl_syntax:atom_value(FName),
     Cs = erl_syntax:function_clauses(Tree),
     io:format("make_function_signature ~p~nCs: ~p~n", [Specs, Cs]),
-    Arity = length(erl_syntax:clause_patterns(hd(Cs))),
+    %% Arity = length(erl_syntax:clause_patterns(hd(Cs))),
     R = lists:map(fun(C) ->
-                          Patterns = 
-                              lists:map(fun(E) ->
-                                                els_ast:to_list(E)
-                                        end, erl_syntax:clause_patterns(C)),
-                          Guard = case erl_syntax:clause_guard(C) of 
-                                      none -> [];
-                                      X -> X
-                                  end,
 			  Tc = els_typespec:variable_titled(C),
                           unicode:characters_to_binary(els_pp:erlast_to_str(FName, Tc), utf8)
                   end, Cs),

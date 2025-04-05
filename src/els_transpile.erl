@@ -126,6 +126,7 @@ dispatch_special(A) ->
           "lambda" => fun lambda_/3,
 	  "lc||" => fun list_comp_/3,
           "let" => fun let_/3,
+          "let=" => fun letequal_/3,
           "list" => fun list_/3,
           "map" => fun map_/3,
 	  "named_fun" => fun named_fun_/3,
@@ -512,7 +513,7 @@ match_op(#item{value=_X, loc=Loc}, L, E) ->
     erl_syntax:set_pos(Me, Loc).
 
 
-unary_op(Op, Loc, [Item]=List, E) ->
+unary_op(Op, Loc, [Item]=_List, E) ->
     %%io:format("error1 ~p~n", [{Op, List}]),
     unary_op_do(Op, Loc, Item, E);
 unary_op(Op, Loc, [_Left, _Right] = List, E) 
@@ -752,32 +753,6 @@ defmacro_(X, L, E) ->
     L2 = [Macro, Args | Rest],
     defun_(X, L2, E).
 
-old_defmacro_(X, L, E) ->
-    io:format("defmacro_ : ~p~n", [X]),
-    Line = X#item.loc,
-    [Name, Args | Rest] = L,
-    Macro = Name#item{value="MACRO_" ++ Name#item.value},
-    
-    io:format("Name, Args | Rest =~n  ~p~n ~p~n ~p ~n", [Macro, Args, Rest]),
-    case hd(Args) of
-        A when is_list(A) ->
-            %%match_defun_(Macro, [Args|Rest], E);
-            defun_comment(Macro, Args, Rest, E);
-        _  ->
-            Body = lists:map(fun(A) -> form(A, E) end, Rest),
-            io:format("simpleArgs ~p ~n", [Args]),
-            ArgList = lists:map(fun(A) -> sterm(A, E) end, Args),
-            %%  Register argument into environment.
-            %%  replace body from environment(argment)
-            FunName = erl_syntax:atom(Macro#item.value),
-            io:format("MO: ~p ~p~n", [Line, FunName]),
-            MQ=?MQP(Line, "'@name'(_@@args) -> _@@body.", 
-                 [{'name', FunName}, 
-                  {'args', ArgList},
-                  {'body', Body}]),
-            io:format("MQ2: ~p~n", [MQ]),
-            MQ
-    end.
 
 listsmap(F, L) when is_list(L) ->
     Fun = fun (E) when is_list(E) ->
@@ -1109,7 +1084,70 @@ case_(X, L, E) ->
 pattern(Term, Env) ->
     sterm(Term, Env).
 
+make_temp_var(V, I) ->
+    list_to_atom(lists:flatten(io_lib:format("~s@~s", [V, I]))).
+
+replace_vars_do([], Acct, Dic, Line, Env) ->
+    {lists:reverse(Acct), Dic};
+replace_vars_do([[Pattern, Body]| Rest], Acct, Dic, Line, Env) ->
+    PatternAst = sterm(Pattern, Env),
+    BodyAst = sterm(Body, Env),
+    VariableSet = erl_syntax_lib:variables(PatternAst),
+    NewDic = sets:fold(fun(Element, AccIn) ->
+			       maps:put(Element, make_temp_var(Element, Line), AccIn)
+		       end, Dic, VariableSet),
+    Ret = erl_syntax_lib:map(fun(Element) ->
+				     case erl_syntax:type(Element) of
+					 variable ->
+					     V = erl_syntax:variable_name(Element),
+					     NewV = maps:get(V, NewDic, V),
+					     erl_syntax:copy_pos(Element, erl_syntax:variable(NewV));
+					 _  ->
+					     Element
+				     end
+			     end, PatternAst),
+    Ast = erl_syntax:copy_pos(PatternAst, erl_syntax:match_expr(Ret, BodyAst)),
+    io:format("replace: ~p~n~p~nTo: ~p~n", [PatternAst, BodyAst, Ast]),
+    io:format("Dict: ~p~nNewDict: ~p~n", [Dic, NewDic]),
+    replace_vars_do(Rest, [Ast|Acct], NewDic, Line, Env).
+
+replace_vars(ArgList, Dic, Line, Env) ->
+    replace_vars_do(ArgList, [], Dic, Line, Env).
     
+%% (let (( a b ) (c  (+ a d) )) bodylist)
+%% -->
+%% begin
+%%   (= a@n b)
+%%   (= c@n (+ a@n d) )
+%%   bodylist
+%% end
+letequal_(X, L, E) ->
+    io:format("let_ : ~p ~n", [X]),
+    Loc = X#item.loc,
+    [Args | Rest] = L,
+    LocLine = lists:flatten(io_lib:format("~p_~p", [erl_anno:line(Loc),erl_anno:column(Loc)])),
+    {NewArgs, Dic} = replace_vars(Args, #{}, LocLine, E),
+    Body = lists:map(fun(A) -> 
+			    B = form(A, E),
+			    erl_syntax_lib:map(
+			      fun(Tree) ->
+				      case erl_syntax:type(Tree) of
+					  variable ->
+					      case maps:get(erl_syntax:variable_name(Tree), Dic, none) of
+						  none ->
+						      Tree;
+						  NewValue ->
+						      io:format("ReplaceBody: ~p to ~p~n", [Tree, NewValue]),
+						      erl_syntax:copy_pos(Tree, erl_syntax:variable(NewValue))
+					      end;
+					  _  ->
+					      Tree
+				      end
+			      end, B)
+		    end, Rest),
+    io:format("NewArgs: ~p~nBody: ~p~n", [NewArgs, Body]),
+    erl_syntax:set_pos(erl_syntax:block_expr(NewArgs++Body), Loc).
+
 
 %%
 %% (let ((a b) (b c))
@@ -1122,6 +1160,7 @@ pattern(Term, Env) ->
 %%  fun (list(pattern)) -> bodies end(list(value))
 %%  compile to 
 %%  
+    
 let_(X, L, E) ->
     io:format("let_ : ~p~n", [X]),
     Loc = X#item.loc,

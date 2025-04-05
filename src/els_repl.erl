@@ -29,30 +29,11 @@ is_ddl({attribute, _, record, {Name, Body}}) ->
 is_ddl(_) ->
     false.
 
-recompile(Tab, Module, Fun, Arity, Ast) ->
-    [{Module, OldBeam}] = ets:lookup(Tab, Module),
-    {ok, {_, [{abstract_code, {_, OldAst}}]}} = beam_lib:chunks(OldBeam, [abstract_code]),
-    PreAst = lists:filter(fun(E) -> case is_ddl(E) of
-                                        {ok, Fun, Arity} ->
-                                            false;
-                                        {ok, _, _} ->
-                                            true;
-                                        false -> 
-                                            true
-                                        end
-                          end, OldAst),
-    NewAst = lists:append(PreAst, [Ast]),
-    compile_and_register(Tab, Module, NewAst).
-
-add_function(Tab, Fun, Arity, Revert) ->
-    NewTab = els_localfun:create_local_func(Fun, Revert, Tab),
-    io:format("locals: ~p~n", [NewTab]),
-    NewTab.
 
 register_function(Ast, Env) ->
     Macros = proplists:get_value(macros, Env, #{}),
     case els_localfun:register_local_func(Ast, Macros) of
-	{FunDic, Name, Arity} ->
+	{FunDic, _Name, _Arity} ->
 	    %% io:format("registerd ~p: ~p: in ~p~n", [Name,Arity, FunDic]),
 	    OldEnv = proplists:delete(macros, Env),
 	    NewEnv = [{macros, FunDic} | OldEnv],
@@ -64,7 +45,7 @@ register_function(Ast, Env) ->
 execute(Revert, Env) ->
     case is_ddl(Revert) of
         {ok, FunName, Arity} ->
-	    {NewAst, NewEnv} = register_function(Revert, Env),
+	    {_NewAst, NewEnv} = register_function(Revert, Env),
 	    %% io:format("executed ~p~n", [NewEnv]),
             {value, [ok, FunName, Arity], NewEnv};
         false ->

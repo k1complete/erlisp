@@ -10,15 +10,6 @@
 -export([npp/4]).
 -export([erlast_to_str/2]).
 
-pps(S) when is_list(S) ->
-    [<<"(">>, lists:join(<<" ">>, lists:map(fun(E) ->
-                                                    pps(E)
-                                            end, S)),
-     <<")">>];
-pps(S) when is_integer(S) ->
-    integer_to_binary(S);
-pps(S) when is_record(S, item) ->
-    list_to_binary(S#item.value).
 
 npp([H], Left, Right, Direct) ->
     io:format("in single open ~p ~p~n", [H, {Left, Right, Direct}]),
@@ -83,11 +74,11 @@ pptr(V, L, R, Direction) when is_integer(V)  ->
     #item{value=ppliteral(integer_to_list(V), L, R, Direction), type=integer};
 pptr(V, L, R, Direction) when is_float(V)  ->
     #item{value=ppliteral(float_to_list(V), L, R, Direction), type=float};
-pptr([S], {LLevel, LChar}, {RLevel, RChar}, Direction) ->
+pptr([S], {LLevel, LChar}, {RLevel, RChar}, _Direction) ->
     {NL, NR} = {LLevel, RLevel},
     R = pptr(S, {NL+1, LChar}, {NR+1, RChar}, both),
     [R];
-pptr(S, {LLevel, LChar}, {RLevel, RChar}, Direction) when is_list(S) ->
+pptr(S, {LLevel, LChar}, {RLevel, RChar}, _Direction) when is_list(S) ->
     Head =  pptr(hd(S), {LLevel+1, LChar} ,{0, RChar}, open),
     Last =  pptr(lists:last(S), {0, LChar} ,{RLevel+1, RChar}, close),
     Middle = lists:map(fun(E) ->
@@ -139,7 +130,7 @@ pparg_returntype([Arg|Rest], Acc) ->
 pparg_returntype(A) ->    
     pparg_returntype(A, []).
 
-ppsexp([#item{value="(-spec"}=H1, #item{} = H2, Args=[[#item{value="(("++N}|_]|_], Return |  Body]) 
+ppsexp([#item{value="(-spec"}=H1, #item{} = H2, Args=[[#item{value="(("++_N}|_]|_], Return |  Body]) 
 %%  when hd(N)=/=$( ->
   ->
     io:format("spec ~p ~n", [Args]),

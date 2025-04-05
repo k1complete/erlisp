@@ -39,7 +39,7 @@ create_local_func(Name, C, FunDic) ->
 create_localvaluefun(Locals) ->
     fun(Name, Arg) ->
 	    {{local}, Func} = maps:get({Name, length(Arg)}, Locals),
-	    {value, Value, NewBinding} = erl_eval:expr(Func, Arg, {value, create_localvaluefun(Locals)}),
+	    {value, Value, _NewBinding} = erl_eval:expr(Func, Arg, {value, create_localvaluefun(Locals)}),
 	    Value
     end.
 
@@ -50,11 +50,11 @@ create_valuefun(Locals) ->
 	    %io:format("value fun ~p~n", [Name]),
 	    case Func of
 		Func when is_function(Func) ->
-		    QArg = erl_syntax:revert(erl_syntax:abstract(Arg)),
+		    %%QArg = erl_syntax:revert(erl_syntax:abstract(Arg)),
 		    %%io:format("called localfunc ~p~nQArg ~p~nArg ~p~n ~p~n", [Name, QArg, Arg, Func]),
 		    Q = merl:qquote(?LINE, "apply(_@Func, _@Arg)", [{'Func', Func}, {'Arg', Arg}]),
 		    %%io:format("quoted ast ~p~n", [Q]),
-		    QQ = erl_syntax:revert(Q),
+		    %% QQ = erl_syntax:revert(Q),
 		    %%io:format("quoted localfunc ~p~n", [QQ]),
 		    {value, Value, _NewEnv} = erl_eval:expr(Q, Arg, create_valuefun(Locals)),
 		    %%io:format("Q: ~p~n", [Q]),
