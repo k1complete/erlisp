@@ -1,6 +1,5 @@
 * データ構造
 
-
 *** マップフィールド Map-field-expr
 Map-field-expr := Map-field-exact | Map-field-assoc
 
@@ -20,7 +19,7 @@ Map-field-expr := Map-field-exact | Map-field-assoc
 *** Map-generator-exp
 (<- Key Value Exp)
 
-Exp
+マップ用のジェネレータ式でマップ内包表記内で記載可能な式。
 
 
 ** マップ
@@ -56,7 +55,7 @@ Exp
 *** ビット内包表記
 (bc|| Pattern Bit-generator-exp...)
 
-*** List-generator-exp
+*** Bit-generator-exp
 (<= V Exp)
 Exp
 

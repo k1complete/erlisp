@@ -6,6 +6,7 @@
          tty/0,
          execute/2,
 	 eval/2,
+	 source/2,
         local_function_hander/2]).
 -define(TABLE(), lobby).
 -define(DEFAULT_MODULE(), lobby).
@@ -37,10 +38,17 @@ register_function(Ast, Env) ->
 	    %% io:format("registerd ~p: ~p: in ~p~n", [Name,Arity, FunDic]),
 	    OldEnv = proplists:delete(macros, Env),
 	    NewEnv = [{macros, FunDic} | OldEnv],
+	    io:format("Env: ~p~n", [NewEnv]),
 	    {Ast, NewEnv};
 	_  ->
 	    {Ast, Env}
     end.
+
+env_to_binding(Env) ->
+    BindList = proplists:get_value(binding, Env, []),
+    lists:foldl(fun({K, V}, Acc) ->
+			erl_eval:add_binding(K, V, Acc)
+		end, erl_eval:new_bindings(), BindList).
 
 execute(Revert, Env) ->
     case is_ddl(Revert) of
@@ -50,8 +58,11 @@ execute(Revert, Env) ->
             {value, [ok, FunName, Arity], NewEnv};
         false ->
 	    Fun = els_localfun:create_valuefun(proplists:get_value(macros, Env, #{})),
-            erl_eval:expr(Revert, Env, {value, Fun})
+	    Binding = env_to_binding(Env),
+            {value, Result, NBinding} = erl_eval:expr(Revert, Binding, {value, Fun}),
+	    {value, Result, env_update(binding, NBinding, Env)}
     end.
+
 
 eval(List, Env) when is_list(List) -> 
     ErlTree = els_transpile:form(List, Env),
@@ -65,34 +76,78 @@ eval(Term, Env) ->
     {value, Result, NewEnv}.
     
 
-repl(IN, OUT, Line, Env) ->
-    {ok, Tokens, NextLine, _Rest} = els_scan:read(IN, "erlisp[~B]> ", Line, [], 0),
-    %?LOG_DEBUG(#{nextline=> NextLine}),
-    {ok, Forms}  = els_parser:parse(Tokens),
-    %%
-    io:format(OUT, "~p~n", [NextLine]),
-    {_Results, NextEnv} = lists:mapfoldl(
-                           fun(S, CEnv) -> 
-				   {value, Result, NEnv} = eval(S, CEnv),
-                                   %Exp = els_transpile:sterm(S, Env),
-                                   %Revert = erl_syntax:revert(Exp),
-                                   %{value, Result, NEnv, NewTab} = execute(CTab, Revert, CEnv),
-                                   %{{value, Result, NEnv}, NewTab} = new_execute(CTab, Revert, CEnv),
-                                   io:format(OUT, "~s~n", [els_pp:format(Result, 80)]),
-                                   {Result, NEnv}
-                           end, Env, 
-                           Forms),
-    %%Exp = erl_syntax:list(Exps),
-    %%Exp = transpile:form(hd(Forms), Env),
-    %Revert = erl_syntax:revert(Exp),
-    %io:format("~p~n", [Revert]),
-    %{value, Result, NextEnv} = execute(Tab, Revert, Env),
-    io:format("~p~n", [NextLine]),
-    repl(IN, OUT, NextLine, NextEnv).
 
 local_function_hander(Name, Arg) ->
     ?LOG_DEBUG(#{local_function => {Name, Arg}}),
     apply(?DEFAULT_MODULE(), Name, Arg).
+
+env_update(Key, Value, Env) ->
+    Old=proplists:delete(Key, Env),
+    [{Key, Value}|Old].
+env_get(Key, Env) ->
+    proplists:get_value(Key, Env).
+
+add_line(Env, Line) ->
+    env_update('?Line', Line, Env).
+get_line(Env) ->
+    env_get('?Line', Env).
+    
+repl_one(IN, OUT, Line, Env, Acc) ->
+    case  els_scan:read(IN, "erlisp[~B]> ", Line, [], 0) of
+	{ok, Tokens, NextLine, _Rest} ->
+	    %%?LOG_DEBUG(#{nextline=> NextLine}),
+	    io:format("Repl_one: ~p~n", [Env]),
+	    {ok, Forms}  = els_parser:parse(Tokens),
+	    %%n
+	    Return = try lists:foldl(
+			   fun(S, {value, _Ret, CEnv}) -> 
+				   {value, Result, NEnv} = eval(S, CEnv),
+				   %%Exp = els_transpile:sterm(S, Env),
+				   %%Revert = erl_syntax:revert(Exp),
+				   %%{value, Result, NEnv, NewTab} = execute(CTab, Revert, CEnv),
+				   %%{{value, Result, NEnv}, NewTab} = new_execute(CTab, Revert, CEnv),
+				   %%io:format(OUT, "~s~n", [els_pp:format(Result, 80)]),
+				   {value, Result, NEnv}
+			   end, {value, [], add_line(Env, NextLine)}, 
+			   Forms) 
+		     catch 
+			 error:Reason:StackTrace -> {error, Reason, StackTrace}
+		     end,
+	    Return;
+	{eof, [], _, _} ->
+	    {eof, Acc, Env}
+    end.
+
+
+source_acc(Io, Out, Nline, Env0, RetAcc, OutFun) ->
+    case repl_one(Io, Out, Nline, Env0, RetAcc) of
+	{value, Ret, Env} ->
+	    OutFun(Out, {value, Ret, Env}),
+	    source_acc(Io, Out, get_line(Env), Env, Ret, OutFun);
+	{error, Ret, Env} ->
+	    OutFun(Out, {error, Ret, Env}),
+	    source_acc(Io, Out, get_line(Env), Env, Ret, OutFun);
+	{eof, Ret, Env}  ->
+	    {value, Ret, Env}
+    end.
+
+output(Out, {value, Value, Env}) ->
+    io:format(Out, "~s~n", [els_pp:format(Value, 80)]);
+output(Out, Error) ->
+    io:format(Out, "~p~n", [Error]).
+
+    
+repl(Io, Out, Line, Env0) ->
+    source_acc(Io, Out, Line, Env0, [], fun output/2).
+						
+source(Src, _Opt) ->
+    S = logger:get_primary_config(),
+    logger:update_primary_config(S#{level => info}),
+    Io = tiny_io_server:start_link(Src),
+    {value, Ret, Env} = source_acc(Io, Io, 1, [], [], fun(_Out, E) -> E end),
+    tiny_io_server:stop(Io),
+    {value, Ret, Env}.
+
 
 tty() ->
     S = logger:get_primary_config(),

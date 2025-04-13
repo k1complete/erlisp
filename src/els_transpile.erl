@@ -130,7 +130,7 @@ dispatch_special(A) ->
           "list" => fun list_/3,
           "map" => fun map_/3,
 	  "named_fun" => fun named_fun_/3,
-          "mapp" => fun mapp_/3,
+          "map*" => fun mapp_/3,
 	  "=" => fun match_op/3,
 	  "?=" => fun maybe_match_/3,
 	  "match" => fun match_op/3,
@@ -1087,7 +1087,7 @@ pattern(Term, Env) ->
 make_temp_var(V, I) ->
     list_to_atom(lists:flatten(io_lib:format("~s@~s", [V, I]))).
 
-replace_vars_do([], Acct, Dic, Line, Env) ->
+replace_vars_do([], Acct, Dic, _Line, _Env) ->
     {lists:reverse(Acct), Dic};
 replace_vars_do([[Pattern, Body]| Rest], Acct, Dic, Line, Env) ->
     PatternAst = sterm(Pattern, Env),

@@ -153,12 +153,25 @@ replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
                  N2Tokens ++ [{')', Loc}]],
     {ok, NewTokens, NextLine, N2Rest}.
 
-make_prompt([], _Line, _PrevTokens) ->
+make_prompt(IO, [], _Line, _PrevTokens) ->
     "";
-make_prompt(Prompt, Line, []) ->
-    io_lib:format(Prompt, [loctoline(Line)]);
-make_prompt(_Prompt, _Line, _PrevTokens) ->
-    "".
+make_prompt(IO, Prompt, Line, []) ->
+    Opt = io:getopts(IO),
+    case proplists:get_value(terminal, Opt, false) of
+	true ->
+	    io_lib:format(Prompt, [loctoline(Line)]);
+	false ->
+	    ""
+    end;
+make_prompt(IO, Prompt, Line, _PrevTokens) ->
+    Opt = io:getopts(IO),
+    case proplists:get_value(terminal, Opt, false) of
+	true ->
+	    S = io_lib:format(Prompt, [loctoline(Line)]),
+	    string:pad(" ", length(S));
+	false ->
+	    ""
+    end.
 
 adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line) ->
     {NNewTokens, NLevel, Rest, NewLine} = calclevel(IO, Prompt0, PrevTokens, PrevLevel, Line),
@@ -169,7 +182,7 @@ adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line) ->
             read(IO, Prompt0, NewLine, Tokens++Rest, NLevel);
         {Rest, 0} ->
             %io:format("Token ~p Rest ~p~n", [Tokens, Rest]),
-            ?LOG_DEBUG(#{ajust_level => [Tokens, Rest]}),
+            %%?LOG_DEBUG(#{ajust_level => [Tokens, Rest]}),
             {ok, Tokens, NewLine, Rest};
         _  ->
             %io:format("readRet ~p~n", [{ok, Tokens, NewLine, Rest}]),
@@ -209,12 +222,12 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) when length(PrevTokens) > 0 andal
     %io:format("CalcLevel PreVTokens  ~p ~n PrevLevel ~p~n", [PrevTokens, PrevLevel]),
     adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line);
 read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
-    Prompt = make_prompt(Prompt0, Line, PrevTokens),
+    Prompt = make_prompt(IO, Prompt0, Line, PrevTokens),
     case io:request(IO, {get_until, unicode, Prompt, ?MODULE, tokens, [Line]}) of
         {ok, NewTokens, NextLine} ->
-            ?LOG_DEBUG(#{prevlevel => PrevLevel,
-                         prevtokens => PrevTokens,
-                         newtokens => NewTokens}),
+            %%?LOG_DEBUG(#{prevlevel => PrevLevel,
+	    %%prevtokens => PrevTokens,
+	    %%newtokens => NewTokens}),
             {NewTokens2, NextLine2} =  multiline_quote(IO, NextLine, NewTokens),
             %%?LOG_DEBUG(#{adjust_level => PrevTokens++NewTokens2}),
             %adjust_level(IO, Prompt0, PrevTokens++NewTokens2, PrevLevel, NextLine2);

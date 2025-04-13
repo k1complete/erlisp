@@ -34,7 +34,7 @@ map_update_test() ->
 
 map_pattern_test() ->
     Line=?LINE,
-    {ok, Tokens, _Line} = els_scan:from_string("(= (mapp (:= 'k1 (tuple 1 b))) a)", Line),
+    {ok, Tokens, _Line} = els_scan:from_string("(= (map* (:= 'k1 (tuple 1 b))) a)", Line),
     {ok, [Tree]} = els_parser:parse(Tokens),
     C = els_transpile:form(Tree, []),
     Binding = erl_eval:add_binding(a, #{k0 => 0, k1 => {1, 2}, k2 => 2}, erl_eval:new_bindings()),
