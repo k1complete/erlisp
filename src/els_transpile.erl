@@ -185,7 +185,7 @@ walk(F, Env, Fun) when is_list(F) ->
 	    %%--
             case maps:get({V, Arity},  Macros, undefined)  of
 		{{local}, Macro} ->
-		    %%io:format("local ~p(~p)~n", [F, V]),
+		    io:format("local ~p(~p)~n", [F, V]),
 		    %%io:format("local-Macro ~p~n", [Macro]),
 		    A = Macro(list_to_atom(V), T),
 		    %%io:format("localafter ~p~n", [A]),
@@ -249,10 +249,11 @@ expand_macro(A, E, Macros) ->
     NewMacros = maps:merge(In, Out),
     Env = yal_util:proplists_replace(macros, NewMacros, E),
     %Env = In,
-    %% io:format("Map ~p~n", [Env]),
+    io:format("MapMacoo A ~p ~n InEnv ~p~n", [A, Env]),
     Result = walk(A, Env, fun(Module, Function, Arguments) -> 
+                                  io:format("Apply Before ~p~n", [Module]),
                                   R = apply(Module, Function, Arguments),
-                                  %%io:format("result ~p~n", [R]),
+                                  io:format("Apply result ~p~n", [R]),
                                   R3 = atom_to_item(R, Env),
                                   %%R4 = expand_macro(R3, Env, Macros),
                                   %% io:format("resultR4 ~p~n", [R3]),

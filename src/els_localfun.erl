@@ -79,16 +79,26 @@ strip_macroname_string(Name) ->
 	    X
     end.
 
+strip_macroname_for_register(Name) ->
+    case atom_to_list(Name) of
+	"MACRO_"++Rest ->
+	    Rest;
+	X ->
+	    Name
+    end.
+
 register_local_func(Node, FunDic) ->
     io:format("in register_local_func ~p~n", [FunDic]),
     case erl_syntax:revert(Node) of
 	{function, Anno, Name, Arity, Ast} ->
 	    io:format("in register_local_func2 ~p~n", [Name]),
 	    FName = list_to_atom(strip_macroname_string(Name)),
+	    MName = list_to_atom(strip_macroname_string(Name)),
+	    %%MName = strip_macroname_for_register(Name),
 	    LocalFunc = {'named_fun', Anno, FName, Ast},
 	    LocalFunAst = erl_syntax:revert(LocalFunc),
 	    io:format("register_local_func ~p~n", [FunDic]),
-	    NewFunDic = maps:put({FName, Arity}, {{local}, LocalFunAst}, FunDic),
+	    NewFunDic = maps:put({MName, Arity}, {{local}, LocalFunAst}, FunDic),
 	    {NewFunDic, Name, Arity};
 	_ ->
 	    io:format("in register_local_funcA ~p~n", [erl_syntax:revert(Node)]),

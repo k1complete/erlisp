@@ -34,10 +34,31 @@ is_ddl(_) ->
 register_function(Ast, Env) ->
     Macros = proplists:get_value(macros, Env, #{}),
     case els_localfun:register_local_func(Ast, Macros) of
-	{FunDic, _Name, _Arity} ->
+	{FunDic, Name, Arity} ->
 	    %% io:format("registerd ~p: ~p: in ~p~n", [Name,Arity, FunDic]),
+
+
+	    LocalF = els_localfun:create_valuefun(FunDic),
+	    MName = els_localfun:strip_macroname_string(Name),
+	    io:format("NName(~p):Name(~p)~n", [MName, Name]),
+	    AName = atom_to_list(Name),
+	    NewMacros = if AName =/= MName ->
+				DName = list_to_atom(MName),
+				io:format("Before FunDic: ~p~nDName: ~p~n", [FunDic, DName]),
+				NewDic = maps:remove({DName, Arity}, FunDic),
+				maps:put(
+				  {MName, Arity},
+				  {{local},  LocalF}, NewDic);
+			   true ->
+				io:format("LocalFDic ~p~n",
+					  [FunDic]),
+				FunDic
+			end,
+
 	    OldEnv = proplists:delete(macros, Env),
-	    NewEnv = [{macros, FunDic} | OldEnv],
+	    %%NewEnv = [{macros, FunDic} | OldEnv],
+	    NewEnv = [{macros, NewMacros} | OldEnv],
+
 	    io:format("Env: ~p~n", [NewEnv]),
 	    {Ast, NewEnv};
 	_  ->
@@ -54,7 +75,7 @@ execute(Revert, Env) ->
     case is_ddl(Revert) of
         {ok, FunName, Arity} ->
 	    {_NewAst, NewEnv} = register_function(Revert, Env),
-	    %% io:format("executed ~p~n", [NewEnv]),
+	    io:format("registered ~p ~n Env ~p~n", [_NewAst, NewEnv]),
             {value, [ok, FunName, Arity], NewEnv};
         false ->
 	    Fun = els_localfun:create_valuefun(proplists:get_value(macros, Env, #{})),
@@ -90,13 +111,14 @@ env_get(Key, Env) ->
 add_line(Env, Line) ->
     env_update('?Line', Line, Env).
 get_line(Env) ->
-    env_get('?Line', Env).
+    proplists:get_value('?Line', Env, 0).
     
 repl_one(IN, OUT, Line, Env, Acc) ->
+    io:format("REPLONE: ~p~n Env: ~p~n", [Line, Env]),
     case  els_scan:read(IN, "erlisp[~B]> ", Line, [], 0) of
 	{ok, Tokens, NextLine, _Rest} ->
 	    %%?LOG_DEBUG(#{nextline=> NextLine}),
-	    io:format("Repl_one: ~p~n", [Env]),
+	    io:format("Repl_one: ~p~n", [Tokens]),
 	    {ok, Forms}  = els_parser:parse(Tokens),
 	    %%n
 	    Return = try lists:foldl(
@@ -120,13 +142,15 @@ repl_one(IN, OUT, Line, Env, Acc) ->
 
 
 source_acc(Io, Out, Nline, Env0, RetAcc, OutFun) ->
+    io:format("SA: ~p~n", [Env0]),
     case repl_one(Io, Out, Nline, Env0, RetAcc) of
 	{value, Ret, Env} ->
 	    OutFun(Out, {value, Ret, Env}),
 	    source_acc(Io, Out, get_line(Env), Env, Ret, OutFun);
 	{error, Ret, Env} ->
 	    OutFun(Out, {error, Ret, Env}),
-	    source_acc(Io, Out, get_line(Env), Env, Ret, OutFun);
+	    {error, Ret, Env};
+	%%source_acc(Io, Out, get_line(Env), Env, Ret, OutFun);
 	{eof, Ret, Env}  ->
 	    {value, Ret, Env}
     end.
@@ -140,11 +164,13 @@ output(Out, Error) ->
 repl(Io, Out, Line, Env0) ->
     source_acc(Io, Out, Line, Env0, [], fun output/2).
 						
-source(Src, _Opt) ->
+source(Src, Opt) ->
     S = logger:get_primary_config(),
     logger:update_primary_config(S#{level => info}),
+    Line = proplists:get_value('?Line', Opt, 1),
+    io:format("Source: Line ~p~n", [Line]),
     Io = tiny_io_server:start_link(Src),
-    {value, Ret, Env} = source_acc(Io, Io, 1, [], [], fun(_Out, E) -> E end),
+    {value, Ret, Env} = source_acc(Io, Io, Line, Opt, [], fun(_Out, E) -> E end),
     tiny_io_server:stop(Io),
     {value, Ret, Env}.
 
