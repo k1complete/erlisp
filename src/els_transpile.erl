@@ -249,7 +249,7 @@ expand_macro(A, E, Macros) ->
     NewMacros = maps:merge(In, Out),
     Env = yal_util:proplists_replace(macros, NewMacros, E),
     %Env = In,
-    io:format("MapMacoo A ~p ~n InEnv ~p~n", [A, Env]),
+    %%io:format("MapMacoo A ~p ~n InEnv ~p~n", [A, Env]),
     Result = walk(A, Env, fun(Module, Function, Arguments) -> 
                                   io:format("Apply Before ~p~n", [Module]),
                                   R = apply(Module, Function, Arguments),
@@ -1230,7 +1230,7 @@ binary_field_(#item{loc=Loc}, [Value, SizeP, Types], E) ->
     erl_syntax:set_pos(Q, Loc).
 
 
-%%
+%% (bc|| a generators)
 binary_comp_(_X, [TT|Rest] = _L, E) ->
     Template = sterm(TT, E),
     Body = lists:map(fun(A) -> sterm(A, E) end, Rest),

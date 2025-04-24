@@ -114,11 +114,11 @@ get_line(Env) ->
     proplists:get_value('?Line', Env, 0).
     
 repl_one(IN, OUT, Line, Env, Acc) ->
-    io:format("REPLONE: ~p~n Env: ~p~n", [Line, Env]),
+    %%io:format("REPLONE: ~p~n Env: ~p~n", [Line, Env]),
     case  els_scan:read(IN, "erlisp[~B]> ", Line, [], 0) of
 	{ok, Tokens, NextLine, _Rest} ->
 	    %%?LOG_DEBUG(#{nextline=> NextLine}),
-	    io:format("Repl_one: ~p~n", [Tokens]),
+	    %%io:format("Repl_one: ~p~n", [Tokens]),
 	    {ok, Forms}  = els_parser:parse(Tokens),
 	    %%n
 	    Return = try lists:foldl(
@@ -142,7 +142,7 @@ repl_one(IN, OUT, Line, Env, Acc) ->
 
 
 source_acc(Io, Out, Nline, Env0, RetAcc, OutFun) ->
-    io:format("SA: ~p~n", [Env0]),
+    %% io:format("SA: ~p~n", [Env0]),
     case repl_one(Io, Out, Nline, Env0, RetAcc) of
 	{value, Ret, Env} ->
 	    OutFun(Out, {value, Ret, Env}),

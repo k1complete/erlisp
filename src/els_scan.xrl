@@ -168,7 +168,8 @@ make_prompt(IO, Prompt, Line, _PrevTokens) ->
     case proplists:get_value(terminal, Opt, false) of
 	true ->
 	    S = io_lib:format(Prompt, [loctoline(Line)]),
-	    string:pad(" ", length(S));
+	    string:pad(" ", length(S)),
+	    S;
 	false ->
 	    ""
     end.
