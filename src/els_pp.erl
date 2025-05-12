@@ -78,6 +78,11 @@ pptr([S], {LLevel, LChar}, {RLevel, RChar}, _Direction) ->
     {NL, NR} = {LLevel, RLevel},
     R = pptr(S, {NL+1, LChar}, {NR+1, RChar}, both),
     [R];
+pptr([H|T], {LLevel, LChar}, {RLevel, RChar}, _Direction) when not is_list(T) ->
+    Head =  pptr(H, {LLevel+1, LChar} ,{0, RChar}, open),
+    Last =  pptr(T, {0, LChar} ,{RLevel+1, RChar}, close),
+    Middle = [#item{type=atom, value="."}],
+    lists:append([[Head], Middle, [Last]]);
 pptr(S, {LLevel, LChar}, {RLevel, RChar}, _Direction) when is_list(S) ->
     Head =  pptr(hd(S), {LLevel+1, LChar} ,{0, RChar}, open),
     Last =  pptr(lists:last(S), {0, LChar} ,{RLevel+1, RChar}, close),
@@ -163,7 +168,8 @@ ppsexp([#item{value="(defun"}=H1, #item{}=H2 | Clauses]) ->
 ppsexp(S) when is_list(S), length(S) > 2 ->
     [H1,H2|T] = S,
     H1S = ppsexp(H1),
-    Indent = length("("++prettypr:format(H1S)),
+%%    Indent = length("("++prettypr:format(H1S)),
+    Indent = 2,
     H2S = ppsexp(H2),
     Seps = lists:map(fun(E) ->
                              ppsexp(E)
@@ -198,6 +204,8 @@ ppsexp(I) when is_integer(I) ->
 escape(S) ->
     string:replace(S, "\"", "\\\"", all).
 
+erl_to_ast([H|T]) when not is_list(T) ->
+    [erl_to_ast(H) | erl_to_ast(T)];
 erl_to_ast(T) when is_list(T) ->
     S = try lists:all(fun(E) when is_integer(E) andalso 
                                   E =< 1114111 andalso 
@@ -241,6 +249,7 @@ erl_to_ast(T) when is_function(T) ->
     #item{type=string, value=erlang:fun_to_list(T)};
 erl_to_ast(T) when is_atom(T) ->
     #item{type=atom, value=lists:flatten(io_lib:format("~p", [T]))}.
+
     
 -define(T(X), prettypr:text(X)).
 

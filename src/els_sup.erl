@@ -31,10 +31,11 @@ init([]) ->
                  period => 1},
     ChildSpecs = [childspec()],
     %ChildSpecs = [],
+    io:format("started"),
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions
 childspec() ->
-    #{id => erllisp_repl,
-      start => {repl, tty, []}     
+    #{id => els_repl,
+      start => {els_repl, tty, []}     
       }.

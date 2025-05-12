@@ -1392,19 +1392,19 @@ getmodfun(#item{type=Type, value=X, loc=Loc}) when Type == atom; Type== module_f
     
 list_(X, L, Env) ->
     R = lists:map(fun(Elem) ->
-                          io:format("List Term ~p~n", [Elem]),
+                          %%io:format("List Term ~p~n", [Elem]),
                           A=sterm(Elem, Env),
-                          io:format("List TermAfter ~p~n", [A]),
+                          %%io:format("List TermAfter ~p~n", [A]),
                           A
                   end, L),
     Loc = X#item.loc,
     erl_syntax:set_pos(erl_syntax:list(R), Loc).
 
 quote_(X, [E], _Env) ->
-    io:format("quote ~p ~p~n", [X, E]),
+    %%io:format("quote ~p ~p~n", [X, E]),
     #item{loc=Pos} = X,
     R = term_to_ast(E, Pos, _Env, true),
-    io:format("quote_ R: ~p~n", [R]),
+    %%io:format("quote_ R: ~p~n", [R]),
     R.
     
 %backquote_(X, [E], _Env)  -> 

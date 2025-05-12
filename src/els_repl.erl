@@ -67,9 +67,15 @@ register_function(Ast, Env) ->
 
 env_to_binding(Env) ->
     BindList = proplists:get_value(binding, Env, []),
-    lists:foldl(fun({K, V}, Acc) ->
-			erl_eval:add_binding(K, V, Acc)
-		end, erl_eval:new_bindings(), BindList).
+    A = lists:foldl(fun({K, V}, Acc) ->
+			    erl_eval:add_binding(K, V, Acc)
+		    end, erl_eval:new_bindings(), BindList),
+    EnvBinding = lists:filter(fun({env, _}) -> false;
+				 (_) -> true
+			      end, BindList),
+    NewEnv = [{binding, EnvBinding} | proplists:delete(binding, Env)],
+    %%io:format("IO: ~p~n", [EnvBinding]),
+    erl_eval:add_binding(env, NewEnv, A).
 
 execute(Revert, Env) ->
     case is_ddl(Revert) of
@@ -80,6 +86,7 @@ execute(Revert, Env) ->
         false ->
 	    Fun = els_localfun:create_valuefun(proplists:get_value(macros, Env, #{})),
 	    Binding = env_to_binding(Env),
+	    %%io:format("Binding ~p ~n", [Binding]),
             {value, Result, NBinding} = erl_eval:expr(Revert, Binding, {value, Fun}),
 	    {value, Result, env_update(binding, NBinding, Env)}
     end.
@@ -115,7 +122,7 @@ get_line(Env) ->
     
 repl_one(IN, OUT, Line, Env, Acc) ->
     %%io:format("REPLONE: ~p~n Env: ~p~n", [Line, Env]),
-    case  els_scan:read(IN, "erlisp[~B]> ", Line, [], 0) of
+    case  els_scan:read(IN, "els[~B]> ", Line, [], 0) of
 	{ok, Tokens, NextLine, _Rest} ->
 	    %%?LOG_DEBUG(#{nextline=> NextLine}),
 	    %%io:format("Repl_one: ~p~n", [Tokens]),
@@ -142,8 +149,13 @@ repl_one(IN, OUT, Line, Env, Acc) ->
 
 
 source_acc(Io, Out, Nline, Env0, RetAcc, OutFun) ->
-    %% io:format("SA: ~p~n", [Env0]),
-    case repl_one(Io, Out, Nline, Env0, RetAcc) of
+    %%io:format("SA: ~p~n", [Env0]),
+    V = fun(Name, Args) ->
+		Env0
+	end,
+    K = {env,0},
+    Env1 = env_update(macros, maps:put(K, {local, V}, env_get(macros, Env0)), Env0),
+    case repl_one(Io, Out, Nline, Env1, RetAcc) of
 	{value, Ret, Env} ->
 	    OutFun(Out, {value, Ret, Env}),
 	    source_acc(Io, Out, get_line(Env), Env, Ret, OutFun);
@@ -170,14 +182,18 @@ source(Src, Opt) ->
     Line = proplists:get_value('?Line', Opt, 1),
     io:format("Source: Line ~p~n", [Line]),
     Io = tiny_io_server:start_link(Src),
-    {value, Ret, Env} = source_acc(Io, Io, Line, Opt, [], fun(_Out, E) -> E end),
+    {value, Ret, Env} = source_acc(Io, Io, Line, init(Opt), [], fun(_Out, E) -> E end),
     tiny_io_server:stop(Io),
     {value, Ret, Env}.
 
 
+init(Env) ->
+    Macros = #{},
+    [{macros, Macros}].
+
 tty() ->
     S = logger:get_primary_config(),
     logger:update_primary_config(S#{level => debug}),
-    repl(standard_io, standard_io, 1, []).
+    repl(standard_io, standard_io, 1, init([])).
 
     

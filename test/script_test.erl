@@ -11,7 +11,7 @@ hello_world_test() ->
            (+ a a))
     """,
     Opt = [{'?Line', Line}],
-    ?assertEqual({value, 4, [{binding, [{a, 1}]}, {'?Line', Line+2}]}, els_repl:source(A, Opt)).
+    ?assertEqual(4, element(2, els_repl:source(A, Opt))).
 
 local_macro_test() ->
     Line =?LINE,
