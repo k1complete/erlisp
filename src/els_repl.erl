@@ -7,7 +7,8 @@
          execute/2,
 	 eval/2,
 	 source/2,
-        local_function_hander/2]).
+	 extract_record_module/2,
+	 local_function_hander/2]).
 -define(TABLE(), lobby).
 -define(DEFAULT_MODULE(), lobby).
 
@@ -77,17 +78,32 @@ env_to_binding(Env) ->
     %%io:format("IO: ~p~n", [EnvBinding]),
     erl_eval:add_binding(env, NewEnv, A).
 
+get_record_defs(Env) ->
+    proplists:get_value(record_defs, Env, []).
+add_record_defs(Env, Ast) ->
+    env_update(record_defs, [Ast| get_record_defs(Env)], Env).
+
 execute(Revert, Env) ->
+    RecordDefs = get_record_defs(Env),
     case is_ddl(Revert) of
+        {ok, record, {Name, Body}} ->
+	    io:format("DEFRECORD ~p~n", [Revert]),
+	    NewEnv = add_record_defs(Env, Revert),
+            {value, [ok, record, Name], NewEnv};
         {ok, FunName, Arity} ->
-	    {_NewAst, NewEnv} = register_function(Revert, Env),
+	    Revert2 = extract_record_function(RecordDefs, Revert),
+	    {_NewAst, NewEnv} = register_function(Revert2, Env),
+	    %%{_NewAst, NewEnv} = register_function(Revert, Env),
 	    io:format("registered ~p ~n Env ~p~n", [_NewAst, NewEnv]),
             {value, [ok, FunName, Arity], NewEnv};
         false ->
 	    Fun = els_localfun:create_valuefun(proplists:get_value(macros, Env, #{})),
 	    Binding = env_to_binding(Env),
-	    %%io:format("Binding ~p ~n", [Binding]),
-            {value, Result, NBinding} = erl_eval:expr(Revert, Binding, {value, Fun}),
+	    [Revert2] = extract_record_module(RecordDefs, [Revert]),
+	    io:format("Revert2: ~p~nRevert: ~p~n", [Revert2, Revert]),
+	    io:format("Binding ~p ~n", [Binding]),
+            %%{value, Result, NBinding} = erl_eval:expr(Revert, Binding, {value, Fun}),
+            {value, Result, NBinding} = erl_eval:expr(Revert2, Binding, {value, Fun}),
 	    {value, Result, env_update(binding, NBinding, Env)}
     end.
 
@@ -195,5 +211,25 @@ tty() ->
     S = logger:get_primary_config(),
     logger:update_primary_config(S#{level => debug}),
     repl(standard_io, standard_io, 1, init([])).
+
+    
+extract_record_module(RecordDefs, Trees) ->
+    F = erl_syntax:function(erl_syntax:atom("function_test"),
+			    [erl_syntax:clause([], none, Trees)]),
+    Cls = extract_record_clause(RecordDefs, F),
+    Bodies = erl_syntax:clause_body(hd(Cls)),
+    Bodies.
+			 
+extract_record_clause(RecordDefs, Clause) ->
+    B = extract_record_function(RecordDefs, Clause),
+    Cls = erl_syntax:function_clauses(B).
+
+extract_record_function(RecordDefs, Function) ->
+    Rds = lists:map(fun(E) ->
+			    erl_syntax:revert(E)
+		    end, RecordDefs),
+    F2 = erl_syntax:revert(Function),
+    B = erl_expand_records:module(Rds++[F2], []), 
+    lists:last(B).
 
     
