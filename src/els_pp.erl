@@ -41,24 +41,39 @@ npp({H}, _Left, _Right, none) ->
 %%    io:format("~p~n", [S]),
 %%    pps(S).
 pp(S) ->
-    R = pptr(S, {0, "("}, {0, ")"}, none),
+    R = pptr(S, "", "", none),
     B = ppsexp(R),
     prettypr:format(B).
 
-ppliteral(Value, {LLevel, LChar}, {_RLevel, _RChar}, open) ->
-    Chars = lists:foldl(fun(_E, A) -> A++LChar end, [], lists:seq(1,LLevel)),
-    %%io:format("ppliteral-l: ~p ~p~n", [Value, Chars]),
-    Chars ++ Value;
-ppliteral(Value, {_LLevel, _LChar}, {RLevel, RChar}, close) ->
-    Chars = lists:foldl(fun(_E, A) -> A++RChar end, [], lists:seq(1,RLevel)),
-    %%io:format("ppliteral-r: ~p ~p~n", [Value, Chars]),
-    Value ++ Chars;
-ppliteral(Value, {LLevel, LChar}, {RLevel, RChar}, both) ->
-    %%io:format("ppliteral-b: ~p ~p~n", [Value, {LLevel, RLevel}]),
-    R = ppliteral(Value, {LLevel, LChar}, {RLevel, RChar}, open),
-    ppliteral(R, {LLevel, LChar}, {RLevel, RChar}, close);
-ppliteral(Value, _, _, none) ->
-    Value.
+ppliteral(Value, LChar, RChar, _Dir) ->
+    LChar++Value++RChar.
+
+detect_paren_and_body(S) ->
+    case S of
+	#item{type=atom, value="list"} ->
+	    {"[", "]", #item{value="", type=atom}};
+	#item{type=atom, value="tuple"} ->
+	    {"{", "}", #item{value="", type=atom}};
+	#item{type=atom, value="map"} ->
+	    {"#{", "}", #item{value="", type=atom}};
+	_ ->
+	    {"(", ")", S}
+    end.
+
+paren_control(S, L, R) ->
+    case S of
+	[S3] ->
+	    Head = pptr(S3, L,R, both),
+	    [Head];
+	_ ->
+	    Head = pptr(hd(S), L, "", open),
+	    Last =  pptr(lists:last(S), "", R, close),
+	    Middle = lists:map(fun(E) ->
+				       pptr(E, "", "", none)
+			       end,
+			       lists:sublist(S, 2, length(S) - 2)),
+	    lists:append([[Head], Middle, [Last]])
+    end.
 
 pptr(#item{type=integer, value=V}=S, L, R, Direction) ->
     S#item{value=ppliteral(V, L, R, Direction)};
@@ -74,27 +89,29 @@ pptr(V, L, R, Direction) when is_integer(V)  ->
     #item{value=ppliteral(integer_to_list(V), L, R, Direction), type=integer};
 pptr(V, L, R, Direction) when is_float(V)  ->
     #item{value=ppliteral(float_to_list(V), L, R, Direction), type=float};
-pptr([S], {LLevel, LChar}, {RLevel, RChar}, _Direction) ->
-    {NL, NR} = {LLevel, RLevel},
-    R = pptr(S, {NL+1, LChar}, {NR+1, RChar}, both),
+pptr([S], LChar, RChar, _Direction) ->
+    {NL, NR} = {"(", ")"},
+    R = pptr(S, LChar++NL, NR++RChar, both),
     [R];
-pptr([H|T], {LLevel, LChar}, {RLevel, RChar}, _Direction) when not is_list(T) ->
-    Head =  pptr(H, {LLevel+1, LChar} ,{0, RChar}, open),
-    Last =  pptr(T, {0, LChar} ,{RLevel+1, RChar}, close),
+pptr([H|T], LChar, RChar, _Direction) when not is_list(T) ->
+    Head =  pptr(H, LChar ++ "(" , "", open),
+    Last =  pptr(T, "", ")" ++ RChar, close),
     Middle = [#item{type=atom, value="."}],
     lists:append([[Head], Middle, [Last]]);
-pptr(S, {LLevel, LChar}, {RLevel, RChar}, _Direction) when is_list(S) ->
-    Head =  pptr(hd(S), {LLevel+1, LChar} ,{0, RChar}, open),
-    Last =  pptr(lists:last(S), {0, LChar} ,{RLevel+1, RChar}, close),
-    Middle = lists:map(fun(E) ->
-                               pptr(E, {0, LChar}, {0, RChar}, none)
-                       end,
-                       lists:sublist(S, 2, length(S) - 2)),
-    lists:append([[Head], Middle, [Last]]).
+pptr(S, LChar, RChar, _Direction) when is_list(S) ->
+    H = hd(S),
+    {NL, NR, H2} = detect_paren_and_body(H),
+    case H2 of
+	#item{value=""} ->
+	    S2 = tl(S),
+	    paren_control(S2, LChar ++ NL, NR ++ RChar);
+	_ ->
+	    paren_control(S, LChar ++ NL, NR ++ RChar)
+    end.
 
 form(S) ->
     S1 = ?MODULE:erl_to_ast(S),
-    S2 = pptr(S1, {0, "("}, {0, ")"}, none),
+    S2 = pptr(S1, "", "", none),
     ?MODULE:ppsexp(S2).
 
 format(S, Column) ->

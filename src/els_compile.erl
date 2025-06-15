@@ -5,6 +5,34 @@
 -export([file/2, file/1, file_ast/2
         ]).
 
+-spec formcompile(list(), list(), list()) -> {erl_syntax:syntaxTree(), list(), list()}.
+formcompile(Form, Errors, Env) ->
+    io:format("PRE: ~p~nEnv:(~p)~n", [Form, Env]),
+    R = els_transpile:form(Form, Env),
+    M = proplists:get_value(macros, Env),
+    case els_localfun:register_local_func(R, M) of
+	{FunDic, Name, Arity} ->
+	    LocalF = els_localfun:create_valuefun(FunDic),
+	    MName = els_localfun:strip_macroname_string(Name),
+	    io:format("NName(~p):Name(~p)~n", [MName, Name]),
+	    AName = atom_to_list(Name),
+	    NewMacros = if AName =/= MName ->
+				maps:put(
+				  {MName, Arity},
+				  {{local},  LocalF}, M);
+			   true ->
+				io:format("LocalFDic ~p~n",
+					  [FunDic]),
+				FunDic
+			end,
+	    OEnv = proplists:delete(macros, Env),
+	    NewEnv = [{macros, NewMacros}|OEnv],
+	    {R, {Errors, NewEnv}};
+	_ ->
+	    {R, {Errors, Env}}
+    end.
+
+
 -spec file(string()) -> {ok, module(), binary()}.
 file(File) ->
     file(File, []).
@@ -19,30 +47,7 @@ file(File, Opt) ->
     Env=[{macros, #{}}],
     {Ast0, {Errors, _Env}} = lists:mapfoldl(fun(F, {A, E}) ->
 					  try
-					      io:format("PRE: ~p~nEnv:(~p)~n", [F, E]),
-					      R = els_transpile:form(F, E),
-					      M = proplists:get_value(macros, E),
-					      case els_localfun:register_local_func(R, M) of
-						  {FunDic, Name, Arity} ->
-						      LocalF = els_localfun:create_valuefun(FunDic),
-						      MName = els_localfun:strip_macroname_string(Name),
-						      io:format("NName(~p):Name(~p)~n", [MName, Name]),
-						      AName = atom_to_list(Name),
-						      NewMacros = if AName =/= MName ->
-									  maps:put(
-									    {MName, Arity},
-									    {{local},  LocalF}, M);
-								     true ->
-									  io:format("LocalFDic ~p~n",
-										    [FunDic]),
-									  FunDic
-								  end,
-						      OEnv = proplists:delete(macros, E),
-						      NewEnv = [{macros, NewMacros}|OEnv],
-						      {R, {A, NewEnv}};
-						  _ ->
-						      {R, {A, E}}
-					      end
+					      formcompile(F, A, E)
 					  catch
 					      throw:Error when is_list(Error) ->
 						  io:format("catched : ~p~n", [Error]),
@@ -59,8 +64,6 @@ file(File, Opt) ->
     {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
     io:format("compiled ~p~n", [Binary]),
     {ok, Module, Binary, Ast}.
-
-    
 
 			
 %%
@@ -121,18 +124,14 @@ file_ast(File, Opt) ->
 -spec extract_specs(list(erl_syntax:tree())) -> map().
 extract_specs(Trees) ->
     R = lists:filtermap(fun(E) ->
-                                case erl_syntax:type(E) of
-                                    attribute ->
-                                        case erl_syntax:atom_name(erl_syntax:attribute_name(E)) of
-                                            "spec" ->
-                                                {attribute, _, spec, {FA, S}} = E,
-                                                {true, {FA, S}};
-                                            _ ->
-                                                false
-                                        end;
-                                    _ ->
-                                        false
-                                end
+                                case erl_syntax:type(E) == attribute andalso 
+				    erl_syntax:atom_name(erl_syntax:attribute_name(E)) == "spec" of
+				    true ->
+					{attribute, _, spec, {FA, S}} = E,
+					{true, {FA, S}};
+				    _ ->
+					false
+				end
                         end, Trees),
     maps:from_list(R).
 
