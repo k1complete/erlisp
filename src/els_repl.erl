@@ -86,7 +86,7 @@ add_record_defs(Env, Ast) ->
 execute(Revert, Env) ->
     RecordDefs = get_record_defs(Env),
     case is_ddl(Revert) of
-        {ok, record, {Name, Body}} ->
+        {ok, record, {Name, _Body}} ->
 	    io:format("DEFRECORD ~p~n", [Revert]),
 	    NewEnv = add_record_defs(Env, Revert),
             {value, [ok, record, Name], NewEnv};
@@ -136,7 +136,7 @@ add_line(Env, Line) ->
 get_line(Env) ->
     proplists:get_value('?Line', Env, 0).
     
-repl_one(IN, OUT, Line, Env, Acc) ->
+repl_one(IN, _OUT, Line, Env, Acc) ->
     %%io:format("REPLONE: ~p~n Env: ~p~n", [Line, Env]),
     case  els_scan:read(IN, "els[~B]> ", Line, [], 0) of
 	{ok, Tokens, NextLine, _Rest} ->
@@ -166,7 +166,7 @@ repl_one(IN, OUT, Line, Env, Acc) ->
 
 source_acc(Io, Out, Nline, Env0, RetAcc, OutFun) ->
     %%io:format("SA: ~p~n", [Env0]),
-    V = fun(Name, Args) ->
+    V = fun(_Name, _Args) ->
 		Env0
 	end,
     K = {env,0},
@@ -183,7 +183,7 @@ source_acc(Io, Out, Nline, Env0, RetAcc, OutFun) ->
 	    {value, Ret, Env}
     end.
 
-output(Out, {value, Value, Env}) ->
+output(Out, {value, Value, _Env}) ->
     io:format(Out, "~s~n", [els_pp:format(Value, 80)]);
 output(Out, Error) ->
     io:format(Out, "~p~n", [Error]).
@@ -203,7 +203,7 @@ source(Src, Opt) ->
     {value, Ret, Env}.
 
 
-init(Env) ->
+init(_Env) ->
     Macros = #{},
     [{macros, Macros}].
 
@@ -222,7 +222,7 @@ extract_record_module(RecordDefs, Trees) ->
 			 
 extract_record_clause(RecordDefs, Clause) ->
     B = extract_record_function(RecordDefs, Clause),
-    Cls = erl_syntax:function_clauses(B).
+    erl_syntax:function_clauses(B).
 
 extract_record_function(RecordDefs, Function) ->
     Rds = lists:map(fun(E) ->

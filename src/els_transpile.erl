@@ -1439,10 +1439,10 @@ map_field(E, Env) ->
     
 map_(#item{loc=Loc}, L, Env) ->
     {MapFields, _R, _Len} = 
-	lists:foldl(fun([#item{value="=>", loc=VLoc}, K, V], {A, _K, I}) ->
+	lists:foldl(fun([#item{value="=>", loc=VLoc}, K, V], {A, _K, _I}) ->
 			    R = erl_syntax:map_field_assoc(sterm(K, Env), sterm(V, Env)),
 			    {[erl_syntax:set_pos(R, VLoc)| A], [], 1};
-		      ([#item{value=":=", loc=VLoc}, K, V], {A, _K, I}) ->
+		      ([#item{value=":=", loc=VLoc}, K, V], {A, _K, _I}) ->
 			    R = erl_syntax:map_field_exact(sterm(K, Env), sterm(V, Env)),
 			    {[erl_syntax:set_pos(R, VLoc)| A], [], 1};
 		      (V, {A, _K, I}) when I rem 2 == 1 ->

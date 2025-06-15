@@ -88,7 +88,6 @@ Erlang code.
 
 -include_lib("els_scan.hrl").
 -include_lib("els.hrl").
-%%-export([tokenizer/2]).
 -export([file/2]).
 %%-export([read_balance/4]).
 %%-export([read/3]).
@@ -168,7 +167,7 @@ replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
                  N2Tokens ++ [{')', Loc}]],
     {ok, NewTokens, NextLine, N2Rest}.
 
-make_prompt(IO, [], _Line, _PrevTokens) ->
+make_prompt(_IO, [], _Line, _PrevTokens) ->
     "";
 make_prompt(IO, Prompt, Line, []) ->
     Opt = io:getopts(IO),
