@@ -9,6 +9,9 @@ symbol module_function
 integer float string 
 underscore 
 '(' ')' 
+'{' '}' 
+'#{' 
+'[' ']' 
 '\'' 
 '\.'.
 %% ',' 
@@ -34,6 +37,26 @@ expression ->
         %% io:format("Exp0 ~p~n", ['$1']), 
         '$1'.
 
+sexpression ->
+    '{' '}' : 
+	io:format("{{}}", []),
+	[setline("tuple", '$1')].
+sexpression ->
+    '{' elements '}' : 
+	io:format("{{}}", []),
+	[setline("tuple", '$1') | '$2' ].
+sexpression ->
+    '#{' '}' : 
+	[setline("map", '$1')].
+sexpression ->
+    '#{' elements '}' : 
+	[setline("map", '$1') | '$2' ].
+sexpression ->
+    '[' ']' : 
+	[setline("list", '$1')].
+sexpression ->
+    '[' elements ']' : 
+	[setline("list", '$1') | '$2' ].
 sexpression ->
     '(' ')' : nil.
 sexpression ->

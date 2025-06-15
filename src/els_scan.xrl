@@ -9,7 +9,7 @@ Griph=[-+*=#/\|:]
 PostAlphabet = ({Alphabet}|{Digits}|{Griph})
 Symbols = ([-+/*\|\?a-z]{PostAlphabet}*|:bf)
 %Op = (\+\+|\-\-|==|/=|=<|<|>=|>|=:=|=/=|\+|-|\*|/|!|<-|<=|:=)
-Op = (\+\+|\-\-|==|/=|=<|<|>=|>|=:=|=/=|\+|-|\*|/|!|<-|<=|:=|\?=|=)
+Op = (\+\+|\-\-|==|/=|=<|<|>=|>|=:=|=/=|\+|-|\*|/|!|<-|<=|:=|=>|\?=|=)
 Variables = [A-Z_]{PostAlphabet}*
 WhiteSpace = [\s\t]+
 MQ = \"\"\"
@@ -17,6 +17,7 @@ MQ = \"\"\"
 QString = \"([^\"]|\\\")+\"
 
 LineFeed = \n
+
 Rules.
 %tokenrules
 {Digits} :
@@ -35,8 +36,19 @@ Rules.
   {token, {symbol, TokenLoc, TokenChars}}.
 #r :
   {token, {symbol, TokenLoc, TokenChars}}.
-# :
-  {token, {symbol, TokenLoc, TokenChars}}.
+\[ : 
+  {token, {'[', TokenLoc}}.
+\] : 
+  {token, {']', TokenLoc}}.
+#\{ : 
+  io:format("OK"),
+  {token, {'#{', TokenLoc}}.
+\{ : 
+  io:format("OK"),
+  {token, {'{', TokenLoc}}.
+\} : 
+  io:format("OK!!"),
+  {token, {'}', TokenLoc}}.
 \:\: : 
   {token, {symbol, TokenLoc, TokenChars}}.
 \( :
@@ -57,6 +69,9 @@ Rules.
   {end_token, {read_macro, TokenLoc, 'backquote'}}.
 \! :
   {token, {'!', TokenLoc}}.
+# :
+  {token, {symbol, TokenLoc, TokenChars}}.
+
 {MQ} :
   {end_token, {'"""', TokenLoc}}.
 {QString} :
@@ -85,7 +100,8 @@ Erlang code.
 %%-export([replace/5]).
 -export([read/5]).
 -export([replace/5]).
-
+-define(IS_OPEN(X), is_map_key(X, #{'(' => 1, '{' => 1, '#{' => 1, '[' => 1})).
+-define(IS_CLOSE(X), is_map_key(X, #{')' => 1, '}' => 1, ']' => 1})).
 
   
 calclevel(IO, Prompt0, Tokens, GLevel, Line) ->
@@ -97,11 +113,11 @@ calclevel(IO, Prompt0, Tokens, GLevel, Line) ->
 do_calclevel(_IO, _Prompt0, [], {Acc, PreLevel}, Line) ->
 %%    io:format("calc-out ): ~p ~p ~n", [PreLevel, Acc]),
     {Acc, PreLevel, [], Line};
-do_calclevel(IO, Prompt0, [{'(', _Loc} =T | Tokens], {Acc, PreLevel}, Line) ->
+do_calclevel(IO, Prompt0, [{X, _Loc} =T | Tokens], {Acc, PreLevel}, Line) when ?IS_OPEN(X) ->
     do_calclevel(IO, Prompt0, Tokens, {Acc ++ [T], PreLevel+1}, Line);
-do_calclevel(_IO, _Prompt0, [{')', _Loc} =T | Tokens], {Acc, PrevLevel}, Line) when PrevLevel =< 1 ->
+do_calclevel(_IO, _Prompt0, [{X, _Loc} =T | Tokens], {Acc, PrevLevel}, Line) when PrevLevel =< 1, ?IS_CLOSE(X) ->
     {Acc ++ [T], PrevLevel-1, Tokens, Line};
-do_calclevel(IO, Prompt0, [{')', _Loc} =T | Tokens], {Acc, PreLevel}, Line) ->
+do_calclevel(IO, Prompt0, [{X, _Loc} =T | Tokens], {Acc, PreLevel}, Line) when ?IS_CLOSE(X) ->
 %%    io:format("calc-apply ): ~p ~p ~p ~n", [PreLevel, Acc, Tokens]),
     do_calclevel(IO, Prompt0, Tokens, {Acc ++ [T], PreLevel-1}, Line);
 do_calclevel(IO, Prompt0, [{read_macro, Loc, MChar}], {Acc, PreLevel}, _Line) ->

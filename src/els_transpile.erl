@@ -1417,29 +1417,42 @@ unquote_(X, _L, _Env) ->
     X.
 
 mapp_(#item{loc=Loc}, L, Env) ->
-    MapElem = lists:map(fun([#item{loc=VLoc, value="=>"}, K, V]) ->
-				R = erl_syntax:map_field_assoc(sterm(K, Env), sterm(V, Env)),
-				erl_syntax:set_pos(R, VLoc);
-			   ([#item{loc=VLoc, value=":="}, K, V]) ->
-				R = erl_syntax:map_field_exact(sterm(K, Env), sterm(V, Env)),
-				erl_syntax:set_pos(R, VLoc)
+    io:format("mapp-- ~p~n", [L]),
+    MapElem = lists:map(fun(Elem) ->
+				map_field(Elem, Env)
 			end, L),
     erl_syntax:set_pos(erl_syntax:map_expr(MapElem), Loc).
 
 % (map k1 v1 k1 v1)
 % (map k1 v1 k1 v1)
 % (map k1 v1 k1 v1 (:= k3 v3))
+
+
+map_field([#item{value="=>", loc=VLoc}, K, V], Env) ->
+    R = erl_syntax:map_field_assoc(sterm(K, Env), sterm(V, Env)),
+    erl_syntax:set_pos(R, VLoc);
+map_field([#item{value=":=", loc=VLoc}, K, V], Env) ->
+    R = erl_syntax:map_field_exact(sterm(K, Env), sterm(V, Env)),
+    erl_syntax:set_pos(R, VLoc);
+map_field(E, Env) ->
+    sterm(E, Env).
+    
 map_(#item{loc=Loc}, L, Env) ->
-    LForm = lists:map(fun(E) ->
-                              sterm(E, Env)
-                      end, L),
-    {MapFields, _R, _Len} =  lists:foldl(fun(E, {A, _K, I}) when  I rem 2 == 1 ->
-                                                 {A, E, I+1};
-                                            (E, {A, K, I}) ->
-                                                 S = erl_syntax:map_field_assoc(K, E),
-                                                 S2 = erl_syntax:set_pos(S, erl_syntax:get_pos(K)),
-                                                 {[S2|A], [], I+1}
-                                         end, {[], [], 1}, LForm),
+    {MapFields, _R, _Len} = 
+	lists:foldl(fun([#item{value="=>", loc=VLoc}, K, V], {A, _K, I}) ->
+			    R = erl_syntax:map_field_assoc(sterm(K, Env), sterm(V, Env)),
+			    {[erl_syntax:set_pos(R, VLoc)| A], [], 1};
+		      ([#item{value=":=", loc=VLoc}, K, V], {A, _K, I}) ->
+			    R = erl_syntax:map_field_exact(sterm(K, Env), sterm(V, Env)),
+			    {[erl_syntax:set_pos(R, VLoc)| A], [], 1};
+		      (V, {A, _K, I}) when I rem 2 == 1 ->
+			    {A, V, I+1};
+		      (V, {A, K, I}) when I rem 2 == 0 ->
+			    Key = sterm(K, Env),
+			    VLoc = erl_syntax:get_pos(Key),
+			    R = erl_syntax:map_field_assoc(Key, sterm(V, Env)),
+			    {[erl_syntax:set_pos(R, VLoc)| A], [], 1}
+		   end, {[], [], 1}, L),
     erl_syntax:set_pos(erl_syntax:map_expr(lists:reverse(MapFields)), Loc).
 tuple_(#item{loc=Loc}, L, Env) ->
     LForm = lists:map(fun(E) ->
