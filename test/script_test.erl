@@ -13,6 +13,28 @@ hello_world_test() ->
     Opt = [{'?Line', Line}],
     ?assertEqual(4, element(2, els_repl:source(A, Opt))).
 
+bind_error_test() ->
+    Line =?LINE,
+    A = """
+        (= #{ (:= 'k1 {1 b})} #{'k0 0 'k1 {1 3} 'k2 2})
+    """,
+    Binding = erl_eval:add_binding(b, 2, erl_eval:new_bindings()),
+    io:format("---- Binding ~p~n", [Binding]),
+    Opt = [{'?Line', Line}, {binding, Binding}],
+    ?assertThrow({error, {badmatch, #{k0:= 0,k1 := {1,3},k2 := 2}}, _},
+		 element(2, els_repl:source(A, Opt))).
+
+
+bind_error2_test() ->
+    Line =?LINE,
+    A = """
+        (= a {1 3})
+    """,
+    Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
+    Opt = [{'?Line', Line}, {binding, Binding}],
+    ?assertEqual({1, 3},
+		 element(2,els_repl:source(A, Opt))).
+
 local_macro_test() ->
     Line =?LINE,
     A = """
