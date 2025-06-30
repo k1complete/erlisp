@@ -5,6 +5,9 @@
 
 -define(TQ(Line, T), merl:quote(Line, T)).
 
+nrevert(X) ->
+    erl_syntax:revert(erl_syntax_lib:map(fun(Y) -> Y end, X)).
+			    
 length_test() ->
     Line = ?LINE,
     {ok, Tokens, _Lines} = els_scan:string("(length (cons 1 (cons 2 nil)))", Line),
@@ -26,7 +29,8 @@ lists_reverse2_test() ->
     {ok, Tokens, _Lines} = els_scan:string("(lists:reverse (quote (1 2 3)))", Line),
     {ok, [Tree]} = els_parser:parse(Tokens),
     C4=els_transpile:form(Tree, []),
-    C5=?TQ(Line, "lists:reverse([1,2,3])"),
+    C50 =?TQ(Line, "lists:reverse([1,2,3])"),
+    C5 = nrevert(C50),
     ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
 lists_reverse3_test() ->
@@ -35,7 +39,8 @@ lists_reverse3_test() ->
     %io:format(standard_error, "lists_reverse3_test ~p~n", [Tokens]),
     {ok, [Tree]} = els_parser:parse(Tokens),
     C4=els_transpile:form(Tree, []),
-    C5=?TQ(Line, "lists:reverse([1,2,3])"),
+    C50 =?TQ(Line, "lists:reverse([1,2,3])"),
+    C5 = nrevert(C50),
     ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
     
 quote_macro_test() ->
@@ -44,7 +49,8 @@ quote_macro_test() ->
     io:format("QM macro ~p~n", [Tokens]),
     {ok, [Tree]} = els_parser:parse(Tokens),
     C4=els_transpile:form(Tree, []),
-    C5 = ?TQ(Line, "[a, 'A', 1]"),
+    C50 = ?TQ(Line, "[a, 'A', 1]"),
+    C5 = nrevert(C50),
     ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
     
 
@@ -77,7 +83,8 @@ quote_list_test() ->
     {ok, Tokens, _Lines} = els_scan:string("(quote ((quote a) A 1))", Line),
     {ok, [Tree]} = els_parser:parse(Tokens),
     C4=els_transpile:form(Tree, []),
-    C5 = ?TQ(Line, "[[quote, a], 'A', 1]"),
+    C50 = ?TQ(Line, "[[quote, a], 'A', 1]"),
+    C5 = nrevert(C50),
     ?assertEqual(erl_syntax:revert(C5), erl_syntax:revert(els_transpile:locline(C4))).
     
 defun_form_test() ->
@@ -174,7 +181,8 @@ call_function_test() ->
     {ok, Tokens, _Lines} = els_scan:string(lists:flatten(Cmd), Line),
     {ok, [Tree]} = els_parser:parse(Tokens),
     C4=els_transpile:form(Tree, []),
-    C5 = merl:quote(Line, "hd([1,2,3])"),
+    C50 = erl_syntax:revert(merl:quote(Line, "hd([1,2,3])")),
+    C5 = nrevert(C50),
     ?assertEqual(C5, erl_syntax:revert(els_transpile:locline(C4))).
 
 macro_test() ->
@@ -202,7 +210,7 @@ macro_test() ->
                    ),
     C5= {cons,1,
          {atom,1,'!='},
-         {cons,1,{integer,1,1},{cons,2,{integer,2,2},{nil,2}}}},
+         {cons,1,{integer,1,1},{cons,2,{integer,2,2},{nil,0}}}},
     ?assertEqual(C5, erl_syntax:revert(C4)).
 
 
@@ -217,22 +225,27 @@ macro_2_test() ->
                                {integer,2,2},
                                {nil,2}}}}},
                     #{"==" => fun(L) ->
+				      io:format("==before ~p~n", [L]),
                                       H = erl_syntax:list_head(L),
                                       T = erl_syntax:list_tail(L),
+				      RT=erl_syntax:copy_pos(H, T),
                                       NH = erl_syntax:atom("!="),
                                       NNH=erl_syntax:copy_pos(H, NH),
-                                      R=erl_syntax:cons(NNH, T),
+                                      R=erl_syntax:cons(NNH, RT),
                                       RR=erl_syntax:copy_pos(H, R),
+				      io:format("==after ~p~n", [RR]),
                                       RR
                               end}
                    ),
+    io:format("C4: ~p~n", [C4]),
+    io:format("C4: ~p~n", [C4]),
     C5= {cons,1,
          {atom,1,'!='},
          {cons,1,{integer,1,1},
           {cons,1,
            {atom,1,'!='},
            {cons, 2, 
-            {integer,2,2},{nil,2}}}}},
+            {integer,2,2},{nil,0}}}}},
     ?assertEqual(C5, erl_syntax:revert(C4)).
 
 

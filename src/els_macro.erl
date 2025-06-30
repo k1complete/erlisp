@@ -40,6 +40,7 @@ expand_form(Form, MacroEnv) ->
                             end, T),
     Form2=erl_syntax:cons(H, erl_syntax:copy_pos(T, RT)),
     Form3=erl_syntax:copy_pos(Form, Form2),
+    io:format("Expand ~p~n", [Form3]),
     case erl_syntax:type(H) of
         atom ->
             _EA=expand_apply(Form3, erl_syntax:atom_name(H), MacroEnv);

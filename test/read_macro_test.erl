@@ -8,7 +8,8 @@ quote_test() ->
     {ok, Tokens, _Line} = els_scan:from_string("(lists:reverse '(1 2 3))", Line),
     {ok, [Tree]} = els_parser:parse(Tokens),
     C = els_transpile:form(Tree, []),
-    Expect = merl:quote(Line, "lists:reverse([1,2,3])"),
+    Expect0 = merl:quote(Line, "lists:reverse([1,2,3])"),
+    Expect = erl_syntax:revert(erl_syntax_lib:map(fun(X) -> X end, Expect0)),
     ?assertEqual(Expect,
                  erl_syntax:revert(els_transpile:locline(C))).
 
@@ -37,8 +38,12 @@ backquote_unquote_form_test() ->
     io:format("Line: [~p]~p~n", [Tokens, Line]),
     {ok, [Tree]} = els_parser:parse(Tokens),
     C = els_transpile:form(Tree, []),
-    Expect = merl:quote(Line, ["lists:reverse([a, b])"]),
-    ?assertEqual(Expect, erl_syntax:revert(els_transpile:locline(C))).
+    Expect0 = merl:quote(Line, ["lists:reverse([a, b])"]),
+    Expect = erl_syntax_lib:map(fun(none) ->
+					none;
+				   (Y) -> Y 
+				end, Expect0),
+    ?assertEqual(erl_syntax:revert(Expect), erl_syntax:revert(els_transpile:locline(C))).
 
 backquote_general_test() ->    
     Line = 1,

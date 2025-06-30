@@ -26,7 +26,9 @@ process(Expected, Got) ->
 %     erl_prettypr:format(Trees)}.
     Mr = merl:quote(Line, Expected),
     io:format("transpiled: ~p~n~p~n", [Trees, Mr]),
-    {merl:quote(Line, Expected),
+    MM = merl:quote(Line, Expected),
+    MMM = erl_syntax_lib:map(fun(Y) -> Y end, MM),
+    {erl_syntax:revert(MMM),
      erl_syntax:revert(loctoline(Trees))}.
 
    

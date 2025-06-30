@@ -1,11 +1,15 @@
 -module(els_repl).
 -include_lib("els.hrl").
 -export([
+	 start/1,
+	 start/0,
          repl/4,
          init/0,
          tty/0,
+         tty/1,
          execute/2,
 	 eval/2,
+	 start_tty/1,
 	 source/2,
 	 extract_record_module/2,
 	 local_function_hander/2]).
@@ -16,6 +20,21 @@ compile_and_register(Tab, Module, PreAst) ->
     {ok, Beam} = merl:compile_and_load(PreAst, [debug_info, export_all]),
     ets:insert(Tab, {Module, Beam}),
     {ok, Module, Beam}.
+
+start() ->
+    start([]).
+
+start(Args) ->
+    ok = shell:start_interactive({?MODULE, start_tty, [Args]}),
+    %%io:format("Plain ~p~n", [init:get_plain_arguments()]),
+    %%io:format("Arguments ~p~n", [init:get_arguments()]),
+    %%io:format("Params ~p~n", [Args]),
+    timer:sleep(infinity).
+
+start_tty(Args) ->
+    spawn(fun() ->
+		  tty(Args)
+	  end).
 
 init() ->
     Tab = ets:new(?TABLE(), [named_table]),
@@ -192,6 +211,7 @@ output(Out, Error) ->
     
 repl(Io, Out, Line, Env0) ->
     try 
+	io:format("opt: ~p~n ~p~n", [Io, io:getopts(Io)]),
 	source_acc(Io, Out, Line, Env0, [], fun output/2)
     catch
 	throw:{error, Reason,Env1} ->
@@ -205,7 +225,12 @@ source(Src, Opt) ->
     logger:update_primary_config(S#{level => info}),
     Line = proplists:get_value('?Line', Opt, 1),
     io:format("Source: Line ~p~n", [Line]),
-    Io = tiny_io_server:start_link(Src),
+    Io = case Src of
+	     standard_io ->
+		 standard_io;
+	     _ ->
+		 tiny_io_server:start_link(Src)
+    end,
     Returns = source_acc(Io, Io, Line, init(Opt), [], fun(_Out, E) -> E end),
     tiny_io_server:stop(Io),
     %%%{value, Ret, Env}.
@@ -217,9 +242,15 @@ init(_Env) ->
     [{macros, Macros}|_Env].
 
 tty() ->
+    tty([]).
+
+tty(Args) ->
+    io:format("Args: ~p~n", [Args]),
     S = logger:get_primary_config(),
+    io:format("getopts ~p~n", [io:getopts(standard_io)]),
+    io:format("keymap ~p~n", [edlin:keymap()]),
     logger:update_primary_config(S#{level => debug}),
-    repl(standard_io, standard_io, 1, init([])).
+    repl(standard_io, standard_io, 1, init(Args)).
 
     
 extract_record_module(RecordDefs, Trees) ->
