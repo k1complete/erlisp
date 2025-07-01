@@ -12,10 +12,8 @@ version(A, B) ->
 compile(A) ->
     B = maps:get(file, A),
     lists:map(fun(E) ->
-		      BeamFileName = filename:basename(E, ?ElsExt) ++ ?BeamExt,
-		      {ok, Module, Beam, Ast} = els_compile:file(E),
-		      ok = file:write_file(BeamFileName, Beam, [write]),
-		      io:format("compile <~s>: <~p>~n", [BeamFileName, Module])
+		      {ok, Module, Beam, Ast} = els_compile:file_ast(E,[]),
+		      io:format("compile <~s>~n", [ Module])
 	      end, B),
     halt(0).
     

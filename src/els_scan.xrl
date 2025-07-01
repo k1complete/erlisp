@@ -13,7 +13,7 @@ Op = (\+\+|\-\-|==|/=|=<|<|>=|>|=:=|=/=|\+|-|\*|/|!|<-|<=|:=|=>|\?=|=)
 Variables = [A-Z_]{PostAlphabet}*
 WhiteSpace = [\s\t]+
 MQ = \"\"\"
-%MString = {MQ}(\n|.)*{MQ}
+MString = {MQ}[\n.]+{MQ}
 QString = \"([^\"]|\\\")+\"
 
 LineFeed = \n
@@ -73,16 +73,17 @@ Rules.
   {token, {symbol, TokenLoc, TokenChars}}.
 
 {MQ} :
-  {end_token, {'"""', TokenLoc}}.
+  {token, {'"""', TokenLoc}}.
 {QString} :
   [_|String] = lists:droplast(TokenChars),
   {token, {string, TokenLoc, String}}.
 
 {WhiteSpace} :
   skip_token.
+
 {LineFeed} :
   {end_token, {'\n', TokenLoc}}.
-  %%skip_token.
+%%  %%skip_token.
 
 Erlang code.
 
@@ -204,7 +205,7 @@ adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line) ->
             {ok, Tokens, NewLine, Rest} 
     end.
 
-read_multiline(IO, Line, Add, Stop) ->
+read_multiline(IO, Line, Add, Stop, Col) ->
     case io:get_line(IO, "") of
         {error, Error} ->
             {error, Error};
@@ -213,19 +214,25 @@ read_multiline(IO, Line, Add, Stop) ->
         Stop ->
             {Add, Line+1};
         Data ->
-            %io:format("GetLine ~p vi ~p ~p~n", [Stop, Data, Stop=:=Data]),
-            read_multiline(IO, Line+1, string:concat(Add ,Data), Stop)
+	    SS = string:slice(Data, Col-1),
+	    io:format("GetLine ~p FFF ~p ~p ~p ~p~n", [Stop, Data, Stop=:=Data, SS, Col]),
+	    case SS of
+		Stop ->
+		    {Add, Line+1};
+		Rest ->
+		    io:format("GetLine ~p vi ~p ~p~n", [Stop, Data, Stop=:=Data]),
+		    read_multiline(IO, Line+1, string:concat(Add ,Rest), Stop, Col)
+	    end
     end.
 
 multiline_quote(IO, Line, Tokens) ->
-    case lists:last(Tokens) of
-        {'"""', _} ->
+    case hd(Tokens) of
+        {'"""', {_, Col}} ->
+	    io:format("--------\n", []),
             {MT, L} = read_multiline(IO, Line, "",
-                                     "\"\"\"\n"),
-            MM = {lists:append(lists:droplast(Tokens),
-                               [{string, Line, MT}]),
-                  L},
-            %io:format("REST: ~p n ~p~n", [Tokens,MM]),
+                                     "\"\"\"\n", Col),
+            MM = {[{string, Line, MT}],L},
+	    io:format("REST: ~p n ~p~n", [Tokens,MM]),
             MM;
         _ ->
             {Tokens, Line}
@@ -243,6 +250,7 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
             %%?LOG_DEBUG(#{prevlevel => PrevLevel,
 	    %%prevtokens => PrevTokens,
 	    %%newtokens => NewTokens}),
+	    io:format("get tokens ~p~n", [NewTokens]),
             {NewTokens2, NextLine2} =  multiline_quote(IO, NextLine, NewTokens),
             %%?LOG_DEBUG(#{adjust_level => PrevTokens++NewTokens2}),
             %adjust_level(IO, Prompt0, PrevTokens++NewTokens2, PrevLevel, NextLine2);

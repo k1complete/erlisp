@@ -461,8 +461,8 @@ module_(X, L, _E) ->
          end,
     E2.
 %% spec form
-%% (-spec functionname (argname1 type1) 
-%%           (or (argname1 type2) (argname3 type3)) ) (when (exp)) 
+%% (-spec functionname (argname1 :: type1) 
+%%           (or (argname1 :: type2) (argname3 :: type3)) ) (when (exp)) 
 %%         returntype)
 %% (-spec Funname Arg1 Result1 Args2 Result2... When)
 spec_(X, L, E) ->
