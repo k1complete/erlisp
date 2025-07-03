@@ -2,7 +2,7 @@
 
 -include_lib("els.hrl").
 -include_lib("els_docs.hrl").
--export([file/2, file/1, file_ast/2
+-export([file/2, file/1, file_ast/2, file_ast/3
         ]).
 
 -spec formcompile(list(), list(), list()) -> {erl_syntax:syntaxTree(), list(), list()}.
@@ -95,6 +95,9 @@ file(File, Opt) ->
 
 -spec compile_and_write_beam(sexp(), options()) -> {module, module(), binary()}.
 compile_and_write_beam(Ast, Options) ->
+    compile_and_write_beam(Ast, Options, #{}).
+
+compile_and_write_beam(Ast, Options, CompileOpt) ->
     SS = merl:compile_and_load(Ast, Options),
     ?LOG_DEBUG(#{compile2 => erl_syntax:revert_forms(Ast), options=>Options, ss => SS}),
     {ok, Binary} =SS,
@@ -105,18 +108,27 @@ compile_and_write_beam(Ast, Options) ->
     {ok, Module, Chunks} = beam_lib:all_chunks(Binary),
     ChunksAdded = lists:append(Chunks, [{"Docs", term_to_binary(DocsV1)}]),
     {ok, Binary2} = beam_lib:build_module(ChunksAdded),
-    ModuleName = atom_to_list(Module),
-    File = ModuleName ++ ".beam",
+
+    File = make_output_file_name(Module, CompileOpt),
+
     file:write_file(File, Binary2),
     code:ensure_loaded(Module),
     {module, Module, Binary2}.
 
-				      
+make_output_file_name(Module, CompileOpt) ->				      
+    File = atom_to_list(Module) ++ ".beam",
+    filename:join([maps:get(outputdir, CompileOpt, "."), File]).
+
+
     
 -spec file_ast(string, options()) -> {module, module(), binary(), sexp()}.
 file_ast(File, Opt) ->
+    file_ast(File, Opt, #{}).
+
+
+file_ast(File, Opt, CompileOpt) ->
     {ok, Module, _Binary, Ast} = file(File, Opt),
-    {module, Module, Binary2} = compile_and_write_beam(Ast, Opt),
+    {module, Module, Binary2} = compile_and_write_beam(Ast, Opt, CompileOpt),
     {ok, Module, Binary2, Ast}.
 %    {ok, Module, Binary, Ast}.
 

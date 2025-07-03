@@ -12,7 +12,7 @@ version(A, B) ->
 compile(A) ->
     B = maps:get(file, A),
     lists:map(fun(E) ->
-		      {ok, Module, Beam, Ast} = els_compile:file_ast(E,[]),
+		      {ok, Module, Beam, Ast} = els_compile:file_ast(E,[], A),
 		      io:format("compile <~s>~n", [ Module])
 	      end, B),
     halt(0).
@@ -61,7 +61,11 @@ main(Args) ->
 		  "compile" => 
 		      #{help=>"compile file",
 			arguments =>
-			    [#{name => file,
+			    [#{name => outputdir,
+			       long => "-outputdir",
+			       help => "set output dir",
+			       type => string},
+			     #{name => file,
 			       nargs => all,
 			       type => string}],
 			handler => fun(A) -> 
