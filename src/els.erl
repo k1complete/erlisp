@@ -63,6 +63,7 @@ main(Args) ->
 			arguments =>
 			    [#{name => outputdir,
 			       long => "-outputdir",
+			       short => $o,
 			       help => "set output dir",
 			       type => string},
 			     #{name => file,

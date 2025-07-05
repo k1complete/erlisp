@@ -211,12 +211,12 @@ output(Out, Error) ->
     
 repl(Io, Out, Line, Env0) ->
     try 
-	io:format("opt: ~p~n ~p~n", [Io, io:getopts(Io)]),
+	%% io:format("opt: ~p~n ~p~n", [Io, io:getopts(Io)]),
 	source_acc(Io, Out, Line, Env0, [], fun output/2)
     catch
 	throw:{error, Reason,Env1} ->
 	    Line1 = proplists:get_value('?Line', Env1, 1),
-	    output(Out, {error, Reason, Env1}),
+	    output(Out, {error, Reason, #{}}),
 	    repl(Io, Out, Line1, Env1)
     end.
 						

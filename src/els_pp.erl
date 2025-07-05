@@ -10,6 +10,8 @@
 -export([npp/4]).
 -export([erlast_to_str/2]).
 
+-define(LISTMAX, 10).
+
 
 npp([H], Left, Right, Direct) ->
     io:format("in single open ~p ~p~n", [H, {Left, Right, Direct}]),
@@ -75,6 +77,9 @@ paren_control(S, L, R) ->
 	    lists:append([[Head], Middle, [Last]])
     end.
 
+
+pptr(#item{type=binary, value=V}=S, L, R, Direction) ->
+    S#item{value=ppliteral(V, L, R, Direction)};
 pptr(#item{type=integer, value=V}=S, L, R, Direction) ->
     S#item{value=ppliteral(V, L, R, Direction)};
 pptr(#item{type=atom, value=V}=S, L, R, Direction) ->
@@ -188,9 +193,18 @@ ppsexp(S) when is_list(S), length(S) > 2 ->
 %%    Indent = length("("++prettypr:format(H1S)),
     Indent = 2,
     H2S = ppsexp(H2),
+    T2 = case length(T) > ?LISTMAX of
+	     true ->
+		 lists:sublist(T, ?LISTMAX-2) ++ [#item{type=string, value="..."}, lists:last(T)];
+	     _ ->
+		 T
+	 end,
     Seps = lists:map(fun(E) ->
                              ppsexp(E)
-                     end, T),
+                     end, T2),
+%%    Seps = lists:map(fun(E) ->
+%%                             ppsexp(E)
+%%                     end, T),
     prettypr:par([H1S, H2S, prettypr:sep(Seps)], Indent);
 ppsexp(S) when is_list(S) andalso length(S) == 2 ->
     Pars = lists:map(fun(E) ->
