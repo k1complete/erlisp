@@ -171,7 +171,7 @@ make_function_spec(Tree, Specs, MetaData) ->
 	    A = lists:map(fun(E) ->
 				  els_typespec:variable_titled(E)
 			  end, SpecAsts),
-	    maps:put(spec, [{attribute, 0, spec, {{Name, Arity}, A}}], MetaData)
+	    maps:put(signature, [{attribute, 0, spec, {{Name, Arity}, A}}], MetaData)
     end.
     
 -spec make_function_signature(erl_syntax:tree(), map()) -> signature().
