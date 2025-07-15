@@ -250,7 +250,7 @@ read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
             %%?LOG_DEBUG(#{prevlevel => PrevLevel,
 	    %%prevtokens => PrevTokens,
 	    %%newtokens => NewTokens}),
-	    io:format("get tokens ~p~n", [NewTokens]),
+	    %% io:format("get tokens ~p~n", [NewTokens]),
             {NewTokens2, NextLine2} =  multiline_quote(IO, NextLine, NewTokens),
             %%?LOG_DEBUG(#{adjust_level => PrevTokens++NewTokens2}),
             %adjust_level(IO, Prompt0, PrevTokens++NewTokens2, PrevLevel, NextLine2);

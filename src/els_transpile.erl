@@ -1363,7 +1363,7 @@ call_function(Fun=#item{value=_X, loc=Loc}, T, E) ->
                 [{'F', F},
                  {'FHead', FHead}]);
         _ ->
-            io:format("MQMF: ~p ~n FUN: ~p ~n arg: ~p~n", [M, F, FHead]),
+            %%io:format("MQMF: ~p ~n FUN: ~p ~n arg: ~p~n", [M, F, FHead]),
             ?MQP(Loc, "'@M':'@F'(_@FHead)", 
                 [{'M', M},
                  {'F', F},

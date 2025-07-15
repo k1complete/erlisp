@@ -2,7 +2,8 @@
 
 -include_lib("els.hrl").
 -include_lib("els_docs.hrl").
--export([file/2, file/1, file_ast/2, file_ast/3
+-export([file/2, file/1, file_ast/2, file_ast/3,
+	 extract_specs/3
         ]).
 
 -spec formcompile(list(), list(), list()) -> {erl_syntax:syntaxTree(), list(), list()}.
@@ -141,6 +142,26 @@ extract_specs(Trees) ->
 				    true ->
 					{attribute, _, spec, {FA, S}} = E,
 					{true, {FA, S}};
+				    _ ->
+					false
+				end
+                        end, Trees),
+    maps:from_list(R).
+
+-spec extract_specs(list(erl_syntax:tree()), atom(), integer()) -> map().
+extract_specs(Trees, Function, Arity) ->
+    R = lists:filtermap(fun(E) ->
+                                case erl_syntax:type(E) == attribute andalso 
+				    erl_syntax:atom_name(erl_syntax:attribute_name(E)) == "spec"
+				of
+				    true ->
+					{attribute, _, spec, {{F, A}, S}} = E,
+					case {F, A} of
+					    {Function, Arity} ->
+						{true, {{F, A}, S}};
+					    _ ->
+						false
+					end;
 				    _ ->
 					false
 				end

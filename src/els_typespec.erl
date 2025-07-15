@@ -1,6 +1,6 @@
 -module(els_typespec).
 -include_lib("els.hrl").
--export([to_string/1, to_list/1, fun_to_string/2, fun_to_list/3, fun_to_list/2,
+-export([to_string/1, to_list/1, to_list/2, fun_to_string/2, fun_to_list/3, fun_to_list/2,
         to_binary/1]).
 -export([rep/2, fun_clause_arity/3]).
 -export([fun_to_string2/3]).
@@ -133,14 +133,21 @@ to_list({type, _, 'product', Args}, F) ->
 to_list({type, _, 'bounded_fun', [Ft, Fc]}, F) ->
     Constraint = lists:map(fun(E) -> to_list(E, F) end, Fc),
     Ftype = to_list(Ft, F),
-    sexp_to_list([Ftype,Constraint], F);
+    sexp_to_list([Ftype,[F('when') | Constraint]], F);
 to_list({type, _, 'bounded_fun', Args}, F) ->
     ArgsM = [ hd(Args), {atom, 0, '::'}|tl(Args)],
     sexp_to_list(lists:map(fun(E) ->
                                      to_list(E, F)
                              end, ArgsM), F);
 to_list({type, _, 'constraint', [{atom, _, 'is_subtype'}, [V, T]]}, F) ->
-    ['when', to_list(V, F), '::', to_list(T, F)];
+    M = case is_list(T) of 
+	    true ->
+		io:format("LIST ~p~n", [T]),
+		lists:map(fun(E) -> to_list(E, F) end, T);
+	    false ->
+		to_list(T, F)
+	end,
+    [to_list(V, F), F('::'), M];
 
 to_list({type, _, 'fun', [{type, _, product, Args}, Ret]}, F) ->
     io:format("FUNPRO: ~p~n", [Args]),
@@ -157,13 +164,24 @@ to_list({type, _, 'fun', Args}, F) ->
                   end, Args),
     io:format("FUNRET: ~p~n", [[A, Return]]),
     [A, Return];
+to_list({type, _, 'union', List}, F) ->
+    [F('|') | lists:map(fun(E) ->  to_list(E) end, List)];
 to_list({type, _, 'list', Args}, F) ->
     ArgsM = lists:map(fun(E) -> to_list(E, F) end, Args),
-    ['list', ArgsM];
+    [F('list')| ArgsM];
+to_list({type, _, 'tuple', any}, F) ->
+    [F('tuple'), [F('any')]];
+to_list({type, _, 'tuple', Args}, F) ->
+    ArgsM = lists:map(fun(E) -> to_list(E, F) end, Args),
+    [F('tuple')| ArgsM];
 to_list({type, _, 'integer', []}, F) ->
-    F(integer);
+    F([F(integer)]);
+to_list({type, _, 'pos_integer', []}, F) ->
+    F([F(pos_integer)]);
 to_list({type, _, 'atom', []}, F) ->
-    F('atom');
+    F([F('atom')]);
+to_list({type, _, 'term', []}, F) ->
+    F([F('term')]);
 to_list({atom, _, A}, F)->
     F(A).
 
@@ -216,7 +234,6 @@ builtin_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
 	  "float"=>0},
     case maps:get(Name, M, userdefined) of
 	userdefined ->
-	    io:format("Name: ~p~n", [Name]),
 	    case els_util:getmodfun(T) of
 		{undef, FA} ->
 		    ArgumentsAst = lists:map(fun(A) -> rep(A, E) end, Param),
@@ -226,7 +243,6 @@ builtin_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
 		    erl_syntax:set_pos(erl_syntax:type_application(MA, FA, ArgumentsAst), Loc)
 	    end;
 	{"binary", ParamTerm} ->
-	    io:format("B ~p: ~p~n", [T, ParamTerm]),
 	    ArgumentsAst = lists:map(fun(A) -> rep(A, E) end, ParamTerm),
 	    MF = make_module_qualifier(T#item{value="binary"}),
 	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc);
@@ -280,7 +296,7 @@ builtin_rep(#item{type=atom, loc=Loc, value=Name}=T, Param, E) ->
 	    MF = make_module_qualifier(T),
 	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc);
 	X  ->
-	    io:format("X : ~p~n", [X]),
+	    %%io:format("X : ~p~n", [X]),
 	    ArgumentsAst = lists:map(fun(A) -> rep(A, E) end, Param),
 	    MF = make_module_qualifier(T#item{value=X}),
 	    erl_syntax:set_pos(erl_syntax:type_application(MF, ArgumentsAst), Loc)
@@ -303,11 +319,11 @@ record_field_rep([#item{type=atom} = Name, #item{value="::", loc=Loc}, Type], E)
 rep([#item{type=atom, loc=Loc}=N, #item{type=atom, value="::"}, [T | Arguments]], E) ->
     %%Nast = term_make_atom(N),
     Nast = els_util:term_make_variable(N),
-    io:format("anonted ~p~n~p~n", [T, Arguments]),
+    %%io:format("anonted ~p~n~p~n", [T, Arguments]),
     Type = case builtin_rep(T, Arguments, E) of
 	       userdefined ->
 		   %%userdefined(T, Arguments);
-		   io:format("T ~p~n Arguments~p~n", [T, Arguments]),
+		   %%io:format("T ~p~n Arguments~p~n", [T, Arguments]),
 		   
 		   userdefined;
 	       R -> R
@@ -331,7 +347,7 @@ rep(T, _E) when is_integer(T) ->
     erl_syntax:integer(T);
 %% builtin types and (bitstring M N), (nil), 
 %%         (lambda), (lambda any_arity T_0), (lamnbda (a b) T_0)
-%%         (lamnbda (a b) T_0 (when type))
+%%         (lamnbda (a b) T_0 when (var :: type) (var :: type)
 %%         (.. M N) 
 %%         (map) (map (=> k v)) (map (:= k v)
 %%         (Op integer integer)
@@ -342,11 +358,11 @@ rep(T, _E) when is_integer(T) ->
 %%         (| T1 T2 ...) 
 %%         else... userdefined type
 rep([#item{type=atom}=T|Arguments], E) ->
-    io:format("in ~p~n~p~n", [T, Arguments]),
+    %%io:format("in ~p~n~p~n", [T, Arguments]),
     case builtin_rep(T, Arguments, E) of
 	userdefined ->
 	    %%userdefined(T, Arguments);
-	    io:format("T ~p~n Arguments~p~n", [T, Arguments]),
+	    %%io:format("T ~p~n Arguments~p~n", [T, Arguments]),
 	    userdefined;
 	R -> R
     end;
@@ -369,22 +385,24 @@ fun_clause_arity([], #{funtype := Acc, arity := ArgLen}, _E, _Loc) ->
 fun_clause_arity([Param, Ret|Rest], #{funtype := Acc}, E, Loc) ->
     Return = els_typespec:rep(Ret, E),
     Args = lists:map(fun(Elem) ->
-			     io:format("argn: ~p~n", [Elem]),
+			     %%io:format("argn: ~p~n", [Elem]),
 			     els_typespec:rep(Elem, E)
                      end, Param),
     FFtype = erl_syntax:set_pos(erl_syntax:function_type(Args, Return), Loc),
     io:format("fun_clause_arity ~p~n", [Rest]),
     {FT, Rest3} = case Rest of 
-		      [[#item{value="when"} | WhenValue]| Rest2] ->
-			  Constraint = function_constraint(WhenValue, E),
-			  {erl_syntax:set_pos(erl_syntax:constrained_function_type(FFtype, Constraint), Loc), 
-			   Rest2};
+		      [[#item{value="when", type=atom} | WhenValues] | Rest2] ->
+			  Cls = function_constraint(WhenValues, E),
+			  V=erl_syntax:constrained_function_type(FFtype, Cls), 
+			  VS = erl_syntax:set_pos(V, Loc),
+			  {VS, Rest2};
 		       _ ->
-			   {FFtype, Rest}
+			  {FFtype, Rest}
 		  end,
     io:format("fun_clause_arity Result ~p~n", [FT]),
     FF = erl_syntax:revert(FT),
     io:format("fun_clause_arity RFF ~p~n", [FF]),
+    io:format("fun_clause_arity Rest3 ~p~n", [Rest3]),
     fun_clause_arity(Rest3, #{funtype => [FF|Acc], arity => length(Args)}, E, Loc).
 
 function_constraint(When, Env) ->
