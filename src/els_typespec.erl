@@ -148,7 +148,6 @@ to_list({type, _, 'constraint', [{atom, _, 'is_subtype'}, [V, T]]}, F) ->
 		to_list(T, F)
 	end,
     [to_list(V, F), F('::'), M];
-
 to_list({type, _, 'fun', [{type, _, product, Args}, Ret]}, F) ->
     %% io:format("FUNPRO: ~p~n", [Args]),
     Return = to_list(Ret, F),
@@ -164,20 +163,24 @@ to_list({type, _, 'fun', Args}, F) ->
                   end, Args),
     io:format("FUNRET: ~p~n", [[A, Return]]),
     [A, Return];
-to_list({type, _, 'union', List}, F) ->
+to_list({type, _, 'union', List}, F) when is_list(List) ->
     [F('|') | lists:map(fun(E) ->  to_list(E) end, List)];
-to_list({type, _, 'list', Args}, F) ->
-    ArgsM = lists:map(fun(E) -> to_list(E, F) end, Args),
-    [F('list')| ArgsM];
 to_list({type, _, 'tuple', any}, F) ->
     [F('tuple'), [F('any')]];
-to_list({type, _, UserType, Args}, F) ->
-    [F(UserType) | lists:map(fun(E) ->  to_list(E) end, Args)];
-to_list({type, _, 'tuple', Args}, F) ->
+%%to_list({type, _, 'tuple', Args}, F) when is_list(Args) ->
+%%    ArgsM = lists:map(fun(E) -> to_list(E, F) end, Args),
+%%    [F('tuple')| ArgsM];
+%%to_list({type, _, 'list', Args}, F) when is_list(Args) ->
+%%    ArgsM = lists:map(fun(E) -> to_list(E, F) end, Args),
+%%    [F('list')| ArgsM];
+to_list({type, _, ContainerType, Args}, F) when is_list(Args) ->
     ArgsM = lists:map(fun(E) -> to_list(E, F) end, Args),
-    [F('tuple')| ArgsM];
-to_list({type, _, Atom, []}, F) when is_atom(Atom) ->
-    F([F(Atom)]);
+    [F(ContainerType) | ArgsM];
+to_list({type, _, UserType, Args}, F) when is_atom(UserType), is_list(Args)  ->
+    ArgsM = lists:map(fun(E) -> to_list(E, F) end, Args),
+    %%[F(ContainerType) | ArgsM];
+    %%F([F(UserType)]);
+    [F(UserType) | ArgsM ];
 to_list({atom, _, A}, F)->
     F(A).
 
