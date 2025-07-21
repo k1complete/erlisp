@@ -71,17 +71,17 @@ create_args(N) ->
 
 build_signature(Module, Function, Arity, Ast) ->
     RawSpecMap = get_spec(Module, Function, Arity, Ast),
-    io:format("R ~p~n", [RawSpecMap]),
+    %% io:format("R ~p~n", [RawSpecMap]),
     StrFunction = atom_to_list(Function),
     SpecList = case maps:get({Function, Arity}, RawSpecMap, notfound) of
 		   notfound ->
 		       [#item{type=atom, value=StrFunction} | create_args(Arity)];
 		   M ->
-		       io:format("S ~p~n", [M]),
+		       %% io:format("S ~p~n", [M]),
 		       S = els_typespec:to_list(hd(M), fun makefun/1),
 		       [#item{type=atom, value="-spec"}, [#item{type=atom, value=StrFunction} |hd(S)]] ++ tl(S)
 	       end,
-    io:format("SpecList ~p~n", [SpecList]),
+    %% io:format("SpecList ~p~n", [SpecList]),
     els_pp:pp(SpecList).
 
 build_signature(Module, Function, Arity) ->

@@ -41,13 +41,10 @@ Rules.
 \] : 
   {token, {']', TokenLoc}}.
 #\{ : 
-  io:format("OK"),
   {token, {'#{', TokenLoc}}.
 \{ : 
-  io:format("OK"),
   {token, {'{', TokenLoc}}.
 \} : 
-  io:format("OK!!"),
   {token, {'}', TokenLoc}}.
 \:\: : 
   {token, {symbol, TokenLoc, TokenChars}}.

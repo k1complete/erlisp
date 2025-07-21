@@ -39,11 +39,11 @@ expression ->
 
 sexpression ->
     '{' '}' : 
-	io:format("{{}}", []),
+	%%io:format("{{}}", []),
 	[setline("tuple", '$1')].
 sexpression ->
     '{' elements '}' : 
-	io:format("{{}}", []),
+	%%io:format("{{}}", []),
 	[setline("tuple", '$1') | '$2' ].
 sexpression ->
     '#{' '}' : 
@@ -93,7 +93,7 @@ term ->
 term ->
     '\'' term : 
         A=[setline("quote", '$1'), '$2'],
-        io:format("Term Quote ~p~n", [A]),
+        %%io:format("Term Quote ~p~n", [A]),
         A.
 
 

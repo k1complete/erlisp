@@ -150,12 +150,12 @@ to_list({type, _, 'constraint', [{atom, _, 'is_subtype'}, [V, T]]}, F) ->
     [to_list(V, F), F('::'), M];
 
 to_list({type, _, 'fun', [{type, _, product, Args}, Ret]}, F) ->
-    io:format("FUNPRO: ~p~n", [Args]),
+    %% io:format("FUNPRO: ~p~n", [Args]),
     Return = to_list(Ret, F),
     A = lists:map(fun(E) ->
                           to_list(E, F)
                   end, Args),
-    io:format("FUNRET: ~p~n", [[A, Return]]),
+    %% io:format("FUNRET: ~p~n", [[A, Return]]),
     [A, Return];
 to_list({type, _, 'fun', Args}, F) ->
     io:format("FUN: ~p~n", [Args]),
@@ -171,17 +171,13 @@ to_list({type, _, 'list', Args}, F) ->
     [F('list')| ArgsM];
 to_list({type, _, 'tuple', any}, F) ->
     [F('tuple'), [F('any')]];
+to_list({type, _, UserType, Args}, F) ->
+    [F(UserType) | lists:map(fun(E) ->  to_list(E) end, Args)];
 to_list({type, _, 'tuple', Args}, F) ->
     ArgsM = lists:map(fun(E) -> to_list(E, F) end, Args),
     [F('tuple')| ArgsM];
-to_list({type, _, 'integer', []}, F) ->
-    F([F(integer)]);
-to_list({type, _, 'pos_integer', []}, F) ->
-    F([F(pos_integer)]);
-to_list({type, _, 'atom', []}, F) ->
-    F([F('atom')]);
-to_list({type, _, 'term', []}, F) ->
-    F([F('term')]);
+to_list({type, _, Atom, []}, F) when is_atom(Atom) ->
+    F([F(Atom)]);
 to_list({atom, _, A}, F)->
     F(A).
 

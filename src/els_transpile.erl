@@ -1312,7 +1312,7 @@ lambda_(_X, [[#item{type=atom, value=_N, loc=Loc}|_ArgT]=Args|Rest]=_L, E) ->
     MQ = ?MQP(Loc, "fun(_@@params) -> _@@body end", 
               [{'params', Params},
                {'body', Body}]),
-    io:format("lambda: ~p~n", [MQ]),
+    %%io:format("lambda: ~p~n", [MQ]),
     MQ;
 lambda_(#item{loc=Loc} = _X, L, E) ->
     Clauses = lists:map(fun(LE) ->
