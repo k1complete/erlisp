@@ -124,7 +124,7 @@ to_list({var, _, Arg}, F) ->
 to_list({ann_type, _, [Name| Args]}, F) ->
     sexp_to_list(lists:map(fun(E) ->
                                      to_list(E, F)
-                             end, [Name, {atom,0, "::"} |Args]), F);
+                             end, [Name, {atom,0, '::'} |Args]), F);
 to_list({type, _, 'product', Args}, F) ->
     ArgsM = [ hd(Args), {atom, 0, '::'}|tl(Args)],
     sexp_to_list(lists:map(fun(E) ->

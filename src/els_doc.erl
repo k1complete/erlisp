@@ -7,6 +7,43 @@
 	render_function/3,
 	doc/3]).
 
+literal_convert(E) ->
+    S = binary:bin_to_list(E),
+    io:format("Before: ~p~n", [S]),
+    {ok,Tokens, _Line} = erl_scan:string(S),
+    {ok, ExprList} = erl_parse:parse_exprs(Tokens),
+    Expr=hd(ExprList),
+    io:format("Exp: ~p~n", [Expr]),
+    SS = els_pp:erl_to_ast(Expr),
+    io:format("Item: ~p~n", [SS]),
+    SSS = els_pp:pp(SS),
+    SBin = binary:list_to_bin(SSS),
+    io:format("pp: ~p~n", [SBin]),
+    SBin.
+
+-spec consolidate_doc(Doc) -> Doc2 
+	      when Doc :: binary(),
+		   Doc2 :: binary().
+consolidate_doc(Doc) ->
+    Lines = re:split(Doc, <<"\n">>, [{return, binary}]),
+    {_, Doc2} = lists:foldl(fun(<<"```erlang">> = E, {normal, Acc}) ->
+				    {open, [E|Acc]};
+			       (<<"```">> = E, {_, Acc}) ->
+				    {normal, [E|Acc]};
+			       (E, {normal, Acc}) ->
+				    {normal, [E|Acc]};
+			       (E, {open, Acc}) ->
+				    case re:run(E, <<"^(?<Prompt>[0-9]+\> )(?<Request>.*)$">>, 
+						[{capture, all_names,binary}]) of
+					nomatch ->
+					    Exp = binary:join([E, <<".">>], <<"">>),
+					    {open, [literal_convert(Exp)| Acc]};
+					{match, [Prompt, Request]} -> 
+					    {open, [binary:join([Prompt, literal_convert(Request)], <<"">>) | Acc]}
+				    end
+			    end, {normal, []}, Lines),
+    binary:join(lists:reverse(Doc2), <<"\n">>).
+
 render_function(Function, Arity, Docs) ->
     {docs_v1, _MAnno, _Lang, _Format, _MDoc, _Meta, DocList} = Docs,
     [{{_K, _F, _A}, _Anno, Sig, Doc, _M}] = 
@@ -19,8 +56,11 @@ render_function(Function, Arity, Docs) ->
 			  end
 		     end,
 		     DocList),
-    SigN = lists:flatten(lists:join(<<"\n">>, Sig)),
-    io:format("~s~n~n~s~n", [SigN, maps:get(<<"en">>, Doc)]).
+    SigN = binary:join(Sig, <<"\n">>),
+    DocB = consolidate_doc(maps:get(<<"en">>, Doc)),
+    DocEls = #{<<"en">> => DocB},
+    io:format("Doc ~p~n", [Doc]),
+    io:format("~s~n~n~s~n", [SigN, maps:get(<<"en">>, DocEls)]).
     
 
 get_doc_v1(Module, Function, Arity) ->
@@ -57,6 +97,7 @@ doc(Module, Function, Arity) ->
 	DocV1 ->
 	    render_function(Function, Arity, DocV1)
     end.
+
 	
     
 makefun(E) when is_atom(E) ->

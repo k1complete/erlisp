@@ -30,7 +30,8 @@ get_doc_v1_test() ->
     S2 = els_doc:get_doc_v1(lists, reverse, 1),
     io:format("getops ~p~n", [io:getopts()]),
     D = els_doc:render_function(reverse, 1, S2),
-    ?assertEqual(ok, D).
+    io:format("Doc ~p~n", [D]),
+    ?assertEqual(ok , D).
     
 build_signature_more_test() ->
     A = {type,{1385,16},

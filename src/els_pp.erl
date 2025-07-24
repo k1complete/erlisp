@@ -80,8 +80,8 @@ paren_control(S, L, R) ->
 
 pptr(#item{type=binary, value=V}=S, L, R, Direction) ->
     S#item{value=ppliteral(V, L, R, Direction)};
-pptr(#item{type=integer, value=V}=S, L, R, Direction) ->
-    S#item{value=ppliteral(V, L, R, Direction)};
+pptr(#item{type=integer, value=V}=S, L, R, Direction) when is_integer(V) ->
+    S#item{value=ppliteral(integer_to_list(V), L, R, Direction)};
 pptr(#item{type=atom, value=V}=S, L, R, Direction) ->
     S#item{value=ppliteral(V, L, R, Direction)};
 pptr(#item{type=variable, value=V}=S, L, R, Direction) ->
@@ -256,6 +256,30 @@ erl_to_ast(T) when is_list(T) ->
                               erl_to_ast(E)
                       end, T)
     end;
+erl_to_ast({call, _, Func, Args}) ->
+    Function = erl_to_ast(Func),
+    ArgList = lists:map(fun(E) ->erl_to_ast(E) end, Args),
+    io:format("Args ~p~n", [ArgList]),
+    R = [Function | ArgList],
+    io:format("Return ~p~n", [R]),
+    R;
+erl_to_ast({remote, L, M, F}) ->
+    Mod = erl_to_ast(M),
+    Fun = erl_to_ast(F),
+    io:format("MF: ~p : ~p ~n", [Mod, Fun]),
+    io:format("MFV: ~p : ~p ~n", [Mod#item.value, Fun#item.value]),
+    MF = Mod#item.value ++ ":" ++Fun#item.value,
+    #item{type=atom, loc=L,  value= MF};
+erl_to_ast({cons, _L, H, T}) ->
+    Head = erl_to_ast(H),
+    Tail = erl_to_ast(T),
+    [Head|Tail];
+erl_to_ast({atom, L, V}) ->
+    #item{type=atom, loc=L, value=atom_to_list(V)};
+erl_to_ast({integer, L, V}) ->
+    #item{type=integer, loc=L, value=V};
+erl_to_ast({nil, _L}) ->
+    [];
 erl_to_ast(T) when is_tuple(T) ->
     TList = lists:map(fun(E) -> 
                               erl_to_ast(E) 
