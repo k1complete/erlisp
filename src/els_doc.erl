@@ -7,42 +7,86 @@
 	render_function/3,
 	doc/3]).
 
-literal_convert(E) ->
+quote(#item{type=atom}=E)  ->
+    [#item{type=atom, value="quote"}, E];
+quote(E) ->
+    E.
+id(E) ->
+    E.
+
+response_convert(E, ModeFun) ->
+    S = binary:bin_to_list(E),
+    {ok, Tokens, _Line} = erl_scan:string(S),
+    {ok, Tree} = els_erlformat:parse(Tokens),
+    SSS = els_pp:pp(Tree),
+    SBin = binary:list_to_bin(SSS),
+    SBin.
+literal_convert(E, ModeFun) ->
     S = binary:bin_to_list(E),
     io:format("Before: ~p~n", [S]),
     {ok,Tokens, _Line} = erl_scan:string(S),
     {ok, ExprList} = erl_parse:parse_exprs(Tokens),
     Expr=hd(ExprList),
     io:format("Exp: ~p~n", [Expr]),
-    SS = els_pp:erl_to_ast(Expr),
+    SS = els_item:from_erl(Expr, ModeFun),
     io:format("Item: ~p~n", [SS]),
     SSS = els_pp:pp(SS),
     SBin = binary:list_to_bin(SSS),
     io:format("pp: ~p~n", [SBin]),
     SBin.
 
+
+convert_expression(Prompt, Line, ModeFun) ->
+    S = case binary:last(Line) of
+	    $. ->
+		literal_convert(Line, ModeFun);
+	    _ ->
+		response_convert(Line, ModeFun)
+	end,
+    binary:join([Prompt, S], <<"">>).
+
+split_prompt(E) ->
+    case re:run(E, <<"^(?<Prompt>[0-9]+\> )(?<Request>.*)$">>, 
+		[{capture, all_names,binary}]) of
+	nomatch ->
+	    {<<"">>, E};
+	{match, [Prompt, Request]} ->
+	    {Prompt, Request}
+    end.
+
+split_doc_expression(Doc) ->
+    DocList = re:split(Doc, <<"\n">>, [{return, binary}]),
+    {_, _, _, Acc} = lists:foldl(
+		       fun (<<"```erlang">> = E, {doc, _, _, Acc}) ->
+			       {expression, "", <<"">>, [E|Acc]};
+			   (<<"```">> = E, {expression, P, Line, Acc}) ->
+			       io:format("convert P ~p~n ~p~n", [P, Line]),
+			       Expressions = convert_expression(P, Line, fun id/1),
+			       {doc, "", <<"">>, [E, Expressions | Acc]};
+			   (E, {doc, _, Line, Acc}) ->
+			       {doc, "", <<"">>, [E|Acc]};
+			   (<<$ , Cont/bitstring>>  = E, {expression, P, Line, Acc}) ->
+			       Next = binary:join([Line, Cont], <<"\n">>),
+			       {doc, P, Next, Acc};
+			   (E, {expression, _, <<"">>, Acc}) ->
+			       {Prompt, Request} = split_prompt(E),
+			       {expression, Prompt, Request, Acc};
+			   (E, {expression, P, Line, Acc}) ->
+			       Expression = convert_expression(P, Line, fun id/1),
+			       {Prompt, NewRequest} = split_prompt(E),
+			       {expression, Prompt, NewRequest, [Expression | Acc]}
+		       end, {doc, "", <<"">>, []},  DocList),
+    Acc.
+
+
 -spec consolidate_doc(Doc) -> Doc2 
 	      when Doc :: binary(),
 		   Doc2 :: binary().
 consolidate_doc(Doc) ->
-    Lines = re:split(Doc, <<"\n">>, [{return, binary}]),
-    {_, Doc2} = lists:foldl(fun(<<"```erlang">> = E, {normal, Acc}) ->
-				    {open, [E|Acc]};
-			       (<<"```">> = E, {_, Acc}) ->
-				    {normal, [E|Acc]};
-			       (E, {normal, Acc}) ->
-				    {normal, [E|Acc]};
-			       (E, {open, Acc}) ->
-				    case re:run(E, <<"^(?<Prompt>[0-9]+\> )(?<Request>.*)$">>, 
-						[{capture, all_names,binary}]) of
-					nomatch ->
-					    Exp = binary:join([E, <<".">>], <<"">>),
-					    {open, [literal_convert(Exp)| Acc]};
-					{match, [Prompt, Request]} -> 
-					    {open, [binary:join([Prompt, literal_convert(Request)], <<"">>) | Acc]}
-				    end
-			    end, {normal, []}, Lines),
-    binary:join(lists:reverse(Doc2), <<"\n">>).
+    Acc =split_doc_expression(Doc),
+    io:format("consolidated ~p~n", [Acc]),
+    binary:join(lists:reverse(Acc), <<"\n">>).
+    
 
 render_function(Function, Arity, Docs) ->
     {docs_v1, _MAnno, _Lang, _Format, _MDoc, _Meta, DocList} = Docs,
@@ -66,7 +110,7 @@ render_function(Function, Arity, Docs) ->
 get_doc_v1(Module, Function, Arity) ->
     %%io:format("F0 ~s : ~p~n", [Function, Arity]),
     {ok, Ast} = get_ast(Module),
-    %%io:format("F1 ~s : ~p~n", [Function, Arity]),
+    io:format("F1 ~s : ~p~n", [Function, Arity]),
     case code:get_doc(Module) of
 	{ok, {docs_v1, MAnno, Lang, Formatter,
 	      ModuleDoc, MetaData,
@@ -74,6 +118,7 @@ get_doc_v1(Module, Function, Arity) ->
 	    NDocs = lists:filtermap(fun({{Kind, Name, NArity}, Anno, _Signature, FDoc, FMetadata}) ->
 					    case {Name, NArity} of
 						{Function, Arity} ->
+						    io:format("F ~s : ~p~n", [Name, Function]),
 						    NSignature = build_signature(Module, Function, Arity, Ast),
 						    %%io:format("F ~s : ~p~n", [Name, NSignature]),
 						    BS = lists:map(fun(E) ->
@@ -100,10 +145,6 @@ doc(Module, Function, Arity) ->
 
 	
     
-makefun(E) when is_atom(E) ->
-    #item{type=atom, value=atom_to_list(E)};
-makefun(E) ->
-    E.
 
 create_args(N) ->
     lists:map(fun(E) ->
@@ -118,11 +159,12 @@ build_signature(Module, Function, Arity, Ast) ->
 		   notfound ->
 		       [#item{type=atom, value=StrFunction} | create_args(Arity)];
 		   M ->
-		       %% io:format("S ~p~n", [M]),
-		       S = els_typespec:to_list(hd(M), fun makefun/1),
+		       io:format("SpecIn ~p~n", [hd(M)]),
+		       %% S = els_typespec:to_list(hd(M), fun makefun/1),
+		       S = els_item:from_erl(hd(M)),
 		       [#item{type=atom, value="-spec"}, [#item{type=atom, value=StrFunction} |hd(S)]] ++ tl(S)
 	       end,
-    %% io:format("SpecList ~p~n", [SpecList]),
+    io:format("SpecList ~p~n", [SpecList]),
     els_pp:pp(SpecList).
 
 build_signature(Module, Function, Arity) ->

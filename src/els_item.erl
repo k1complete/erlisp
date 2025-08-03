@@ -6,6 +6,11 @@
 sexp_to_list(List, F) ->
     F(List).
 
+arg_from_erl({cons, L, _H, _T} = E, F) ->
+    [#item{type=atom, value="list", loc=L} | from_erl(E, F)];
+arg_from_erl(E, F) ->
+    from_erl(E, F).
+
 from_erl(E) ->
     from_erl(E, fun(M) -> M end).
 
@@ -32,20 +37,51 @@ from_erl(T, F) when is_list(T) ->
     end;
 from_erl({call, _, Func, Args}, F) ->
     Function = from_erl(Func, F),
-    ArgList = lists:map(fun(E) ->from_erl(E, F) end, Args),
+    ArgList = lists:map(fun(E) -> 
+				arg_from_erl(E, F)
+			end, Args),
     R = [Function | ArgList],
     R;
 from_erl({remote, L, M, FName}, F) ->
-    Mod = from_erl(M),
-    Fun = from_erl(FName),
-    MF = Mod#item.value ++ ":" ++Fun#item.value,
-    F(#item{type=atom, loc=L,  value= MF});
+    {atom, _, Mod} = M,
+    {atom, _, Fun}  = FName,
+    %%MF = Mod#item.value ++ ":" ++Fun#item.value,
+    MF = {atom_to_list(Mod), atom_to_list(Fun)},
+    F(#item{type=module_function, loc=L,  value= MF});
+from_erl({'fun', L, {clauses, Clauses}}, F) ->
+    Cs = lists:map(fun(E) -> from_erl(E) end, Clauses),
+    case length(Cs) of
+	1 ->
+	    F([#item{type=atom, loc=L, value="lambda"} | hd(Cs)]);
+	_ ->
+	    F([#item{type=atom, loc=L, value="lambda"} | Cs])
+    end;
+from_erl({'clauses', L, Clauses}, F) ->
+    lists:map(fun(C) -> from_erl(C) end, Clauses);
+from_erl({'clause', L, Patterns, Guards, Bodies}, F) ->
+    P = lists:map(fun(C) -> from_erl(C) end, Patterns),
+    G = lists:map(fun(C) -> from_erl(C) end, Guards),
+    B = lists:map(fun(C) -> io:format("Body: ~p~n", [C]), from_erl(C, F) end, Bodies),
+    case G of
+	[] -> [P | B];
+	_ -> [P, ["when", G] | B]
+    end;
 from_erl({cons, _L, H, T}, F) ->
     Head = from_erl(H, F),
     Tail = from_erl(T, F),
+    io:format("Cons ~p~n", [H]),
     sexp_to_list([Head|Tail], F);
+from_erl({op, Loc, Op, L}, F) ->
+    Left = from_erl(L, F),
+    Operator = #item{type=atom, value=atom_to_list(Op), loc=Loc},
+    sexp_to_list([Operator, Left], F);
+from_erl({op, Loc, Op, L, R}, F) ->
+    Left = from_erl(L, F),
+    Right = from_erl(R, F),
+    Operator = #item{type=atom, value=atom_to_list(Op), loc=Loc},
+    sexp_to_list([Operator, Left, Right], F);
 from_erl({atom, L, V}, F) ->
-    F(#item{type=atom, loc=L, value=atom_to_list(V)});
+    F([#item{type=atom, loc=L, value="quote"} , #item{type=atom, loc=L, value=atom_to_list(V)}]);
 from_erl({integer, L, V}, F) ->
     F(#item{type=integer, loc=L, value=V});
 from_erl({nil, _L}, F) ->
@@ -55,14 +91,18 @@ from_erl({var, _, Arg}, F) ->
 from_erl({ann_type, _, [Name| Args]}, F) ->
     sexp_to_list(lists:map(fun(E) ->
 				   from_erl(E, F)
-			   end, [Name, {atom,0, '::'} |Args]), F);
+			   end, [Name, {var,0, '::'} |Args]), F);
 from_erl({type, _, 'product', Args}, F) ->
     ArgsM = [ hd(Args), {atom, 0, '::'}|tl(Args)],
     sexp_to_list(lists:map(fun(E) ->
 				   from_erl(E, F)
 			   end, ArgsM), F);
 from_erl({type, _, 'bounded_fun', [Ft, Fc]}, F) ->
-    Constraint = lists:map(fun(E) -> from_erl(E, F) end, Fc),
+    Constraint = lists:map(fun(E) -> 
+				   FC = from_erl(E, F), 
+				   io:format("F: ~p ~n--> FC: ~p~n", [E, FC]),
+				   FC
+			   end, Fc),
     Ftype = from_erl(Ft, F),
     sexp_to_list([Ftype,[from_erl('when') | Constraint]], F);
 from_erl({type, _, 'bounded_fun', Args}, F) ->

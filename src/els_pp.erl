@@ -5,7 +5,6 @@
 -export([ppsexp/1]).
 -export([pptr/4]).
 -export([form/1]).
--export([erl_to_ast/1]).
 -export([format/2]).
 -export([npp/4]).
 -export([erlast_to_str/2]).
@@ -82,6 +81,8 @@ pptr(#item{type=binary, value=V}=S, L, R, Direction) ->
     S#item{value=ppliteral(V, L, R, Direction)};
 pptr(#item{type=integer, value=V}=S, L, R, Direction) when is_integer(V) ->
     S#item{value=ppliteral(integer_to_list(V), L, R, Direction)};
+pptr(#item{type=module_function, value={M, F}}=S, L, R, Direction) ->
+    S#item{value=ppliteral(M++":"++F, L, R, Direction)};
 pptr(#item{type=atom, value=V}=S, L, R, Direction) ->
     S#item{value=ppliteral(V, L, R, Direction)};
 pptr(#item{type=variable, value=V}=S, L, R, Direction) ->
@@ -94,6 +95,10 @@ pptr(V, L, R, Direction) when is_integer(V)  ->
     #item{value=ppliteral(integer_to_list(V), L, R, Direction), type=integer};
 pptr(V, L, R, Direction) when is_float(V)  ->
     #item{value=ppliteral(float_to_list(V), L, R, Direction), type=float};
+pptr([#item{type=atom, value="quote"}, S], LChar, RChar, Direction) ->
+    {NL, NR} = {"'", ""},
+    R = pptr(S, LChar++NL, NR++RChar, both),
+    R;
 pptr([S], LChar, RChar, _Direction) ->
     {NL, NR} = {"(", ")"},
     R = pptr(S, LChar++NL, NR++RChar, both),
@@ -115,7 +120,7 @@ pptr(S, LChar, RChar, _Direction) when is_list(S) ->
     end.
 
 form(S) ->
-    S1 = ?MODULE:erl_to_ast(S),
+    S1 = els_item:from_erl(S),
     S2 = pptr(S1, "", "", none),
     ?MODULE:ppsexp(S2).
 
@@ -226,6 +231,8 @@ ppsexp(#item{type=float, value=V}) ->
     prettypr:text(V);
 ppsexp(#item{type=integer, value=V}) ->    
     prettypr:text(V);
+ppsexp(#item{type=module_function, value={M, F}}) ->    
+    prettypr:text(M++":"++F);
 ppsexp(#item{type=_, value=V}) ->    
     prettypr:text(V);
 ppsexp(I) when is_integer(I) ->
@@ -234,76 +241,6 @@ ppsexp(I) when is_integer(I) ->
 
 escape(S) ->
     string:replace(S, "\"", "\\\"", all).
-
-erl_to_ast([H|T]) when not is_list(T) ->
-    [erl_to_ast(H) | erl_to_ast(T)];
-erl_to_ast(T) when is_list(T) ->
-    S = try lists:all(fun(E) when is_integer(E) andalso 
-                                  E =< 1114111 andalso 
-                                  E >= 10 -> 
-                              true;
-                         (_)  -> 
-                              false
-                      end, T)
-    catch _ ->
-            false
-    end,
-    case S of
-        true ->
-            #item{type=string, value=io_lib:format("~s", [T])};
-        false  ->
-            lists:map(fun(E) ->
-                              erl_to_ast(E)
-                      end, T)
-    end;
-erl_to_ast({call, _, Func, Args}) ->
-    Function = erl_to_ast(Func),
-    ArgList = lists:map(fun(E) ->erl_to_ast(E) end, Args),
-    io:format("Args ~p~n", [ArgList]),
-    R = [Function | ArgList],
-    io:format("Return ~p~n", [R]),
-    R;
-erl_to_ast({remote, L, M, F}) ->
-    Mod = erl_to_ast(M),
-    Fun = erl_to_ast(F),
-    io:format("MF: ~p : ~p ~n", [Mod, Fun]),
-    io:format("MFV: ~p : ~p ~n", [Mod#item.value, Fun#item.value]),
-    MF = Mod#item.value ++ ":" ++Fun#item.value,
-    #item{type=atom, loc=L,  value= MF};
-erl_to_ast({cons, _L, H, T}) ->
-    Head = erl_to_ast(H),
-    Tail = erl_to_ast(T),
-    [Head|Tail];
-erl_to_ast({atom, L, V}) ->
-    #item{type=atom, loc=L, value=atom_to_list(V)};
-erl_to_ast({integer, L, V}) ->
-    #item{type=integer, loc=L, value=V};
-erl_to_ast({nil, _L}) ->
-    [];
-erl_to_ast(T) when is_tuple(T) ->
-    TList = lists:map(fun(E) -> 
-                              erl_to_ast(E) 
-                      end, tuple_to_list(T)),
-    [#item{type=atom, value="tuple"} | TList];
-erl_to_ast(T) when is_binary(T) ->
-    TList = binary_to_list(T),
-    [#item{type=atom, value="binary"} | TList];
-erl_to_ast(T) when is_integer(T) ->
-    T;
-erl_to_ast(T) when is_float(T) ->
-    T;
-erl_to_ast(T) when is_pid(T) ->
-    [#item{type=atom, value="pid"}, #item{type=string, value=pid_to_list(T)}];
-erl_to_ast(T) when is_map(T) ->
-    TList = lists:foldl(
-              fun({K, V}, A) ->
-                      A++[erl_to_ast(K), erl_to_ast(V)]
-              end, [], maps:to_list(T)),
-    [#item{type=atom, value="map"} | TList] ;
-erl_to_ast(T) when is_function(T) ->
-    #item{type=string, value=erlang:fun_to_list(T)};
-erl_to_ast(T) when is_atom(T) ->
-    #item{type=atom, value=lists:flatten(io_lib:format("~p", [T]))}.
 
     
 -define(T(X), prettypr:text(X)).
