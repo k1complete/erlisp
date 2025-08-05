@@ -16,10 +16,18 @@ id(E) ->
 
 response_convert(E, ModeFun) ->
     S = binary:bin_to_list(E),
-    {ok, Tokens, _Line} = erl_scan:string(S),
-    {ok, Tree} = els_erlformat:parse(Tokens),
-    SSS = els_pp:pp(Tree),
-    SBin = binary:list_to_bin(SSS),
+    SBin = case erl_scan:string(S) of
+	       {ok, Tokens, _Line} ->
+		   case els_erlformat:parse(Tokens) of
+		       {ok, Tree} ->
+			   SSS = els_pp:pp(Tree),
+			   binary:list_to_bin(SSS);
+		       _ ->
+			   E
+		   end;
+	       _ ->
+		   E
+	   end,
     SBin.
 literal_convert(E, ModeFun) ->
     S = binary:bin_to_list(E),
@@ -67,12 +75,15 @@ split_doc_expression(Doc) ->
 			       {doc, "", <<"">>, [E|Acc]};
 			   (<<$ , Cont/bitstring>>  = E, {expression, P, Line, Acc}) ->
 			       Next = binary:join([Line, Cont], <<"\n">>),
-			       {doc, P, Next, Acc};
-			   (E, {expression, _, <<"">>, Acc}) ->
+			       {expression, P, Next, Acc};
+			   (E, {expression, P, <<"">>, Acc}) ->
+			       io:format("exp: ~p <<>>~n", [P]),
 			       {Prompt, Request} = split_prompt(E),
 			       {expression, Prompt, Request, Acc};
 			   (E, {expression, P, Line, Acc}) ->
+			       io:format("exp: ~p <<>>", [P]),
 			       Expression = convert_expression(P, Line, fun id/1),
+			       io:format("exp: ~p ~nLine: ~p~n", [P, Line]),
 			       {Prompt, NewRequest} = split_prompt(E),
 			       {expression, Prompt, NewRequest, [Expression | Acc]}
 		       end, {doc, "", <<"">>, []},  DocList),
@@ -84,7 +95,7 @@ split_doc_expression(Doc) ->
 		   Doc2 :: binary().
 consolidate_doc(Doc) ->
     Acc =split_doc_expression(Doc),
-    io:format("consolidated ~p~n", [Acc]),
+    %%io:format("consolidated ~p~n", [Acc]),
     binary:join(lists:reverse(Acc), <<"\n">>).
     
 
@@ -103,7 +114,6 @@ render_function(Function, Arity, Docs) ->
     SigN = binary:join(Sig, <<"\n">>),
     DocB = consolidate_doc(maps:get(<<"en">>, Doc)),
     DocEls = #{<<"en">> => DocB},
-    io:format("Doc ~p~n", [Doc]),
     io:format("~s~n~n~s~n", [SigN, maps:get(<<"en">>, DocEls)]).
     
 

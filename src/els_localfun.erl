@@ -45,13 +45,16 @@ create_localvaluefun(Locals) ->
 
 create_valuefun(Locals) ->
     fun(Name, Arg) ->
-	    {{local}, Func} = maps:get({Name, length(Arg)}, Locals),
-	    case Func of
-		Func when is_function(Func) ->
+	    {Kind, Func} = maps:get({Name, length(Arg)}, Locals, {{error},undefined}),
+	    case {Kind, Func} of
+		{{error}, undefined} ->
+		    Command = lists:flatten(io_lib:format("~p/~p", [Name, length(Arg)])),
+		    throw({'undefined shell command', Command});
+		{{local}, Func} when is_function(Func) ->
 		    Q = merl:qquote(?LINE, "apply(_@Func, _@Arg)", [{'Func', Func}, {'Arg', Arg}]),
 		    {value, Value, _NewEnv} = erl_eval:expr(Q, Arg, create_valuefun(Locals)),
 		    Value;
-		_ ->
+		{{local},_} ->
 		    QArg = erl_syntax:revert(erl_syntax:abstract(Arg)),
 		    Q = merl:qquote(?LINE, "apply(_@Func, _@Arg)", [{'Func', Func}, {'Arg', QArg}]),
 		    QQ = erl_syntax:revert(Q),

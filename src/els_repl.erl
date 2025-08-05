@@ -117,10 +117,12 @@ execute(Revert, Env) ->
         false ->
 	    Fun = els_localfun:create_valuefun(proplists:get_value(macros, Env, #{})),
 	    Binding = env_to_binding(Env),
+	    io:format("execute: ~p~nRecord: ~p~n", [Revert, RecordDefs]),
 	    [Revert2] = extract_record_module(RecordDefs, [Revert]),
 	    %%io:format("Revert2: ~p~nRevert: ~p~n", [Revert2, Revert]),
 	    %%io:format("Binding ~p ~n", [Binding]),
             %%{value, Result, NBinding} = erl_eval:expr(Revert, Binding, {value, Fun}),
+	    io:format("Revert2: ~p~n", [Revert2]),
             {value, Result, NBinding} = erl_eval:expr(Revert2, Binding, {value, Fun}),
 	    {value, Result, env_update(binding, NBinding, Env)}
     end.
@@ -176,6 +178,9 @@ repl_one(IN, _OUT, Line, Env, Acc) ->
 		       Forms)
 		catch 
 		    error:Reason:Stack ->
+			io:format("Catch ~p~nStack: ~p~n", [Reason, Stack]),
+			throw({error, Reason, Env});
+		    throw:Reason:Stack ->
 			throw({error, Reason, Env})
 		end,
 	    Return;
@@ -215,6 +220,7 @@ repl(Io, Out, Line, Env0) ->
 	source_acc(Io, Out, Line, Env0, [], fun output/2)
     catch
 	throw:{error, Reason,Env1} ->
+	    io:format("Catch ~p~n", [Reason]),
 	    Line1 = proplists:get_value('?Line', Env1, 1),
 	    output(Out, {error, Reason, #{}}),
 	    repl(Io, Out, Line1, Env1)

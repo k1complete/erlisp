@@ -71,6 +71,10 @@ from_erl({cons, _L, H, T}, F) ->
     Tail = from_erl(T, F),
     io:format("Cons ~p~n", [H]),
     sexp_to_list([Head|Tail], F);
+from_erl({tuple, L, List}, F) ->
+    Tuple = lists:map(fun(E) -> from_erl(E, F) end, List),
+    io:format("Tuple ~p~n", [Tuple]),
+    sexp_to_list([#item{type=atom, value="tuple", loc=L} |Tuple], F);
 from_erl({op, Loc, Op, L}, F) ->
     Left = from_erl(L, F),
     Operator = #item{type=atom, value=atom_to_list(Op), loc=Loc},
@@ -80,10 +84,14 @@ from_erl({op, Loc, Op, L, R}, F) ->
     Right = from_erl(R, F),
     Operator = #item{type=atom, value=atom_to_list(Op), loc=Loc},
     sexp_to_list([Operator, Left, Right], F);
+from_erl({string, L, V}, F) ->
+    F(#item{type=string, loc=L, value=V});
 from_erl({atom, L, V}, F) ->
     F([#item{type=atom, loc=L, value="quote"} , #item{type=atom, loc=L, value=atom_to_list(V)}]);
 from_erl({integer, L, V}, F) ->
     F(#item{type=integer, loc=L, value=V});
+from_erl({float, L, V}, F) ->
+    F(#item{type=float, loc=L, value=V});
 from_erl({nil, _L}, F) ->
     F([]);
 from_erl({var, _, Arg}, F) ->

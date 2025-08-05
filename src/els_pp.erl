@@ -77,10 +77,14 @@ paren_control(S, L, R) ->
     end.
 
 
+pptr([]=S, L, R, D) ->
+    #item{type=atom, value=ppliteral("", L, R, D)};
 pptr(#item{type=binary, value=V}=S, L, R, Direction) ->
     S#item{value=ppliteral(V, L, R, Direction)};
 pptr(#item{type=integer, value=V}=S, L, R, Direction) when is_integer(V) ->
     S#item{value=ppliteral(integer_to_list(V), L, R, Direction)};
+pptr(#item{type=float, value=V}=S, L, R, Direction) when is_float(V) ->
+    S#item{value=ppliteral(float_to_list(V), L, R, Direction)};
 pptr(#item{type=module_function, value={M, F}}=S, L, R, Direction) ->
     S#item{value=ppliteral(M++":"++F, L, R, Direction)};
 pptr(#item{type=atom, value=V}=S, L, R, Direction) ->
@@ -221,6 +225,8 @@ ppsexp(S) when is_list(S) andalso length(S) == 1 ->
                              ppsexp(E)
                      end, S),
     prettypr:par(Pars);
+ppsexp([]) ->
+    prettypr:null_text();
 ppsexp(#item{type=atom, value=V}) when is_atom(V) ->    
     prettypr:text(atom_to_list(V));
 ppsexp(#item{type=atom, value=V}) ->
