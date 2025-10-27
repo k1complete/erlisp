@@ -77,7 +77,7 @@ paren_control(S, L, R) ->
     end.
 
 
-pptr([]=S, L, R, D) ->
+pptr([]=_S, L, R, D) ->
     #item{type=atom, value=ppliteral("", L, R, D)};
 pptr(#item{type=binary, value=V}=S, L, R, Direction) ->
     S#item{value=ppliteral(V, L, R, Direction)};
@@ -99,7 +99,7 @@ pptr(V, L, R, Direction) when is_integer(V)  ->
     #item{value=ppliteral(integer_to_list(V), L, R, Direction), type=integer};
 pptr(V, L, R, Direction) when is_float(V)  ->
     #item{value=ppliteral(float_to_list(V), L, R, Direction), type=float};
-pptr([#item{type=atom, value="quote"}, S], LChar, RChar, Direction) ->
+pptr([#item{type=atom, value="quote"}, S], LChar, RChar, _Direction) ->
     {NL, NR} = {"'", ""},
     R = pptr(S, LChar++NL, NR++RChar, both),
     R;

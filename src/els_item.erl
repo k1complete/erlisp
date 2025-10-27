@@ -56,9 +56,9 @@ from_erl({'fun', L, {clauses, Clauses}}, F) ->
 	_ ->
 	    F([#item{type=atom, loc=L, value="lambda"} | Cs])
     end;
-from_erl({'clauses', L, Clauses}, F) ->
+from_erl({'clauses', _L, Clauses}, _F) ->
     lists:map(fun(C) -> from_erl(C) end, Clauses);
-from_erl({'clause', L, Patterns, Guards, Bodies}, F) ->
+from_erl({'clause', _L, Patterns, Guards, Bodies}, F) ->
     P = lists:map(fun(C) -> from_erl(C) end, Patterns),
     G = lists:map(fun(C) -> from_erl(C) end, Guards),
     B = lists:map(fun(C) -> io:format("Body: ~p~n", [C]), from_erl(C, F) end, Bodies),

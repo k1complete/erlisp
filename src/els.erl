@@ -12,7 +12,7 @@ version(A, B) ->
 compile(A) ->
     B = maps:get(file, A),
     lists:map(fun(E) ->
-		      {ok, Module, Beam, Ast} = els_compile:file_ast(E,[], A),
+		      {ok, Module, _Beam, _Ast} = els_compile:file_ast(E,[], A),
 		      io:format("compile <~s>~n", [ Module])
 	      end, B),
     halt(0).

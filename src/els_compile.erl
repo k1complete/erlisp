@@ -94,9 +94,6 @@ file(File, Opt) ->
 %%new_compile_macro(_, Acc, E) ->
 %%    Acc.
 
--spec compile_and_write_beam(sexp(), options()) -> {module, module(), binary()}.
-compile_and_write_beam(Ast, Options) ->
-    compile_and_write_beam(Ast, Options, #{}).
 
 compile_and_write_beam(Ast, Options, CompileOpt) ->
     SS = merl:compile_and_load(Ast, Options),

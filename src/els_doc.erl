@@ -7,14 +7,10 @@
 	render_function/3,
 	doc/3]).
 
-quote(#item{type=atom}=E)  ->
-    [#item{type=atom, value="quote"}, E];
-quote(E) ->
-    E.
 id(E) ->
     E.
 
-response_convert(E, ModeFun) ->
+response_convert(E, _ModeFun) ->
     S = binary:bin_to_list(E),
     SBin = case erl_scan:string(S) of
 	       {ok, Tokens, _Line} ->
@@ -71,9 +67,9 @@ split_doc_expression(Doc) ->
 			       io:format("convert P ~p~n ~p~n", [P, Line]),
 			       Expressions = convert_expression(P, Line, fun id/1),
 			       {doc, "", <<"">>, [E, Expressions | Acc]};
-			   (E, {doc, _, Line, Acc}) ->
+			   (E, {doc, _, _Line, Acc}) ->
 			       {doc, "", <<"">>, [E|Acc]};
-			   (<<$ , Cont/bitstring>>  = E, {expression, P, Line, Acc}) ->
+			   (<<$ , Cont/bitstring>>  = _E, {expression, P, Line, Acc}) ->
 			       Next = binary:join([Line, Cont], <<"\n">>),
 			       {expression, P, Next, Acc};
 			   (E, {expression, P, <<"">>, Acc}) ->

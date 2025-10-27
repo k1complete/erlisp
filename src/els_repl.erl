@@ -180,7 +180,7 @@ repl_one(IN, _OUT, Line, Env, Acc) ->
 		    error:Reason:Stack ->
 			io:format("Catch ~p~nStack: ~p~n", [Reason, Stack]),
 			throw({error, Reason, Env});
-		    throw:Reason:Stack ->
+		    throw:Reason:_Stack ->
 			throw({error, Reason, Env})
 		end,
 	    Return;
