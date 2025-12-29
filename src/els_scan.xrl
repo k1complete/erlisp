@@ -100,6 +100,8 @@ Erlang code.
 -define(IS_OPEN(X), is_map_key(X, #{'(' => 1, '{' => 1, '#{' => 1, '[' => 1})).
 -define(IS_CLOSE(X), is_map_key(X, #{')' => 1, '}' => 1, ']' => 1})).
 
+-export([tokens2/2, tokens2/3]).
+
   
 calclevel(IO, Prompt0, Tokens, GLevel, Line) ->
 %%    io:format("calclevel [~p]~n", [Tokens]),
@@ -124,7 +126,7 @@ do_calclevel(IO, Prompt0, [{read_macro, Loc, MChar}], {Acc, PreLevel}, _Line) ->
            unquote_splice => {?MODULE, replace}
           },
     {MM, MF} = maps:get(MChar, RM, {?MODULE, not_implemented}),
-    %io:format("calc-apply before: ~p ~p ~n", [Loc, Acc]),
+    %% io:format("calc-apply before: ~p ~p ~n [~p] ~n", [Loc, Acc, Prompt0]),
     {ok, NewTokens, NewLoc, RestTokens} = apply(MM, MF, [{IO, Prompt0}, ?MODULE, read, 
                                                          Loc, MChar]),
     %io:format("calc-apply after: NT ~p Rest ~p PL ~p ~n", [NewTokens, RestTokens, PreLevel]),
@@ -142,8 +144,27 @@ loctoline(Line) ->
     
 replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
     %Ret = read(IO, Prompt0, loctoline(Loc), [], 0),
-    Ret = read(IO, "", loctoline(Loc), [], 0),
-    %io:format("replace-2read ~p~n", [Ret]),
+    %% io:format("replace-2before ~p~n", [MChar]),
+    %%
+    Opts = io:getopts(IO),
+    if IO == standard_io ->
+	    case lists:keyfind(echo, 1, Opts) of
+		{echo, true} ->
+		    %%io:format("Opts ~p~n", [Opts]),
+		    io:setopts([{echo, false}]);
+		_  ->
+		    io:format("", []),
+		    true
+	    end;
+       true ->
+	    true
+    end,
+    %% Ret = read(IO, "", loctoline(Loc), [], 0),
+    %%io:format("~nOPT ~p~n Loc ~p~n", [io:getopts(IO), Loc]),
+    Ret = read(IO, _Prompt0, loctoline(Loc), [], 0),
+    %%io:format("~nOPT2 ~p~n Ret ~p~n", [io:getopts(IO), Ret]),
+    %% io:setopts([{echo, true}]),
+    %%io:format("replace-2read ~p~n", [Ret]),
     {ok, Tokens, NextLine, Rest} = Ret,
     {_L, ACol} = Loc,
     N2Tokens = lists:map(fun({T, {L, C}, V}) ->
@@ -234,20 +255,37 @@ multiline_quote(IO, Line, Tokens) ->
         _ ->
             {Tokens, Line}
     end.
+
     
-            
+tokens2(Cont, Chars) -> 
+    tokens2(Cont, Chars, 1).
+tokens2(Cont, Chars, Line) ->
+    %%io:format("----- ~p ~n ", [Chars]),
+    R = tokens(Cont, Chars, Line),
+    %%io:format("--out--- ~p ~n ", [R]),
+    R.
+
 
 read(IO, Prompt0, Line, PrevTokens, PrevLevel) when length(PrevTokens) > 0 andalso PrevLevel == 0 ->
-    %io:format("CalcLevel PreVTokens  ~p ~n PrevLevel ~p~n", [PrevTokens, PrevLevel]),
+    %%io:format("CalcLevel PreVTokens   ~p ~n PrevLevel ~p!!!~n", [PrevTokens, PrevLevel]),
     adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line);
 read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
     Prompt = make_prompt(IO, Prompt0, Line, PrevTokens),
-    case io:request(IO, {get_until, unicode, Prompt, ?MODULE, tokens, [Line]}) of
+    %% io:format("Read PreVTokens  ~p ~n PrevLevel <~p> IO <~p> P <~p>~n", [PrevTokens, PrevLevel, IO, Prompt]),
+
+    case io:request(IO, {get_until, unicode, Prompt, ?MODULE, tokens2, [Line]}) of
         {ok, NewTokens, NextLine} ->
             %%?LOG_DEBUG(#{prevlevel => PrevLevel,
 	    %%prevtokens => PrevTokens,
 	    %%newtokens => NewTokens}),
-	    %% io:format("get tokens ~p~n", [NewTokens]),
+	    %%io:format("get tokens ~p~n", [NewTokens]),
+	    if  IO == standard_io ->
+		    io:setopts(IO, [{echo, true}]);
+		true ->
+		    true
+	    end,
+	    %%io:format("IOopt ~p~n", [io:getopts(IO)]),
+
             {NewTokens2, NextLine2} =  multiline_quote(IO, NextLine, NewTokens),
             %%?LOG_DEBUG(#{adjust_level => PrevTokens++NewTokens2}),
             %adjust_level(IO, Prompt0, PrevTokens++NewTokens2, PrevLevel, NextLine2);

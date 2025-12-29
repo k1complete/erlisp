@@ -54,7 +54,7 @@ main(Args) ->
 			required => false,
 			handler => 
 			    fun(A) -> 
-				    io:format("A ~p~n", [A]),
+				    %%io:format("A ~p~n", [A]),
 				    els_repl:start([]) 
 			    end
 		       },

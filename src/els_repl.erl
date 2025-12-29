@@ -117,12 +117,12 @@ execute(Revert, Env) ->
         false ->
 	    Fun = els_localfun:create_valuefun(proplists:get_value(macros, Env, #{})),
 	    Binding = env_to_binding(Env),
-	    io:format("execute: ~p~nRecord: ~p~n", [Revert, RecordDefs]),
+	    %% io:format("execute: ~p~nRecord: ~p~n", [Revert, RecordDefs]),
 	    [Revert2] = extract_record_module(RecordDefs, [Revert]),
 	    %%io:format("Revert2: ~p~nRevert: ~p~n", [Revert2, Revert]),
 	    %%io:format("Binding ~p ~n", [Binding]),
             %%{value, Result, NBinding} = erl_eval:expr(Revert, Binding, {value, Fun}),
-	    io:format("Revert2: ~p~n", [Revert2]),
+	    %% io:format("Revert2: ~p~n", [Revert2]),
             {value, Result, NBinding} = erl_eval:expr(Revert2, Binding, {value, Fun}),
 	    {value, Result, env_update(binding, NBinding, Env)}
     end.
@@ -251,10 +251,10 @@ tty() ->
     tty([]).
 
 tty(Args) ->
-    io:format("Args: ~p~n", [Args]),
+    %%io:format("Args: ~p~n", [Args]),
     S = logger:get_primary_config(),
-    io:format("getopts ~p~n", [io:getopts(standard_io)]),
-    io:format("keymap ~p~n", [edlin:keymap()]),
+    %%io:format("getopts ~p~n", [io:getopts(standard_io)]),
+    %%io:format("keymap ~p~n", [edlin:keymap()]),
     logger:update_primary_config(S#{level => debug}),
     repl(standard_io, standard_io, 1, init(Args)).
 
