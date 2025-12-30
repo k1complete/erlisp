@@ -16,7 +16,23 @@ compile(A) ->
 		      io:format("compile <~s>~n", [ Module])
 	      end, B),
     halt(0).
-    
+
+run(A) ->
+    B = maps:get(file, A),
+    case file:open(B, [read, {encode, utf8}]) of
+	{ok, F} ->
+	    case els_repl:source(F,[]) of
+		{value, _Value, _} ->
+		    halt(0);
+		Error ->
+		    io:format("<~p>~n", [Error]),
+		    halt(1)
+	    end;
+	{error, Reason} ->
+	    io:format("Error: ~p~n", [Reason]),
+	    halt(0)
+    end.
+
     
 main(Args) ->
     S=escript:script_name(),
@@ -53,7 +69,7 @@ main(Args) ->
 		      #{help=>"start interactive shell",
 			required => false,
 			handler => 
-			    fun(A) -> 
+			    fun(_A) -> 
 				    %%io:format("A ~p~n", [A]),
 				    els_repl:start([]) 
 			    end
@@ -75,11 +91,13 @@ main(Args) ->
 		  "run" => 
 		      #{help=>"run script file",
 			arguments =>
-			    [#{name => files,
+			    [#{name => file,
 			       nargs => all,
 			       type => string}],
-			required => false
-		       }
+			required => false,
+			handler => fun(A) ->
+					   run(A)
+				   end}
 		 },
 	    help => "Ccommand"
 	   },

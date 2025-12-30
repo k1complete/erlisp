@@ -161,11 +161,12 @@ dispatch_special(A) ->
 
 atom_to_module_function(F) ->            
     case F of
-        #item{type=atom, value=Value} ->
+        #item{type=atom, value=Value, loc=Loc} ->
             case split(Value) of
                 {module_function, {Module, Function}} ->
                     F#item{type=module_function,
-                           value={Module, Function}};
+                           value={Module, Function},
+			   loc=Loc};
                 _ ->
                     F
             end;
@@ -181,34 +182,39 @@ walk(F, Env, Fun) when is_list(F) ->
     Arity = length(T),
     Macros = proplists:get_value(macros, Env, #{}),
     case atom_to_module_function(H) of
-        #item{type=atom, value=V} ->
+        #item{type=atom, value=V, loc=Loc} ->
 	    %%--
             case maps:get({V, Arity},  Macros, undefined)  of
 		{{local}, Macro} ->
-		    io:format("local ~p(~p)~n", [F, V]),
+		    %% io:format("local ~p(~p)~n", [F, V]),
 		    %%io:format("local-Macro ~p~n", [Macro]),
 		    A = Macro(list_to_atom(V), T),
 		    %%io:format("localafter ~p~n", [A]),
-		    A2 = atom_to_item(A, Env),
+		    Env2 = [{loc, Loc}|Env],
+		    A2 = atom_to_item(A, Env2),
 		    %% io:format("localafter2 ~p~n", [A2]),
-		    walk(A2, Env, Fun);
+		    walk(A2, Env2, Fun);
                 {M, Macro} ->
                     %% io:format("call-M: ~p~n", [F]),
                     A = Fun(M, Macro, tl(F)),
                     %% io:format("call-M-Result: ~p~n", [A]),
-                    walk(A, Env, Fun);
+		    Env2 = [{loc, Loc}|Env],
+		    A2 = atom_to_item(A, Env2),
+                    walk(A2, Env2, Fun);
                 undefined ->
                     [H | lists:map(fun (E) -> 
                                            walk(E, Env, Fun)
                                    end, T)]
             end;
-        #item{type=module_function, value={Module, Function}} ->
+        #item{type=module_function, value={Module, Function}, loc=Loc} ->
             case maps:get({Module, Function, Arity},  Macros, undefined)  of
                 {M, Macro} ->
                     %% io:format("call2: ~p~n", [F]),
                     A = Fun(M, Macro, T),
                     %% io:format("call-Result: ~p~n", [A]),
-                    walk(A, Env, Fun);
+		    Env2 = [{loc, Loc}|Env],
+		    A2 = atom_to_item(A, Env2),
+                    walk(A2, Env2, Fun);
                 undefined ->
                     [H | lists:map(fun (E) -> 
                                            walk(E, Env, Fun)
@@ -222,11 +228,12 @@ walk(F, Env, Fun) when is_list(F) ->
 walk(F, _Env, _Fun) -> 
     F.
 
-atom_to_item(A, _Env) when is_list(A) ->
+atom_to_item(A, Env) when is_list(A) ->
+    Loc = proplists:get_value(loc, Env, 0),
     lists:map(fun(E) when is_atom(E) ->
-                      yal_util:make_symbol(E);
+                      yal_util:make_symbol(E, Loc);
                  (E) when is_list(E) ->
-                      atom_to_item(E, _Env);
+                      atom_to_item(E, Env);
                  (E)  ->
                       E
               end, A);
@@ -249,11 +256,11 @@ expand_macro(A, E, Macros) ->
     NewMacros = maps:merge(In, Out),
     Env = yal_util:proplists_replace(macros, NewMacros, E),
     %Env = In,
-    %%io:format("MapMacoo A ~p ~n InEnv ~p~n", [A, Env]),
+    %% io:format("MapMacoo A ~p ~n InEnv ~p~n", [A, Env]),
     Result = walk(A, Env, fun(Module, Function, Arguments) -> 
-                                  io:format("Apply Before ~p~n", [Module]),
+                                  %% io:format("Apply Before ~p~n", [Module]),
                                   R = apply(Module, Function, Arguments),
-                                  io:format("Apply result ~p~n", [R]),
+                                  %% io:format("Apply result ~p~n", [R]),
                                   R3 = atom_to_item(R, Env),
                                   %%R4 = expand_macro(R3, Env, Macros),
                                   %% io:format("resultR4 ~p~n", [R3]),
@@ -264,12 +271,12 @@ expand_macro(A, E, Macros) ->
 
 merge_into_env(Env, Key, Value) ->
     MEnv = proplists:to_map(Env),
-    io:format("merge_into_env ~p~n", [Env]),
+    %% io:format("merge_into_env ~p~n", [Env]),
     M = maps:get(Key, MEnv, maps:new()),
-    io:format("merge_into_envM ~p ~p~n", [M, Value]),
+    %% io:format("merge_into_envM ~p ~p~n", [M, Value]),
     R = maps:merge(M, Value),
     Ret = proplists:from_map(maps:put(Key, MEnv, R)),
-    io:format("merge_into_env ~p~n", [Ret]),
+    %% io:format("merge_into_env ~p~n", [Ret]),
     Ret.
     
 

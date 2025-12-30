@@ -22,7 +22,7 @@ backquote_test() ->
     io:format("Formed: ~p~n", [C]),
     ?assertEqual("lists:reverse(lists:append([[1], [2], [b]]))",
                  erl_prettypr:format(C)).
-%%    ?assertEqual(Expect, erl_syntax:revert(els_transpile:locline(C))).
+    %?assertEqual(Expect, erl_syntax:revert(els_transpile:locline(C))).
 
 backquote_atom_test() ->
     Line = 1,

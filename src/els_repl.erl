@@ -159,6 +159,8 @@ get_line(Env) ->
 repl_one(IN, _OUT, Line, Env, Acc) ->
     %%io:format("REPLONE: ~p~n Env: ~p~n", [Line, Env]),
     case  els_scan:read(IN, "els[~B]> ", Line, [], 0) of
+	{ok, [], NextLine, _Rest} ->
+	    repl_one(IN, _OUT, NextLine, Env, Acc);
 	{ok, Tokens, NextLine, _Rest} ->
 	    %%?LOG_DEBUG(#{nextline=> NextLine}),
 	    %%io:format("Repl_one: ~p~n", [Tokens]),
@@ -234,6 +236,8 @@ source(Src, Opt) ->
     Io = case Src of
 	     standard_io ->
 		 standard_io;
+	     P when is_pid(P) ->
+		 P;
 	     _ ->
 		 tiny_io_server:start_link(Src)
     end,

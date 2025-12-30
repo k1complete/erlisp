@@ -6,7 +6,7 @@
 
 -spec 'MACRO_backquote'(sexp()) -> sexp().
 'MACRO_backquote'(E)  -> 
-    %%io:format("bqquote L:~p~n", [E]),
+    %% io:format("bqquote L:~p~n", [E]),
     R = bc_([yal_util:make_symbol(backquote), E]),
     %%io:format("quote_ R: ~p~n", [R]),
     R.
