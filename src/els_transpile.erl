@@ -197,9 +197,9 @@ walk(F, Env, Fun) when is_list(F) ->
                 {M, Macro} ->
                     %% io:format("call-M: ~p~n", [F]),
                     A = Fun(M, Macro, tl(F)),
-                    %% io:format("call-M-Result: ~p~n", [A]),
 		    Env2 = [{loc, Loc}|Env],
 		    A2 = atom_to_item(A, Env2),
+                    %% io:format("call-M-Result: ~p~n", [{H, A2}]),
                     walk(A2, Env2, Fun);
                 undefined ->
                     [H | lists:map(fun (E) -> 
@@ -234,7 +234,9 @@ atom_to_item(A, Env) when is_list(A) ->
                       yal_util:make_symbol(E, Loc);
                  (E) when is_list(E) ->
                       atom_to_item(E, Env);
-                 (E)  ->
+                 (E) when is_record(E, item), E#item.loc =:= 0 ->
+                      E#item{loc=Loc};
+                 (E) ->
                       E
               end, A);
 atom_to_item(List, _Env) ->

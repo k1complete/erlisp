@@ -19,10 +19,14 @@ backquote_test() ->
     {ok, [Tree]} = els_parser:parse(Tokens),
     C = els_transpile:form(Tree, []),
     Expect = merl:quote(Line, "lists:reverse(lists:append([[1],[2],[b]]))"),
+    Expect2 = erl_syntax:revert(erl_syntax_lib:map(fun(E) -> 
+							   E
+						   end, 
+						   Expect)),
     io:format("Formed: ~p~n", [C]),
     ?assertEqual("lists:reverse(lists:append([[1], [2], [b]]))",
-                 erl_prettypr:format(C)).
-    %?assertEqual(Expect, erl_syntax:revert(els_transpile:locline(C))).
+                 erl_prettypr:format(C)),
+    ?assertEqual(Expect2, erl_syntax:revert(els_transpile:locline(C))).
 
 backquote_atom_test() ->
     Line = 1,
