@@ -66,6 +66,8 @@ Rules.
   {end_token, {read_macro, TokenLoc, 'backquote'}}.
 \! :
   {token, {'!', TokenLoc}}.
+#\\ :
+  {end_token, {read_macro, TokenLoc, 'escape'}}.
 # :
   {token, {symbol, TokenLoc, TokenChars}}.
 
@@ -97,6 +99,7 @@ Erlang code.
 %%-export([replace/5]).
 -export([read/5]).
 -export([replace/5]).
+-export([escape/5]).
 
 -define(IS_OPEN(X), is_map_key(X, #{'(' => 1, '{' => 1, '#{' => 1, '[' => 1})).
 -define(IS_CLOSE(X), is_map_key(X, #{')' => 1, '}' => 1, ']' => 1})).
@@ -124,6 +127,7 @@ do_calclevel(IO, Prompt0, [{read_macro, Loc, MChar}], {Acc, PreLevel}, _Line) ->
     RM = #{quote => {?MODULE, replace},
            backquote => {?MODULE, replace},
            unquote => {?MODULE, replace},
+           escape => {?MODULE, escape},
            unquote_splice => {?MODULE, replace}
           },
     {MM, MF} = maps:get(MChar, RM, {?MODULE, not_implemented}),
@@ -142,7 +146,38 @@ loctoline({Line, _Col}) ->
     Line;
 loctoline(Line) ->
     Line.
-    
+
+set_col_offset(Line, _Offset) when is_integer(Line) ->
+    Line;
+set_col_offset({Line, Col}, {Line, Offset}) ->
+    {Line, Col+Offset};
+set_col_offset({Line, Col}, {_, Offset}) ->
+    {Line, Col};
+set_col_offset(List, Offset) when is_list(List) ->
+    lists:map(fun(Token) ->
+		      case Token of 
+			  {X, Loc} ->
+			      {X, set_col_offset(Loc, Offset)};
+			  {X, Loc, Y} ->
+			      {X, set_col_offset(Loc, Offset), Y};
+			  X ->
+			      X
+		      end
+	      end, List).
+
+escape({IO, _Prompt0}, _M, _F, Loc, MChar) ->
+    {Line, Row} = Loc,
+    io:format("Loc: ~p, MChar: ~p~n", [Loc, MChar]),
+    C = io:get_chars(IO, "", 1),
+    {Line, Col} = Loc,
+    NLoc = set_col_offset({Line, Col}, {Line, 2}),
+    Ret = read1(IO, _Prompt0, NLoc, [], 0),
+    {ok, Tokens, NextLine, Rest} = Ret,
+    NTokens = set_col_offset(Tokens, NLoc),
+    NRest = set_col_offset(Rest, NLoc),
+    io:format("escaped: ~p,~p,~p~n", [Row, NTokens, NRest]),
+    {ok, [{string, {Line, Row+1}, C}], Line, NTokens++NRest}.
+
 replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
     %Ret = read(IO, Prompt0, loctoline(Loc), [], 0),
     %% io:format("replace-2before ~p~n", [MChar]),
@@ -165,27 +200,17 @@ replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
     %%io:format("~nOPT ~p~n Loc ~p~n", [io:getopts(IO), Loc]),
     %% RC = io:get_chars(IO, "GETC", 0),
     %% io:format("Getchars ~p~n", [RC]),
-    Ret = read1(IO, _Prompt0, loctoline(Loc), [], 0),
+    %% Ret = read1(IO, _Prompt0, loctoline(Loc), [], 0),
+    Ret = read1(IO, _Prompt0, Loc, [], 0),
     %% Ret = read(IO, "", loctoline(Loc), [], 0),
     %%io:format("~nOPT2 ~p~n Ret ~p~n", [io:getopts(IO), Ret]),
     %% io:setopts([{echo, true}]),
     %%io:format("replace-2read ~p~n", [Ret]),
     {ok, Tokens, NextLine, Rest} = Ret,
-    {_L, ACol} = Loc,
-    N2Tokens = lists:map(fun({T, {L, C}, V}) ->
-                                 {T, {L, C+ACol}, V};
-                            ({T, {L, C}}) ->
-                                 {T, {L, C+ACol}};
-                            (T) ->
-                                 T
-                         end, Tokens),
-    N2Rest = lists:map(fun({T, {L, C}, V}) ->
-                                 {T, {L, C+ACol}, V};
-                          ({T, {L, C}}) ->
-                                 {T, {L, C+ACol}};
-                          (T) ->
-                               T
-                         end, Rest),
+    N2Tokens = set_col_offset(Tokens, Loc),
+    N2Rest = set_col_offset(Rest, Loc),
+    %%N2Tokens = Tokens,
+    %%N2Rest = Rest,
     NewTokens = [{'(', Loc}, 
                  {symbol, Loc, atom_to_list(MChar)} | 
                  N2Tokens ++ [{')', Loc}]],
@@ -273,7 +298,7 @@ tokens2(Cont, Chars, Line) ->
     %%io:format("--out--- ~p ~n ", [R]),
     R.
 
-read_do(IO, Prompt0, Prompt, Line, PrevTokens, PrevLevel) ->
+read_do(IO, Prompt0, Prompt, {Line, Col}, PrevTokens, PrevLevel) ->
     case io:request(IO, {get_until, unicode, Prompt, ?MODULE, tokens2, [Line]}) of
         {ok, NewTokens, NextLine} ->
             %%?LOG_DEBUG(#{prevlevel => PrevLevel,
@@ -286,10 +311,13 @@ read_do(IO, Prompt0, Prompt, Line, PrevTokens, PrevLevel) ->
 		    true
 	    end,
 	    %%io:format("IOopt ~p~n", [io:getopts(IO)]),
-
-            {NewTokens2, NextLine2} =  multiline_quote(IO, NextLine, NewTokens),
+	    N2NextLine=NextLine,
+	    N2NewTokens=NewTokens,
+	    %%N2NextLine=set_col_offset(NextLine, {Line, Col}),
+	    %%N2NewTokens=set_col_offset(NewTokens, {Line, Col}),
+            {NewTokens2, NextLine2} =  multiline_quote(IO, N2NextLine, N2NewTokens),
             %%?LOG_DEBUG(#{adjust_level => PrevTokens++NewTokens2}),
-	    %%io:format("Requested:[~p], [~p]~n", [PrevTokens, NewTokens2]),
+	    io:format("Requested:[~p], [~p]~n", [PrevTokens, NewTokens2]),
             %adjust_level(IO, Prompt0, PrevTokens++NewTokens2, PrevLevel, NextLine2);
             adjust_level(IO, Prompt0, PrevTokens++NewTokens2, 0, NextLine2);
         {eof, NextLine} ->
@@ -302,7 +330,9 @@ read_do(IO, Prompt0, Prompt, Line, PrevTokens, PrevLevel) ->
             io:format(
                       "Error! sss ~p, ~p, ~p ~n",[Error, PrevTokens, PrevLevel]),
             Error
-    end.
+    end;
+read_do(IO, Prompt0, Prompt, Line, PrevTokens, PrevLevel) when is_integer(Line) ->
+    read_do(IO, Prompt0, Prompt, {Line, 1}, PrevTokens, PrevLevel).
 
 read(IO, Prompt0, Line, PrevTokens, PrevLevel) when length(PrevTokens) > 0 andalso PrevLevel == 0 ->
     %%io:format("CalcLevel PreVTokens   ~p ~n PrevLevel ~p!!!~n", [PrevTokens, PrevLevel]),
