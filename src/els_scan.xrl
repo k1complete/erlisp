@@ -151,7 +151,7 @@ set_col_offset(Line, _Offset) when is_integer(Line) ->
     Line;
 set_col_offset({Line, Col}, {Line, Offset}) ->
     {Line, Col+Offset};
-set_col_offset({Line, Col}, {_, Offset}) ->
+set_col_offset({Line, Col}, {_, _Offset}) ->
     {Line, Col};
 set_col_offset(List, Offset) when is_list(List) ->
     lists:map(fun(Token) ->
@@ -165,56 +165,42 @@ set_col_offset(List, Offset) when is_list(List) ->
 		      end
 	      end, List).
 
-escape({IO, _Prompt0}, _M, _F, Loc, MChar) ->
+escape({IO, _Prompt0}, _M, _F, Loc, _MChar) ->
     {Line, Row} = Loc,
-    io:format("Loc: ~p, MChar: ~p~n", [Loc, MChar]),
+    %% io:format("Loc: ~p, MChar: ~p~n", [Loc, MChar]),
     C = io:get_chars(IO, "", 1),
     {Line, Col} = Loc,
     NLoc = set_col_offset({Line, Col}, {Line, 2}),
-    Ret = read1(IO, _Prompt0, NLoc, [], 0),
+    Ret = read(IO, _Prompt0, NLoc, [], 0),
     {ok, Tokens, NextLine, Rest} = Ret,
-    NTokens = set_col_offset(Tokens, NLoc),
-    NRest = set_col_offset(Rest, NLoc),
-    io:format("escaped: ~p,~p,~p~n", [Row, NTokens, NRest]),
-    {ok, [{string, {Line, Row+1}, C}], Line, NTokens++NRest}.
+    {ok, [{string, {Line, Row+1}, C}], NextLine, Tokens++Rest}.
 
-replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
-    %Ret = read(IO, Prompt0, loctoline(Loc), [], 0),
-    %% io:format("replace-2before ~p~n", [MChar]),
-    %%
-    %%%  
+set_echo_off(IO) ->
     Opts = io:getopts(IO),
     if IO == standard_io ->
 	    case lists:keyfind(echo, 1, Opts) of
 		{echo, true} ->
-		    %%io:format("Opts ~p~n", [Opts]),
 		    io:setopts([{echo, false}]);
-		_  ->
-		    io:format("", []),
+               _  ->
 		    true
 	    end;
        true ->
 	    true
-    end,
-    %% Ret = read(IO, "", loctoline(Loc), [], 0),
-    %%io:format("~nOPT ~p~n Loc ~p~n", [io:getopts(IO), Loc]),
-    %% RC = io:get_chars(IO, "GETC", 0),
-    %% io:format("Getchars ~p~n", [RC]),
-    %% Ret = read1(IO, _Prompt0, loctoline(Loc), [], 0),
-    Ret = read1(IO, _Prompt0, Loc, [], 0),
-    %% Ret = read(IO, "", loctoline(Loc), [], 0),
-    %%io:format("~nOPT2 ~p~n Ret ~p~n", [io:getopts(IO), Ret]),
-    %% io:setopts([{echo, true}]),
-    %%io:format("replace-2read ~p~n", [Ret]),
-    {ok, Tokens, NextLine, Rest} = Ret,
-    N2Tokens = set_col_offset(Tokens, Loc),
-    N2Rest = set_col_offset(Rest, Loc),
-    %%N2Tokens = Tokens,
-    %%N2Rest = Rest,
+    end.
+    
+replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
+    set_echo_off(IO),
+    {NL, NC} = Loc,
+    Off = case {MChar, NC} of
+	      {backquote,1} -> 0;
+	      _ -> 0
+	  end,
+    %% io:format("~nOPT ~p~n", [{Loc, MChar, Off}]),
+    {ok, Tokens, NextLine, Rest} = read(IO, _Prompt0, {NL, NC+Off}, [], 0),
     NewTokens = [{'(', Loc}, 
                  {symbol, Loc, atom_to_list(MChar)} | 
-                 N2Tokens ++ [{')', Loc}]],
-    {ok, NewTokens, NextLine, N2Rest}.
+                 Tokens ++ [{')', Loc}]],
+    {ok, NewTokens, NextLine, Rest}.
 
 make_prompt(_IO, [], _Line, _PrevTokens) ->
     "";
@@ -298,30 +284,27 @@ tokens2(Cont, Chars, Line) ->
     %%io:format("--out--- ~p ~n ", [R]),
     R.
 
-read_do(IO, Prompt0, Prompt, {Line, Col}, PrevTokens, PrevLevel) ->
+read_do(IO, Prompt0, {Line, Col}, PrevTokens, PrevLevel) ->
+    Prompt = case Col of
+		 0 -> make_prompt(IO, Prompt0, Line, PrevTokens);
+		 _ -> ""
+	     end,
     case io:request(IO, {get_until, unicode, Prompt, ?MODULE, tokens2, [Line]}) of
         {ok, NewTokens, NextLine} ->
             %%?LOG_DEBUG(#{prevlevel => PrevLevel,
-	    %%prevtokens => PrevTokens,
-	    %%newtokens => NewTokens}),
-	    %%io:format("get tokens ~p~n", [NewTokens]),
+	    %%io:format("get tokens Col: ~p ~p ~p~n", [Col, NewTokens, NextLine]),
 	    if  IO == standard_io ->
 		    io:setopts(IO, [{echo, true}]);
 		true ->
 		    true
 	    end,
-	    %%io:format("IOopt ~p~n", [io:getopts(IO)]),
-	    N2NextLine=NextLine,
-	    N2NewTokens=NewTokens,
-	    %%N2NextLine=set_col_offset(NextLine, {Line, Col}),
-	    %%N2NewTokens=set_col_offset(NewTokens, {Line, Col}),
+	    N2NextLine=set_col_offset(NextLine, {Line, Col}),
+	    N2NewTokens=set_col_offset(NewTokens, {Line, Col}),
             {NewTokens2, NextLine2} =  multiline_quote(IO, N2NextLine, N2NewTokens),
             %%?LOG_DEBUG(#{adjust_level => PrevTokens++NewTokens2}),
-	    io:format("Requested:[~p], [~p]~n", [PrevTokens, NewTokens2]),
-            %adjust_level(IO, Prompt0, PrevTokens++NewTokens2, PrevLevel, NextLine2);
             adjust_level(IO, Prompt0, PrevTokens++NewTokens2, 0, NextLine2);
         {eof, NextLine} ->
-	    io:format("PrevTokens ~p~n", [PrevTokens]),
+	    %%io:format("PrevTokens ~p~n", [PrevTokens]),
             {eof, PrevTokens, NextLine, []};
         {error, terminated} ->
             %io:format("PrevTokens ~p~n", [PrevTokens]),
@@ -331,20 +314,13 @@ read_do(IO, Prompt0, Prompt, {Line, Col}, PrevTokens, PrevLevel) ->
                       "Error! sss ~p, ~p, ~p ~n",[Error, PrevTokens, PrevLevel]),
             Error
     end;
-read_do(IO, Prompt0, Prompt, Line, PrevTokens, PrevLevel) when is_integer(Line) ->
-    read_do(IO, Prompt0, Prompt, {Line, 1}, PrevTokens, PrevLevel).
+read_do(IO, Prompt0, Line, PrevTokens, PrevLevel) when is_integer(Line) ->
+    read_do(IO, Prompt0, {Line, 0}, PrevTokens, PrevLevel).
 
 read(IO, Prompt0, Line, PrevTokens, PrevLevel) when length(PrevTokens) > 0 andalso PrevLevel == 0 ->
-    %%io:format("CalcLevel PreVTokens   ~p ~n PrevLevel ~p!!!~n", [PrevTokens, PrevLevel]),
     adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line);
 read(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
-    Prompt = make_prompt(IO, Prompt0, Line, PrevTokens),
-    %% io:format("Read PreVTokens  ~p ~n PrevLevel <~p> IO <~p> P <~p>~n", [PrevTokens, PrevLevel, IO, Prompt]),
-    read_do(IO, Prompt0, Prompt, Line, PrevTokens, PrevLevel).
-
-read1(IO, Prompt0, Line, PrevTokens, PrevLevel) ->
-    read_do(IO, Prompt0, "", Line, PrevTokens, PrevLevel).
-    
+    read_do(IO, Prompt0, Line, PrevTokens, PrevLevel).
 
 from_string_rest(IO, Line, Rest, Acc) ->
     case read(IO, [], Line, Rest, 0) of
@@ -375,7 +351,7 @@ from_string(String, Line) ->
 reads(IO, File, Line, PrevTokens, Acc) ->
     case read(IO, [], Line, PrevTokens, 0) of
         {ok, [], _, RestTokens}  ->
-            io:format("ReadsRET: ~p~n", [{Acc, RestTokens}]),
+            %%io:format("ReadsRET: ~p~n", [{Acc, RestTokens}]),
             {ok, Acc++RestTokens};
         {ok, Tokens, NextLine, RestTokens} ->
             logger:degbug(#{reads=> Tokens}),

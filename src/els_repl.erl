@@ -260,6 +260,7 @@ tty(Args) ->
     %%io:format("getopts ~p~n", [io:getopts(standard_io)]),
     %%io:format("keymap ~p~n", [edlin:keymap()]),
     logger:update_primary_config(S#{level => debug}),
+
     repl(standard_io, standard_io, 1, init(Args)).
 
     
