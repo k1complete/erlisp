@@ -175,19 +175,22 @@ escape({IO, _Prompt0}, _M, _F, Loc, _MChar) ->
     {ok, Tokens, NextLine, Rest} = Ret,
     {ok, [{string, {Line, Row+1}, C}], NextLine, Tokens++Rest}.
 
-set_echo_off(IO) ->
-    Opts = io:getopts(IO),
-    if IO == standard_io ->
-	    case lists:keyfind(echo, 1, Opts) of
-		{echo, true} ->
-		    io:setopts([{echo, false}]);
-               _  ->
-		    true
-	    end;
-       true ->
+set_echo_on(standard_io) ->
+    io:setopts([{echo, true}]);
+set_echo_on(_) ->
+    true.
+
+set_echo_off(standard_io) ->
+    Opts = io:getopts(standard_io),
+    case lists:keyfind(echo, 1, Opts) of
+	{echo, true} ->
+	    io:setopts([{echo, false}]);
+	_  ->
 	    true
-    end.
-    
+    end;
+set_echo_off(_) ->
+    true.
+
 replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
     set_echo_off(IO),
     {NL, NC} = Loc,
@@ -286,18 +289,18 @@ tokens2(Cont, Chars, Line) ->
 
 read_do(IO, Prompt0, {Line, Col}, PrevTokens, PrevLevel) ->
     Prompt = case Col of
-		 0 -> make_prompt(IO, Prompt0, Line, PrevTokens);
-		 _ -> ""
+		 0 -> 
+		     set_echo_on(IO),
+		     make_prompt(IO, Prompt0, Line, PrevTokens);
+		 _ -> 
+		     set_echo_off(IO),
+		     ""
 	     end,
     case io:request(IO, {get_until, unicode, Prompt, ?MODULE, tokens2, [Line]}) of
         {ok, NewTokens, NextLine} ->
             %%?LOG_DEBUG(#{prevlevel => PrevLevel,
 	    %%io:format("get tokens Col: ~p ~p ~p~n", [Col, NewTokens, NextLine]),
-	    if  IO == standard_io ->
-		    io:setopts(IO, [{echo, true}]);
-		true ->
-		    true
-	    end,
+	    set_echo_on(IO),
 	    N2NextLine=set_col_offset(NextLine, {Line, Col}),
 	    N2NewTokens=set_col_offset(NewTokens, {Line, Col}),
             {NewTokens2, NextLine2} =  multiline_quote(IO, N2NextLine, N2NewTokens),
