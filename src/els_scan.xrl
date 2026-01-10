@@ -175,31 +175,35 @@ escape({IO, _Prompt0}, _M, _F, Loc, _MChar) ->
     {ok, Tokens, NextLine, Rest} = Ret,
     {ok, [{string, {Line, Row+1}, C}], NextLine, Tokens++Rest}.
 
-set_echo_on(standard_io) ->
-    io:setopts([{echo, true}]);
-set_echo_on(_) ->
-    true.
 
-set_echo_off(standard_io) ->
-    Opts = io:getopts(standard_io),
-    case lists:keyfind(echo, 1, Opts) of
-	{echo, true} ->
-	    io:setopts([{echo, false}]);
-	_  ->
+set_echo(IO, Bool) ->
+    R= case get(term) of
+	   undefined -> false;
+	   S -> proplists:get_value(echo, S, false)
+       end,
+    Opts = case io:getopts(IO) of
+	       undefined -> false;
+	       S2 -> proplists:get_value(echo, S2, false)
+	   end,
+    %% io:format("on befgore Opts: ~p~n~p~n", [Opts, R]),
+    case {R, Opts, Bool} of
+	{true, O, B} when O =/= B ->
+	    io:setopts(IO, [{echo, Bool}]);
+	{true, O, O} ->
+	    true;
+	{false, _, _} ->
 	    true
-    end;
-set_echo_off(_) ->
-    true.
+    end.
+    
+set_echo_on(IO) ->
+    set_echo(IO, true).
+
+set_echo_off(IO) ->
+    set_echo(IO, false).
 
 replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
-    set_echo_off(IO),
     {NL, NC} = Loc,
-    Off = case {MChar, NC} of
-	      {backquote,1} -> 0;
-	      _ -> 0
-	  end,
-    %% io:format("~nOPT ~p~n", [{Loc, MChar, Off}]),
-    {ok, Tokens, NextLine, Rest} = read(IO, _Prompt0, {NL, NC+Off}, [], 0),
+    {ok, Tokens, NextLine, Rest} = read(IO, _Prompt0, {NL, NC}, [], 0),
     NewTokens = [{'(', Loc}, 
                  {symbol, Loc, atom_to_list(MChar)} | 
                  Tokens ++ [{')', Loc}]],
@@ -296,7 +300,13 @@ read_do(IO, Prompt0, {Line, Col}, PrevTokens, PrevLevel) ->
 		     set_echo_off(IO),
 		     ""
 	     end,
-    case io:request(IO, {get_until, unicode, Prompt, ?MODULE, tokens2, [Line]}) of
+    Ret =  io:request(IO, {get_until, unicode, Prompt, ?MODULE, tokens2, [Line]}),
+    %% io:format("read ret ~p~n", [Ret]),
+    case Ret of
+        {ok, [{'\n',NL_Loc}], NextLine} ->
+	    read(IO, Prompt0, {NextLine, 0}, PrevTokens, PrevLevel);
+        {ok, [], NextLine} ->
+	    read(IO, Prompt0, {NextLine, 0}, PrevTokens, PrevLevel);
         {ok, NewTokens, NextLine} ->
             %%?LOG_DEBUG(#{prevlevel => PrevLevel,
 	    %%io:format("get tokens Col: ~p ~p ~p~n", [Col, NewTokens, NextLine]),

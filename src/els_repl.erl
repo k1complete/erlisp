@@ -159,8 +159,6 @@ get_line(Env) ->
 repl_one(IN, _OUT, Line, Env, Acc) ->
     %%io:format("REPLONE: ~p~n Env: ~p~n", [Line, Env]),
     case  els_scan:read(IN, "els[~B]> ", Line, [], 0) of
-	{ok, [], NextLine, _Rest} ->
-	    repl_one(IN, _OUT, NextLine, Env, Acc);
 	{ok, Tokens, NextLine, _Rest} ->
 	    %%?LOG_DEBUG(#{nextline=> NextLine}),
 	    %%io:format("Repl_one: ~p~n", [Tokens]),
@@ -217,6 +215,8 @@ output(Out, Error) ->
 
     
 repl(Io, Out, Line, Env0) ->
+    put(term, io:getopts()),
+    %%io:format("Term: ~p~n", [get(term)]),
     try 
 	%% io:format("opt: ~p~n ~p~n", [Io, io:getopts(Io)]),
 	source_acc(Io, Out, Line, Env0, [], fun output/2)
