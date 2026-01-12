@@ -105,7 +105,7 @@ Erlang code.
 -define(IS_CLOSE(X), is_map_key(X, #{')' => 1, '}' => 1, ']' => 1})).
 
 -export([tokens2/2, tokens2/3]).
-
+-export([get_parens/2]).
   
 calclevel(IO, Prompt0, Tokens, GLevel, Line) ->
 %%    io:format("calclevel [~p]~n", [Tokens]),
@@ -209,9 +209,9 @@ replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
                  Tokens ++ [{')', Loc}]],
     {ok, NewTokens, NextLine, Rest}.
 
-make_prompt(_IO, [], _Line, _PrevTokens) ->
+make_prompt(_IO, [], _Line, _PrevTokens, _PrevLevel) ->
     "";
-make_prompt(IO, Prompt, Line, []) ->
+make_prompt(IO, Prompt, Line, [], Prevlevel) ->
     Opt = io:getopts(IO),
     case proplists:get_value(terminal, Opt, false) of
 	true ->
@@ -219,16 +219,30 @@ make_prompt(IO, Prompt, Line, []) ->
 	false ->
 	    ""
     end;
-make_prompt(IO, Prompt, Line, _PrevTokens) ->
+make_prompt(IO, Prompt, Line, PrevTokens, PrevLevel) ->
     Opt = io:getopts(IO),
     case proplists:get_value(terminal, Opt, false) of
 	true ->
+	    %%io:format("l:~p~nt:~p~n", [PrevLevel, PrevTokens]),
+	    %%S = io_lib:format(Prompt, [loctoline(Line)]),
 	    S = io_lib:format(Prompt, [loctoline(Line)]),
-	    string:pad(" ", length(S)),
-	    S;
+	    P = string:pad(get_parens(PrevTokens, PrevLevel), length(S)-2, leading),
+	    P++". ";
 	false ->
 	    ""
     end.
+
+%% 
+get_parens(Tokens, Len) ->
+    R = lists:foldl(
+	  fun({I, _}, A) when I == '('; I == '{'; I == '[' ->
+		  [atom_to_list(I)|A];
+	     ({I, _}, [_|A]) when I == ')'; I == '}'; I == ']' ->
+		  A;
+	     (_, A) ->
+		  A
+	  end, [], Tokens),
+    lists:flatten(lists:reverse(R)).
 
 adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line) ->
     {NNewTokens, NLevel, Rest, NewLine} = calclevel(IO, Prompt0, PrevTokens, PrevLevel, Line),
@@ -259,12 +273,12 @@ read_multiline(IO, Line, Add, Stop, Col) ->
             {Add, Line+1};
         Data ->
 	    SS = string:slice(Data, Col-1),
-	    io:format("GetLine ~p FFF ~p ~p ~p ~p~n", [Stop, Data, Stop=:=Data, SS, Col]),
+	    %%%io:format("GetLine ~p FFF ~p ~p ~p ~p~n", [Stop, Data, Stop=:=Data, SS, Col]),
 	    case SS of
 		Stop ->
 		    {Add, Line+1};
 		Rest ->
-		    io:format("GetLine ~p vi ~p ~p~n", [Stop, Data, Stop=:=Data]),
+		    %%%io:format("GetLine ~p vi ~p ~p~n", [Stop, Data, Stop=:=Data]),
 		    read_multiline(IO, Line+1, string:concat(Add ,Rest), Stop, Col)
 	    end
     end.
@@ -272,11 +286,11 @@ read_multiline(IO, Line, Add, Stop, Col) ->
 multiline_quote(IO, Line, Tokens) ->
     case hd(Tokens) of
         {'"""', {_, Col}} ->
-	    io:format("--------\n", []),
+	    %%%io:format("--------\n", []),
             {MT, L} = read_multiline(IO, Line, "",
                                      "\"\"\"\n", Col),
             MM = {[{string, Line, MT}],L},
-	    io:format("REST: ~p n ~p~n", [Tokens,MM]),
+	    %%% io:format("REST: ~p n ~p~n", [Tokens,MM]),
             MM;
         _ ->
             {Tokens, Line}
@@ -295,7 +309,7 @@ read_do(IO, Prompt0, {Line, Col}, PrevTokens, PrevLevel) ->
     Prompt = case Col of
 		 0 -> 
 		     set_echo_on(IO),
-		     make_prompt(IO, Prompt0, Line, PrevTokens);
+		     make_prompt(IO, Prompt0, Line, PrevTokens, PrevLevel);
 		 _ -> 
 		     set_echo_off(IO),
 		     ""

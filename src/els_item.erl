@@ -29,7 +29,7 @@ from_erl(T, F) when is_list(T) ->
     end,
     case S of
         true ->
-            F(#item{type=string, value=io_lib:format("~s", [T])});
+            F(#item{type=string, value=io_lib:format("~ts", [T])});
         false  ->
             lists:map(fun(E) ->
                               from_erl(E, F)

@@ -184,6 +184,9 @@ repl_one(IN, _OUT, Line, Env, Acc) ->
 			throw({error, Reason, Env})
 		end,
 	    Return;
+	{error, {ELoc, Mod, Reason}, NextLoc} ->
+	    Nenv = add_line(Env, NextLoc),
+	    {error, {ELoc, Mod, Reason}, NextLoc, Nenv};
 	{eof, [], _, _} ->
 	    {eof, Acc, Env}
     end.
@@ -200,6 +203,9 @@ source_acc(Io, Out, Nline, Env0, RetAcc, OutFun) ->
 	{value, Ret, Env} ->
 	    OutFun(Out, {value, Ret, Env}),
 	    source_acc(Io, Out, get_line(Env), Env, Ret, OutFun);
+	{error, Reason, NextLoc, Env} ->
+	    OutFun(Out, {error, Reason, Env}),
+	    source_acc(Io, Out, get_line(Env), Env, RetAcc, OutFun);
 	{error, Ret, Env} ->
 	    OutFun(Out, {error, Ret, Env});
 	%%{error, Ret, Env};
@@ -209,9 +215,9 @@ source_acc(Io, Out, Nline, Env0, RetAcc, OutFun) ->
     end.
 
 output(Out, {value, Value, _Env}) ->
-    io:format(Out, "~s~n", [els_pp:format(Value, 80)]);
+    io:format(Out, "~ts~n", [els_pp:format(Value, 80)]);
 output(Out, Error) ->
-    io:format(Out, "~s~n", [els_pp:format(Error, 80)]).
+    io:format(Out, "~ts~n", [els_pp:format(Error, 80)]).
 
     
 repl(Io, Out, Line, Env0) ->
