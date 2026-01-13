@@ -105,7 +105,7 @@ Erlang code.
 -define(IS_CLOSE(X), is_map_key(X, #{')' => 1, '}' => 1, ']' => 1})).
 
 -export([tokens2/2, tokens2/3]).
--export([get_parens/2]).
+-export([get_parens/3]).
   
 calclevel(IO, Prompt0, Tokens, GLevel, Line) ->
 %%    io:format("calclevel [~p]~n", [Tokens]),
@@ -131,10 +131,26 @@ do_calclevel(IO, Prompt0, [{read_macro, Loc, MChar}], {Acc, PreLevel}, _Line) ->
            unquote_splice => {?MODULE, replace}
           },
     {MM, MF} = maps:get(MChar, RM, {?MODULE, not_implemented}),
-    %% io:format("calc-apply before: ~p ~p ~n [~p] ~n", [Loc, Acc, Prompt0]),
-    {ok, NewTokens, NewLoc, RestTokens} = apply(MM, MF, [{IO, Prompt0}, ?MODULE, read, 
+    %%PrevTokens = case put(prevtokens, Acc) of
+    %%		     undefined ->
+    %%			 [];
+    %%		     X -> 
+    %%			 X
+    %%		 end,
+    PrevTokens = Acc,
+    %%io:format("calc-apply before: ~p~n", [Acc]),
+    NPrompt = case Prompt0 of
+		  {P, T} ->
+		      {P, T++PrevTokens};
+		  P when is_list(P) ->
+		      {P, PrevTokens}
+	      end,
+    {ok, NewTokens, NewLoc, RestTokens} = apply(MM, MF, [{IO, NPrompt}, ?MODULE, read, 
                                                          Loc, MChar]),
-    %io:format("calc-apply after: NT ~p Rest ~p PL ~p ~n", [NewTokens, RestTokens, PreLevel]),
+
+    %%put(prevtokens, PrevTokens),
+    %% io:format("calc-apply after: NT ~p ~n", [PrevTokens]),
+    
     do_calclevel(IO, Prompt0, RestTokens, {Acc ++ NewTokens, PreLevel}, NewLoc);
 do_calclevel(IO, Prompt0, [{'\n', _Loc} | Tokens], {Acc, PreLevel}, Line) ->
     do_calclevel(IO, Prompt0, Tokens, {Acc, PreLevel}, Line);
@@ -211,29 +227,54 @@ replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
 
 make_prompt(_IO, [], _Line, _PrevTokens, _PrevLevel) ->
     "";
-make_prompt(IO, Prompt, Line, [], Prevlevel) ->
+make_prompt(IO, Prompt, Line, Tokens, PrevLevel) when is_list(Prompt) ->
+    make_prompt(IO, {Prompt, []}, Line, Tokens, PrevLevel);
+make_prompt(IO, {Prompt, PrevTokens}, Line, [], PrevLevel) ->
     Opt = io:getopts(IO),
     case proplists:get_value(terminal, Opt, false) of
 	true ->
-	    io_lib:format(Prompt, [loctoline(Line)]);
+	    case PrevTokens of 
+		[] ->
+		    io_lib:format(Prompt, [loctoline(Line)]);
+		_ ->
+		    %% io:format("P: ~p~nTokens: ~p~n", [Prompt, PrevTokens]),
+		    S = io_lib:format(Prompt, [loctoline(Line)]),
+		    P = string:pad(get_parens(PrevTokens, [], PrevLevel), length(S)-2, leading),
+		    P++". "
+	    end;
 	false ->
 	    ""
     end;
-make_prompt(IO, Prompt, Line, PrevTokens, PrevLevel) ->
+make_prompt(IO, {Prompt, PPrevTokens}, Line, PrevTokens, PrevLevel) ->
     Opt = io:getopts(IO),
     case proplists:get_value(terminal, Opt, false) of
 	true ->
 	    %%io:format("l:~p~nt:~p~n", [PrevLevel, PrevTokens]),
 	    %%S = io_lib:format(Prompt, [loctoline(Line)]),
 	    S = io_lib:format(Prompt, [loctoline(Line)]),
-	    P = string:pad(get_parens(PrevTokens, PrevLevel), length(S)-2, leading),
+	    P = string:pad(get_parens(PPrevTokens, PrevTokens, PrevLevel), length(S)-2, leading),
 	    P++". ";
 	false ->
 	    ""
     end.
 
 %% 
-get_parens(Tokens, Len) ->
+
+get_parens(PrevTokens, Tokens, Level) ->
+    %%    PrevTokens = case get(prevtokens) of 
+    %%undefined ->
+    %%			 [];
+    %%		     X ->
+    %%			 X
+    %%		 end,
+    %%io:format("PrevTokens: ~p~n", [PrevTokens]),
+    %%io:format("Tokens: ~p~n", [Tokens]),
+    CTokens = case Tokens of
+		  undefined ->
+		      PrevTokens;
+		  _ ->
+		      PrevTokens++Tokens
+	      end,
     R = lists:foldl(
 	  fun({I, _}, A) when I == '('; I == '{'; I == '[' ->
 		  [atom_to_list(I)|A];
@@ -241,7 +282,7 @@ get_parens(Tokens, Len) ->
 		  A;
 	     (_, A) ->
 		  A
-	  end, [], Tokens),
+	  end, [], CTokens),
     lists:flatten(lists:reverse(R)).
 
 adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line) ->

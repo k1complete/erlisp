@@ -12,7 +12,7 @@ paren_test() ->
 	 {'{',{4,8}},
 	 {integer,{4,10},1},
 	 {integer,{5,2},2}],
-    Tokens = els_scan:get_parens(L, 2),
+    Tokens = els_scan:get_parens([], L, 2),
     Expect = "({",
     ?assertEqual(Expect, Tokens).
 paren_close_test() ->
@@ -23,6 +23,6 @@ paren_close_test() ->
 	 {'}',{4,8}},
 	 {integer,{4,10},1},
 	 {integer,{5,2},2}],
-    Tokens = els_scan:get_parens(L, 2),
+    Tokens = els_scan:get_parens([], L, 2),
     Expect = "(",
     ?assertEqual(Expect, Tokens).
