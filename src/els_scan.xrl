@@ -225,6 +225,13 @@ replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
                  Tokens ++ [{')', Loc}]],
     {ok, NewTokens, NextLine, Rest}.
 
+make_quote_prompt([], _Line, QuoteStr) ->
+    "";
+make_quote_prompt(Prompt, Line, QuoteStr) ->
+    S = io_lib:format(Prompt, [loctoline(Line)]),
+    P = string:pad(QuoteStr, length(S)-2, leading),
+    P ++ ". ".
+
 make_prompt(_IO, [], _Line, _PrevTokens, _PrevLevel) ->
     "";
 make_prompt(IO, Prompt, Line, Tokens, PrevLevel) when is_list(Prompt) ->
@@ -304,8 +311,9 @@ adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line) ->
             {ok, Tokens, NewLine, Rest} 
     end.
 
-read_multiline(IO, Line, Add, Stop, Col) ->
-    case io:get_line(IO, "") of
+read_multiline(IO, Prompt0, Line, Add, Stop, Col) ->
+    Prompt = make_quote_prompt(Prompt0, Line, "\"\"\""),
+    case io:get_line(IO, Prompt) of
         {error, Error} ->
             {error, Error};
         eof ->
@@ -320,15 +328,15 @@ read_multiline(IO, Line, Add, Stop, Col) ->
 		    {Add, Line+1};
 		Rest ->
 		    %%%io:format("GetLine ~p vi ~p ~p~n", [Stop, Data, Stop=:=Data]),
-		    read_multiline(IO, Line+1, string:concat(Add ,Rest), Stop, Col)
+		    read_multiline(IO, Prompt0, Line+1, string:concat(Add ,Rest), Stop, Col)
 	    end
     end.
 
-multiline_quote(IO, Line, Tokens) ->
+multiline_quote(IO, Prompt0, Line, Tokens) ->
     case hd(Tokens) of
         {'"""', {_, Col}} ->
 	    %%%io:format("--------\n", []),
-            {MT, L} = read_multiline(IO, Line, "",
+            {MT, L} = read_multiline(IO, Prompt0, Line, "",
                                      "\"\"\"\n", Col),
             MM = {[{string, Line, MT}],L},
 	    %%% io:format("REST: ~p n ~p~n", [Tokens,MM]),
@@ -368,7 +376,7 @@ read_do(IO, Prompt0, {Line, Col}, PrevTokens, PrevLevel) ->
 	    set_echo_on(IO),
 	    N2NextLine=set_col_offset(NextLine, {Line, Col}),
 	    N2NewTokens=set_col_offset(NewTokens, {Line, Col}),
-            {NewTokens2, NextLine2} =  multiline_quote(IO, N2NextLine, N2NewTokens),
+            {NewTokens2, NextLine2} =  multiline_quote(IO, Prompt0, N2NextLine, N2NewTokens),
             %%?LOG_DEBUG(#{adjust_level => PrevTokens++NewTokens2}),
             adjust_level(IO, Prompt0, PrevTokens++NewTokens2, 0, NextLine2);
         {eof, NextLine} ->
