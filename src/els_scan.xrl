@@ -67,7 +67,7 @@ Rules.
 \! :
   {token, {'!', TokenLoc}}.
 #\\ :
-  {end_token, {read_macro, TokenLoc, 'escape'}}.
+  {end_token, {read_macro, TokenLoc, 'character_literal'}}.
 # :
   {token, {symbol, TokenLoc, TokenChars}}.
 
@@ -99,7 +99,7 @@ Erlang code.
 %%-export([replace/5]).
 -export([read/5]).
 -export([replace/5]).
--export([escape/5]).
+-export([character_literal/5]).
 
 -define(IS_OPEN(X), is_map_key(X, #{'(' => 1, '{' => 1, '#{' => 1, '[' => 1})).
 -define(IS_CLOSE(X), is_map_key(X, #{')' => 1, '}' => 1, ']' => 1})).
@@ -127,7 +127,7 @@ do_calclevel(IO, Prompt0, [{read_macro, Loc, MChar}], {Acc, PreLevel}, _Line) ->
     RM = #{quote => {?MODULE, replace},
            backquote => {?MODULE, replace},
            unquote => {?MODULE, replace},
-           escape => {?MODULE, escape},
+           character_literal => {?MODULE, character_literal},
            unquote_splice => {?MODULE, replace}
           },
     {MM, MF} = maps:get(MChar, RM, {?MODULE, not_implemented}),
@@ -181,15 +181,26 @@ set_col_offset(List, Offset) when is_list(List) ->
 		      end
 	      end, List).
 
-escape({IO, _Prompt0}, _M, _F, Loc, _MChar) ->
-    {Line, Row} = Loc,
+character_literal({IO, _Prompt0}, _M, _F, Loc, _MChar) ->
     %% io:format("Loc: ~p, MChar: ~p~n", [Loc, MChar]),
-    C = io:get_chars(IO, "", 1),
+    set_echo(IO, false),
+    [C] = io:get_chars(IO, "", 1),
+    set_echo(IO, true),
+    %% #\a
+    %% 012
     {Line, Col} = Loc,
-    NLoc = set_col_offset({Line, Col}, {Line, 2}),
+    CCol = Col+2,
+    NCol = if C > 256 -> 
+		   io:format("CCC ~p~n", [C]),
+		   1;
+	      true -> 0
+	   end,
+    NLoc = set_col_offset({Line, CCol}, {Line, NCol}),
+    ILoc = {Line, CCol},
     Ret = read(IO, _Prompt0, NLoc, [], 0),
     {ok, Tokens, NextLine, Rest} = Ret,
-    {ok, [{string, {Line, Row+1}, C}], NextLine, Tokens++Rest}.
+    %% io:format("Loc: ~p, MC: ~tc~n", [CCol, C]),
+    {ok, [{character, ILoc, C}], NextLine, Tokens++Rest}.
 
 
 set_echo(IO, Bool) ->
@@ -225,7 +236,7 @@ replace({IO, _Prompt0}, _M, _F, Loc, MChar) ->
                  Tokens ++ [{')', Loc}]],
     {ok, NewTokens, NextLine, Rest}.
 
-make_quote_prompt([], _Line, QuoteStr) ->
+make_quote_prompt([], _Line, _QuoteStr) ->
     "";
 make_quote_prompt(Prompt, Line, QuoteStr) ->
     S = io_lib:format(Prompt, [loctoline(Line)]),
@@ -267,7 +278,7 @@ make_prompt(IO, {Prompt, PPrevTokens}, Line, PrevTokens, PrevLevel) ->
 
 %% 
 
-get_parens(PrevTokens, Tokens, Level) ->
+get_parens(PrevTokens, Tokens, _Level) ->
     %%    PrevTokens = case get(prevtokens) of 
     %%undefined ->
     %%			 [];
@@ -366,7 +377,7 @@ read_do(IO, Prompt0, {Line, Col}, PrevTokens, PrevLevel) ->
     Ret =  io:request(IO, {get_until, unicode, Prompt, ?MODULE, tokens2, [Line]}),
     %% io:format("read ret ~p~n", [Ret]),
     case Ret of
-        {ok, [{'\n',NL_Loc}], NextLine} ->
+        {ok, [{'\n', _NL_Loc}], NextLine} ->
 	    read(IO, Prompt0, {NextLine, 0}, PrevTokens, PrevLevel);
         {ok, [], NextLine} ->
 	    read(IO, Prompt0, {NextLine, 0}, PrevTokens, PrevLevel);

@@ -1,6 +1,7 @@
 
 -type location() :: erl_anno:location().
--type atype() :: variable | function | atom | string.
+-type atype() :: variable | function | atom | 
+		 string | integer | character.
 
 -record(item, 
         {value :: atom(),

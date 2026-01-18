@@ -61,6 +61,9 @@ term_to_ast(A, Loc, Env, Quote) ->
             S = erl_syntax:atom_name(A2),
             R = erl_syntax:atom(S),
             erl_syntax:set_pos(R, Aloc);
+	#item{type=character, value=Character, loc=Aloc} ->
+	    A2 = erl_syntax:integer(Character),
+            erl_syntax:set_pos(A2, Aloc);
         Integer when is_integer(Integer) ->
             erl_syntax:set_pos(erl_syntax:integer(Integer), Loc);
         Float when is_float(Float) ->

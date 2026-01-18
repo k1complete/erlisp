@@ -6,7 +6,7 @@ term asymbol  lines.
 
 Terminals
 symbol module_function
-integer float string 
+integer float string character
 underscore 
 '(' ')' 
 '{' '}' 
@@ -112,6 +112,12 @@ literal ->
 literal ->
     float : 
         tokenvalue('$1').  
+literal ->
+    character : 
+	{character, Pos, Value} = '$1',
+        #item{type=character,
+	      loc=Pos,
+	      value=Value}.
 
 Erlang code.
 

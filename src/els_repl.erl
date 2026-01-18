@@ -203,7 +203,7 @@ source_acc(Io, Out, Nline, Env0, RetAcc, OutFun) ->
 	{value, Ret, Env} ->
 	    OutFun(Out, {value, Ret, Env}),
 	    source_acc(Io, Out, get_line(Env), Env, Ret, OutFun);
-	{error, Reason, NextLoc, Env} ->
+	{error, Reason, _NextLoc, Env} ->
 	    OutFun(Out, {error, Reason, Env}),
 	    source_acc(Io, Out, get_line(Env), Env, RetAcc, OutFun);
 	{error, Ret, Env} ->
