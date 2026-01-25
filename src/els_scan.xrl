@@ -186,18 +186,20 @@ character_literal({IO, _Prompt0}, _M, _F, Loc, _MChar) ->
     set_echo(IO, false),
     [C] = io:get_chars(IO, "", 1),
     set_echo(IO, true),
-    %% #\a
-    %% 012
+    %% #\ab
+    %%  012
     {Line, Col} = Loc,
     CCol = Col+2,
     NCol = if C > 256 -> 
-		   io:format("CCC ~p~n", [C]),
+		   %%io:format("CCC ~p~n", [C]),
 		   1;
 	      true -> 0
 	   end,
     NLoc = set_col_offset({Line, CCol}, {Line, NCol}),
     ILoc = {Line, CCol},
+    %% io:format("MC: ~tc: ~p~n", [C, Loc]),
     Ret = read(IO, _Prompt0, NLoc, [], 0),
+    %%io:format("CL: ~p, MC: ~tc~n", [Ret, C]),
     {ok, Tokens, NextLine, Rest} = Ret,
     %% io:format("Loc: ~p, MC: ~tc~n", [CCol, C]),
     {ok, [{character, ILoc, C}], NextLine, Tokens++Rest}.
@@ -374,6 +376,7 @@ read_do(IO, Prompt0, {Line, Col}, PrevTokens, PrevLevel) ->
 		     set_echo_off(IO),
 		     ""
 	     end,
+    %% io:format("read req ~p~n", [{Prompt0, {Line, Col}, PrevTokens, PrevLevel}]),
     Ret =  io:request(IO, {get_until, unicode, Prompt, ?MODULE, tokens2, [Line]}),
     %% io:format("read ret ~p~n", [Ret]),
     case Ret of

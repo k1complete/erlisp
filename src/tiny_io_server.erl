@@ -13,7 +13,7 @@ start_link(String) ->
     spawn_link(?MODULE,init,[String]).
 
 init(String) ->
-    {ok, Fd} = file:open(String, [read, ram]),
+    {ok, Fd} = file:open(unicode:characters_to_binary(String), [read, ram]),
     %% io:format("Inited: <~p>~n", [String]),
     ?MODULE:loop(#state{fd = Fd, mode=list}).
 
@@ -220,18 +220,46 @@ until_enough(ThisFar,CharList,N)
 until_enough(ThisFar,CharList,_N) ->
     {more,ThisFar++CharList}.
 
+utfcheck(Bs) ->
+    if 
+	(Bs band 2#10000000) == 2#00000000 -> %% single bytes
+	    0;
+	(Bs band 2#1100000) == 2#10000000 -> %% follow bytes
+	    0;
+	(Bs band 2#11100000) == 2#11000000 -> %% first byte
+	    if Bs >= 16#C2 andalso Bs =< 16#DF ->
+		    1;
+	       true ->
+		    0
+	    end;
+	(Bs band 2#11110000) == 2#11100000 ->
+	    2;
+	(Bs band 2#11111000) == 2#11110000 ->
+	    3;
+	true ->
+	    0
+    end.
+
+-spec getc(io:device(), list()) -> {ok, list()}.
 getc(Fd, []) ->
     case ram_file:read(Fd, 1) of
         eof ->
             {ok, eof};
-        Rest ->
-	    %%io:format(standard_error, "[getc '~p']~n", [Rest]),
-            Rest
+	{ok, [Rest]} ->
+	    {ok, D2} = case utfcheck(Rest) of 
+			   0 ->
+			       {ok, []};
+			   X ->
+			       ram_file:read(Fd, X)
+		       end,
+	    Ret = unicode:characters_to_list(list_to_binary([Rest|D2])),
+	    {ok, Ret}
     end;
 getc(_Fd, LookAhead) ->
     %% io:format("[getc ahead '~p']~n", [LookAhead]),
     {ok, LookAhead}.
 
+-spec my_split(integer(), list(), list()) -> {list(), list()}.
 my_split(0,Left,Acc) ->
     {lists:reverse(Acc),Left};
 my_split(_,[],Acc) ->

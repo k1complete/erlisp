@@ -117,3 +117,13 @@ multi_line_test() ->
             R),
     ?assertEqual(NextLoc, Line+1).
     
+utf8_character_literal_test() ->
+    Line=?LINE,
+    S="#\\a #\\あ #\\b c",
+    {RR, R, NextLoc} = els_scan:from_string(S, Line),
+    ?assertEqual([{character, {Line, 3}, 97},
+		  {character, {Line, 7}, 12354},
+		  {character, {Line, 12}, 98},
+		  {symbol, {Line, 14}, "c"}],R),
+    ?assertEqual(NextLoc, Line).
+    
