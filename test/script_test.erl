@@ -71,10 +71,10 @@ local_macro_form_test() ->
     {ok, [Tree]} = els_parser:parse(Tokens),
     io:format("CC: ~p~n", [Tree]),
     C = els_transpile:form(Tree, []),
-    {NFunDic, Name, Arity} = els_localfun:register_local_func(C, #{}),
+    {NFunDic, _Name, _Arity} = els_localfun:register_local_func(C, #{}),
     LocalF = els_localfun:create_valuefun(NFunDic),
     Macros = maps:put({"strlen", 1},{{local},  LocalF}, #{}),
-    {ok, Tokens1, _Line} = els_scan:from_string(lists:flatten(lists:join("\n", S1)), Line),
+    {ok, Tokens1, _} = els_scan:from_string(lists:flatten(lists:join("\n", S1)), Line),
     {ok, [Tree1]} = els_parser:parse(Tokens1),
     Env = [{macros, Macros}],
     io:format("CC1---: ~p~n", [Tree1]),
@@ -98,7 +98,7 @@ local_macro_form_test() ->
                          [{tree,variable,{attr,{Line+1,11},[],none},a}]}}]}}]}},
     ?assertEqual(C2Ext, C2),
     io:format("Ret: ~p~n", [C2]),
-    {NFunDic2, Name2, Arity2} = els_localfun:register_local_func(C2, NFunDic),
+    {NFunDic2, _Name2, _Arity2} = els_localfun:register_local_func(C2, NFunDic),
     LocalF2 = els_localfun:create_valuefun(NFunDic2),
     S2 = merl:quote("main(\"c12\", \"d12\")"),
     Ret2 = erl_eval:expr(S2, [], {value, LocalF2}),
@@ -106,7 +106,7 @@ local_macro_form_test() ->
    
     
 compile_with_macro2_test() ->
-    {ok, Module, _Binary, _Ast} = els_compile:file_ast("test/testdata/macrotest.elisp", []),
+    {ok, _Module, _Binary, _Ast} = els_compile:file_ast("test/testdata/macrotest.elisp", []),
     ?assertEqual({module, macrotest}, code:ensure_loaded(macrotest)),
     io:format("MACRO2: ~p", [_Ast]),
     %% {file, _File} = code:is_loaded(Module),

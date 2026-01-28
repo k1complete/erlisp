@@ -60,20 +60,16 @@ backquote_general_test() ->
                  erl_eval:expr(erl_syntax:revert(els_transpile:locline(C)), Binding)).
     
 
-backquote_unquote_test2() ->
+backquote_unquote_test() ->
     Line = 1,
     {ok, Tokens, _Line} = els_scan:from_string("(lists:reverse `(1 2 ,(+ 1 2)))", Line),
     {ok, [Tree]} = els_parser:parse(Tokens),
     C = els_transpile:form(Tree, []),
-    Expect = merl:quote(Line, "lists:reverse([1,2,b])"),
-    ?assertEqual(Expect, erl_syntax:revert(els_transpile:locline(C))).
-
-backquote_test3() ->
-    Line = 1,
-    {ok, Tokens, _Line} = els_scan:from_string("(lists:reverse `(1 2 b))", Line),
-    {ok, [Tree]} = els_parser:parse(Tokens),
-    C = els_transpile:form(Tree, []),
-    Expect = merl:quote(Line, "lists:reverse([1,2,b])"),
-    ?assertEqual(Expect, erl_syntax:revert(els_transpile:locline(C))).
+    Expect = merl:quote(Line, "lists:reverse(lists:append([[1],[2],[(1+2)]]))"),
+    Expect2 = erl_syntax:revert(erl_syntax_lib:map(fun(E) -> 
+							   E
+						   end, 
+						   Expect)),
+    ?assertEqual(Expect2, erl_syntax:revert(els_transpile:locline(C))).
 
     

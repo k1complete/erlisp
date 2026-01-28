@@ -6,7 +6,6 @@
 -define(TQ(Line, T), merl:quote(Line, T)).
 
 paren_test() ->
-    Line = ?LINE,
     L = [{'(',{4,1}},
 	 {symbol,{4,2},"list"},
 	 {'{',{4,8}},
@@ -16,7 +15,6 @@ paren_test() ->
     Expect = "({",
     ?assertEqual(Expect, Tokens).
 paren_close_test() ->
-    Line = ?LINE,
     L = [{'(',{4,1}},
 	 {symbol,{4,2},"list"},
 	 {'{',{4,8}},

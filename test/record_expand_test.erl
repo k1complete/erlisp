@@ -27,7 +27,7 @@ record_expand_test() ->
     io:format("CCC: ~p~n", [[RD, F2]]),
     B = [RD, F2],
     B1 = erl_expand_records:module(B, []),
-    [H,T] = B1,
+    [_H,T] = B1,
     Cls = erl_syntax:function_clauses(T),
     Bodies = erl_syntax:clause_body(hd(Cls)),
     ?assertEqual({value, 1,[{'A',{rec1,1,2,3,4}},{rec0,1}]}, erl_eval:exprs(Bodies, [])),

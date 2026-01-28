@@ -75,19 +75,6 @@ spec_type_test() ->
     ?assertEqual(Expected, erl_syntax:revert(Ast)).
 
 multi_clause_type_test() ->
-    Src = [ "-spec m (list()) -> integer();",
-	    "        (integer()) -> list()."],
-    Expected0 = {attribute,{2,2},
-		spec,
-		{{m,1},
-		 [{type,{2,8},
-		   'fun',
-		   [{type,{2,8},product,[{type,{2,9},list,[]}]},
-		    {type,{2,20},integer,[]}]},
-		  {type,{3,8},
-		   'fun',
-		   [{type,{3,8},product,[{type,{3,9},integer,[]}]},
-		    {type,{3,23},list,[]}]}]}},
     Line=?LINE,
     Spec = ["(-spec foo ((list))    (integer)",
 	    "           ((integer)) (list))"],   
@@ -112,23 +99,6 @@ multi_clause_type_test() ->
     ?assertEqual(Expected, erl_syntax:revert(Ast)).
 
 multi_clause_when_type_test() ->
-    Esrc =["attribute,{4,2},",
-           " spec,",
-           "{{m,1},",
-	   "[{type,{4,8},",
-	   "  bounded_fun,",
-	   "  [{type,{4,8},",
-	   "    'fun',",
-           "    [{type,{4,8},product,[{type,{4,9},list,[{var,{4,14},'X'}]}]},",
-           "     {type,{4,21},integer,[]}]},",
-           "  [{type,{4,36},",
-           "      constraint,",
-           "      [{atom,{4,36},is_subtype},",
-           "       [{var,{4,36},'X'},{type,{4,41},atom,[]}]]}]]},",
-           "   {type,{5,8},",
-           "   'fun',",
-           "    [{type,{5,8},product,[{type,{5,9},integer,[]}]}",
-           "      {type,{5,23},list,[]}]}]}"],
     Line=?LINE,
     Spec = ["(-spec foo ((list X)) (integer) (when (X :: (atom)))",
 	    "           ((integer)) (list))"],   
@@ -161,7 +131,7 @@ multi_clause_when_type_test() ->
 		    {type,{Line,77},list,[]}]}]}},
     ?assertEqual(Expected, erl_syntax:revert(Ast)),
     {attribute, _, spec, A}=erl_syntax:revert(Ast),
-    {{Name, Arity}, FunTypes} = A,
+    {{Name, _Arity}, FunTypes} = A,
     D = els_typespec:fun_to_list(Name, FunTypes),
     ?assertEqual(Src, D).
     
@@ -171,7 +141,7 @@ type_attr_test() ->
     {ok, Tokens, _Line} = els_scan:from_string("(-type (f) (lambda ( (Asm :: (integer) )) (Odd :: (integer))))", Line),
 %%    {ok, Tokens, _Line} = els_scan:from_string("(-spec (foo ((a :: (integer)) (integer)) (integer)))", Line),
     {ok, Ret} = els_parser:parse(Tokens),
-    TypeErl = "-type f() ::  fun((Asm :: integer()) -> Odd:: integer())",
+    %% TypeErl = "-type f() ::  fun((Asm :: integer()) -> Odd:: integer())",
     Type = {attribute,{Line,2},
 	    'type',
 	    {f,{type,{Line,13},

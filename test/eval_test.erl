@@ -77,7 +77,7 @@ nested_list_dot_test() ->
 
 defun_test() ->
     Line=?LINE,
-    Cmd = ["(-module c)",
+    Cmd = ["(-module cd)",
            "(-export (add 2))",
            "(defun add (a b)",
            "  (match c (+ a b))",
@@ -87,8 +87,10 @@ defun_test() ->
     {ok, Tree} = els_parser:parse(Tokens),
     C = lists:map(fun(E) -> els_transpile:form(E, []) end, Tree),
     %% Binding = erl_eval:add_binding(b, 3, erl_eval:new_bindings()),
+    io:format("C: ~p~n", [C]),
     {ok, _Binary} = merl:compile_and_load(C, [debug_info]),
-    Result = apply(c, add, [2, 3]),
+    io:format("C: ~p~n", [_Binary]),
+    Result = apply(cd, add, [2, 3]),
     ?assertEqual(25, Result).
 
 

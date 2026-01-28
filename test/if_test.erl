@@ -115,6 +115,6 @@ if_clause_no_body_error_test() ->
        [{error, {no_body, {Line, 8},
 	 [{item,"quote",{Line,8},atom},
 	  {item,"true",{Line,9},atom}]}}],
-       C = els_transpile:form(Tree, [])
+       els_transpile:form(Tree, [])
       ).
     

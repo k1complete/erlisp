@@ -8,12 +8,12 @@
 %%%-->
 %%%[{a b} c]
 -include("els.hrl").
-pp2(#item{type=atom, value=V}=S, L, R, Direction) ->
+pp2(#item{type=atom, value=V}=S, L, R, _Direction) ->
     S#item{value=L++V++R};
 pp2([S], LChar, RChar, _Dir) ->
     R = pp2(S, LChar++"(", ")" ++ RChar, both),
     [R];
-pp2([H|T], LChar, RChar, Dir) when not is_list(T) ->
+pp2([H|T], LChar, RChar, _Dir) when not is_list(T) ->
     Head = pp2(H, LChar++"(", "", open),
     Last = pp2(T, "", ")"++RChar, close),
     Middle = [#item{type=atom, value="."}],

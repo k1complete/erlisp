@@ -108,7 +108,7 @@ plus_test() ->
 multi_line_test() ->
     Line=?LINE,
     S="(+ 1\n1)",
-    {RR, R, NextLoc} = els_scan:from_string(S, Line),
+    {_RR, R, NextLoc} = els_scan:from_string(S, Line),
     ?assertEqual([{'(',{Line,1}},
                       {symbol,{Line,2},"+"},
                       {integer,{Line,4},1},
@@ -120,7 +120,7 @@ multi_line_test() ->
 utf8_character_literal_test() ->
     Line=?LINE,
     S="#\\a #\\あ #\\b c",
-    {RR, R, NextLoc} = els_scan:from_string(S, Line),
+    {_RR, R, NextLoc} = els_scan:from_string(S, Line),
     ?assertEqual([{character, {Line, 3}, 97},
 		  {character, {Line, 7}, 12354},
 		  {character, {Line, 12}, 98},

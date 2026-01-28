@@ -14,9 +14,9 @@ get_spec_test() ->
     S = els_typespec:to_list(hd(M), fun makefun/1),
     S1 = [#item{type=atom, value="-spec"},  [#item{type=atom, value="reverse"} |hd(S)]] ++ tl(S),
     %%P = els_typespec:fun_to_list(reverse, S),
-    Exp = ['-spec',[ 'reverse', ['List1'], 'List2'], 
-	   ['when', ['List1', '::', [list, 'T']], ['List2', '::', [list, 'T']],
-	    ['T', '::', [term] ]]],
+    %%    Exp = ['-spec',[ 'reverse', ['List1'], 'List2'], 
+    %%	   ['when', ['List1', '::', [list, 'T']], ['List2', '::', [list, 'T']],
+    %%	    ['T', '::', [term] ]]],
     P = els_pp:pp(S1),
     ?assertEqual("(-spec (reverse (List1) List2)\n  (when (List1 :: [T]) (List2 :: [T]) (T :: (term))))", P).
 

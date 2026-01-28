@@ -17,9 +17,9 @@ scanlist_test() ->
 	[yal_util:make_symbol('foo5'), []],
 	[yal_util:make_symbol('foo6'), []]],
     K = ["try", "of", "catch", "after"],
-    Hd = hd(A),
-    R2 = els_util:scanlist(tl(A), tl(K), {Hd#item.value, []}, #{}, #{hd(K) => hd(A)}),
-    {R, LocH} = els_util:scanlist(A, K),
+    %% Hd = hd(A),
+    %% R2 = els_util:scanlist(tl(A), tl(K), {Hd#item.value, []}, #{}, #{hd(K) => hd(A)}),
+    {R, _LocH} = els_util:scanlist(A, K),
     ?assertEqual(#{"try" => [[yal_util:make_symbol('a'), [1]]],
 		   "of" => [[[1], [yal_util:make_symbol(foo1), []]],
 			    [[2], [yal_util:make_symbol(foo2), []]]],
@@ -37,10 +37,10 @@ scanlist_catch_test() ->
 	[yal_util:make_symbol('foo5'), []],
 	[yal_util:make_symbol('foo6'), []]],
     K = ["try", "of", "catch", "after"],
-    Hd = hd(A),
-    R2 = els_util:scanlist(tl(A), tl(K), {Hd#item.value, []}, #{}, #{hd(K) => hd(A)}),
+    %%Hd = hd(A),
+    %%R2 = els_util:scanlist(tl(A), tl(K), {Hd#item.value, []}, #{}, #{hd(K) => hd(A)}),
 
-    {R, LocH} = els_util:scanlist(A, K),
+    {R, _LocH} = els_util:scanlist(A, K),
     ?assertEqual(#{"try" => [[yal_util:make_symbol('a'), [1]]],
 		   "catch" => [[[3], [yal_util:make_symbol(foo3), []]],
 			       [[4], [yal_util:make_symbol(foo4), []]]],
@@ -60,7 +60,7 @@ scanmap_list_test() ->
 					   io:format("after: ~p~n", [S]),
 					   els_transpile:form(S, E)
 				   end, V);
-		    (K, V)  ->
+		    (_K, V)  ->
 			 lists:map(fun(S) ->
 					   io:format("S: ~p~n", [S]),
 					   R = els_transpile:clause_(S, 0, E),
@@ -90,8 +90,8 @@ scanmap_list_test() ->
 		    [{call,0,{atom,0,foo2},[{integer,0,1}]}]}],
 	      "try" => [{call,0,{atom,0,a},[{integer,0,1}]}]},
     R2 = maps:map(fun(_K, V) ->
-			       lists:map(fun(E) ->
-						 erl_syntax:revert(E)
+			       lists:map(fun(Element) ->
+						 erl_syntax:revert(Element)
 					 end, V)
 		  end, R),
     ?assertEqual(Expect, R2).
@@ -108,7 +108,7 @@ scanmap_list_catch_only_group_test() ->
 					   io:format("after: ~p~n", [S]),
 					   els_transpile:form(S, E)
 				   end, V);
-		    (K, V)  ->
+		    (_K, V)  ->
 			 lists:map(fun(S) ->
 					   io:format("S: ~p~n", [S]),
 					   R = els_transpile:clause_(S, 0, E),
@@ -129,8 +129,8 @@ scanmap_list_catch_only_group_test() ->
 		    [{call,0,{atom,0,foo4},[{integer,0,1}]}]}],
 	      "try" => [{call,0,{atom,0,a},[{integer,0,1}]}]},
     R2 = maps:map(fun(_K, V) ->
-			       lists:map(fun(E) ->
-						 erl_syntax:revert(E)
+			       lists:map(fun(Element) ->
+						 erl_syntax:revert(Element)
 					 end, V)
 		  end, R),
     ?assertEqual(Expect, R2).

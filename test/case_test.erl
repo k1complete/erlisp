@@ -71,5 +71,5 @@ case_no_body_test() ->
        [{error, {no_body, {Line, 2},
 	 [[[ {item,"quote",{Line,17},atom},
 	   {item,"true",{Line,18},atom} ]]] }}],
-       C = els_transpile:form(Tree, [])
+       els_transpile:form(Tree, [])
     ).
