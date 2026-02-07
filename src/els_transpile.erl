@@ -245,19 +245,19 @@ atom_to_item(A, Env) when is_list(A) ->
 atom_to_item(List, _Env) ->
     List.
 
-    
 %%% expand macroではマクロ実行のしかたがlocalと違う
 expand_macro(A, E, Macros) ->
     R2 = proplists:get_value(require, E, require),
-    In = maps:merge(#{{"backquote",  1} => {yal_macro, 'MACRO_backquote'},
-                      {"make_symbol", 1} => {yal_util, 'make_symbol'}},
-                    Macros),
+    %% In = maps:merge(#{{"backquote",  1} => {yal_macro, 'MACRO_backquote'},
+    %%                          {"make_symbol", 1} => {yal_util, 'make_symbol'}},
+    %%                        Macros),
     Out = case ets:whereis(R2) of
               undefined ->
                   maps:new();
               Tid ->
                   maps:from_list(ets:tab2list(Tid))
           end,
+    In = Macros,
     NewMacros = maps:merge(In, Out),
     Env = yal_util:proplists_replace(macros, NewMacros, E),
     %Env = In,
@@ -346,7 +346,8 @@ form_trans([List| T], E) when is_list(List) ->
 
 %%form_trans(#item{value=Term, loc=Loc, type=atom}, _E) ->
 %%    erl_syntax:set_pos(erl_syntax:variable(Term), Loc).
-    
+
+%% expand macro in current environment
 
 export_(X, L, E) ->
     Loc = X#item.loc,

@@ -12,11 +12,13 @@ lambda_test() ->
            "   (atom_to_list c)))",
            "(apply f `(,A 1))"],
     Cmd0 = lists:flatten(Cmd),
+    Env0 = els_util:env_init(),
+
     {ok, Tokens, _Line} = els_scan:from_string(Cmd0, Line),
     {ok, Trees} =els_parser:parse(Tokens),
     Binding=erl_eval:add_binding('A', 1, erl_eval:new_bindings()),
     C = lists:foldl(fun(Tree, {_, B}) -> 
-                            C = els_transpile:form(Tree, []),
+                            C = els_transpile:form(Tree, Env0),
                             io:format("Tree ~p~n", [C]),
                             {value, Result, NewBinding} = erl_eval:expr(erl_syntax:revert(C), B),
                             {Result, NewBinding}
@@ -37,11 +39,13 @@ lambda_with_guard_test() ->
            " (atom_to_list c))))",
            "(apply f `(,A 1))"],
     Cmd0 = lists:flatten(Cmd),
+    Env0 = els_util:env_init(),
+
     {ok, Tokens, _Line} = els_scan:from_string(Cmd0, Line),
     {ok, Trees} =els_parser:parse(Tokens),
     Binding=erl_eval:add_binding('A', 1, erl_eval:new_bindings()),
     C = lists:foldl(fun(Tree, {_, B}) -> 
-                            C = els_transpile:form(Tree, []),
+                            C = els_transpile:form(Tree, Env0),
                             io:format("Tree ~p~n", [C]),
                             {value, Result, NewBinding} = erl_eval:expr(erl_syntax:revert(C), B),
                             {Result, NewBinding}
@@ -55,9 +59,11 @@ case_with_multistatement_test() ->
            "     (match y (* (hd (tl x)) 10))",
            "     (+ y (hd x)))",
            "  (s s))"],
+    Env0 = els_util:env_init(),
+
     {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(Cmd), Line),
     {ok, [Tree]} =els_parser:parse(Tokens),
-    C = els_transpile:form(Tree, []),
+    C = els_transpile:form(Tree, Env0),
     Binding=erl_eval:add_binding(param, [1,2,3], erl_eval:new_bindings()),
     ?assertEqual({value, 32, [{param, [1,2,3]}, {x, [2,3]}, {y, 30}]},
                  erl_eval:expr(erl_syntax:revert(C), Binding)).
@@ -70,11 +76,13 @@ named_fun_test() ->
 	   "                   ((n) (* n (apply frac `(,(- n 1)))))))",
 	   "(apply f '(10))"],
     Cmd0 = lists:flatten(Cmd),
+    Env0 = els_util:env_init(),
+
     {ok, Tokens, _Line} = els_scan:from_string(Cmd0, Line),
     {ok, Trees} =els_parser:parse(Tokens),
     Binding=erl_eval:add_binding('A', 1, erl_eval:new_bindings()),
     C = lists:foldl(fun(Tree, {_, B}) -> 
-                            C = els_transpile:form(Tree, []),
+                            C = els_transpile:form(Tree, Env0),
                             io:format("Tree ~p~n", [C]),
                             {value, Result, NewBinding} = erl_eval:expr(erl_syntax:revert(C), B),
                             {Result, NewBinding}

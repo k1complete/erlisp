@@ -3,6 +3,20 @@
 -include_lib("els_scan.hrl").
 -export([eq/2, scanitem/3, scanlist/5, scanlist/2]).
 -export([getmodfun/1, term_make_variable/1, term_make_atom/1, term_make_atom/2]).
+-export([macro_init/1, macro_init/0]).
+-export([env_init/1, env_init/0]).
+
+env_init() ->
+    env_init([]).
+env_init(Env) ->
+    [{macros, macro_init()} | Env].
+
+macro_init(Macros) ->
+    maps:merge(#{{"backquote",  1} => {yal_macro, 'MACRO_backquote'},
+		 {"make_symbol", 1} => {yal_util, 'make_symbol'}},
+	       Macros).
+macro_init() ->
+    macro_init(#{}).
 
 eq(#item{value=V}, V) ->
     true;

@@ -1,5 +1,7 @@
 -module(els_repl).
 -include_lib("els.hrl").
+
+-type tree():: syntax_tool:tree().
 -export([
 	 start/1,
 	 start/0,
@@ -36,6 +38,7 @@ start_tty(Args) ->
 		  tty(Args)
 	  end).
 
+-spec init() -> #{}.
 init() ->
     Tab = ets:new(?TABLE(), [named_table]),
     InitAst=merl:qquote("-module('@Lobby').", [{'Lobby', merl:term(?DEFAULT_MODULE())}]),
@@ -43,6 +46,7 @@ init() ->
     Tab,
     #{}.
 
+-spec is_ddl(term()) -> {ok, term(), term()} | false.
 is_ddl({function, _, Fun, Arity, _}) ->
     {ok, Fun, Arity};
 is_ddl({attribute, _, record, {Name, Body}}) ->
@@ -50,7 +54,10 @@ is_ddl({attribute, _, record, {Name, Body}}) ->
 is_ddl(_) ->
     false.
 
-
+-spec register_function(tree(), env()) ->  {tree(), env()}.
+-doc """
+register function as {macro, function} into env
+""".
 register_function(Ast, Env) ->
     Macros = proplists:get_value(macros, Env, #{}),
     case els_localfun:register_local_func(Ast, Macros) of
@@ -254,7 +261,7 @@ source(Src, Opt) ->
 
 
 init(_Env) ->
-    Macros = #{},
+    Macros = els_util:macro_init(),
     [{macros, Macros}|_Env].
 
 tty() ->

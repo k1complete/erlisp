@@ -45,7 +45,7 @@ file(File, Opt) ->
     {ok, Tokens} = els_scan:file(File, Opt),
     io:format("scan ~p~n", [Tokens]),
     {ok, Forms} = els_parser:parse(Tokens),
-    Env=[{macros, #{}}],
+    Env=[{macros, els_util:macro_init()}],
     {Ast0, {Errors, _Env}} = lists:mapfoldl(fun(F, {A, E}) ->
 					  try
 					      formcompile(F, A, E)
