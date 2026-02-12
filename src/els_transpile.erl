@@ -19,14 +19,22 @@
 -export([record_field_rep/2, record_/3, spec_/3, type_/3]).
 
 -spec module_function(#item{}, erl_anno:pos()) -> erl_tree().
-module_function(A, Loc) ->
-    {M, F} = A#item.value,
+module_function(#item{value={M, F}}, Loc) ->
     erl_syntax:set_pos(erl_syntax:module_qualifier(
                          erl_syntax:atom(M),
                          erl_syntax:atom(F)),
 %%                         erl_syntax:set_pos(erl_syntax:atom(M), Loc), 
 %%                         erl_syntax:set_pos(erl_syntax:atom(F), Loc)), 
-                       Loc).
+                       Loc);
+module_function(#item{value=A}, Loc) ->
+    {module_function, {M, F}} = split(A),
+    erl_syntax:set_pos(erl_syntax:module_qualifier(
+                         erl_syntax:atom(M),
+                         erl_syntax:atom(F)),
+		       Loc).
+
+
+
 
 sterm(A, Env) ->
     sterm(A, 0, Env).
@@ -35,6 +43,9 @@ sterm(A, Loc, Env) ->
 
 term_to_ast(A, Loc, Env, Quote) ->
     case A of
+        #item{type=module_function, loc=Aloc, value=V} when Quote == true ->
+            Atom = erl_syntax:atom(V),
+            erl_syntax:set_pos(Atom, Aloc);
         #item{type=module_function} ->
             module_function(A, Loc);
         #item{type=string, value=V} ->
@@ -71,6 +82,7 @@ term_to_ast(A, Loc, Env, Quote) ->
         [[#item{type=atom, value="dot", loc=Aloc}, F]] when is_list(A) ->
             term_to_ast(F, Aloc, Env, Quote);
         _ when is_list(A), Quote == false ->
+	    %% io:format("STERM: ~p~n", [A]),
             form_trans(A, Env);
         nil ->
             erl_syntax:set_pos(erl_syntax:nil(), Loc);
@@ -156,8 +168,10 @@ dispatch_special(A) ->
           "#r" => fun record_expr_/3,
 	  "<-" => fun generator_/3,
 	  "<=" => fun binary_generator_/3,
-	  ":=" => fun map_field_exact_/3
+	  ":=" => fun map_field_exact_/3,
+	  "macro-expand" => fun macro_expand_/3
          },
+    %% io:format("dispatch [~p]~n", [A]),
     maps:get(A, L, undef).
 
 
@@ -185,6 +199,9 @@ walk(F, Env, Fun) when is_list(F) ->
     Arity = length(T),
     Macros = proplists:get_value(macros, Env, #{}),
     case atom_to_module_function(H) of
+        #item{type=atom, value=V} when V=="quote" ->
+	    %%--
+	    F;
         #item{type=atom, value=V, loc=Loc} ->
 	    %%--
             case maps:get({V, Arity},  Macros, undefined)  of
@@ -244,7 +261,6 @@ atom_to_item(A, Env) when is_list(A) ->
               end, A);
 atom_to_item(List, _Env) ->
     List.
-
 %%% expand macroではマクロ実行のしかたがlocalと違う
 expand_macro(A, E, Macros) ->
     R2 = proplists:get_value(require, E, require),
@@ -291,12 +307,19 @@ form(A, E) ->
     %NFundic = els_localfun:get_nfundic(),
     %Macros = maps:merge(NFundic, M),
     Macros = M,
-    B = expand_macro(A, E, Macros),
-    %% io:format("form-E ~p ~nFrom ~p ~n To ~p~n", [E, A, B]),
+    %% io:format("A: ~p~n", [A]),
+    B = case A of
+	    [#item{value="quote"}|T] ->
+		%% io:format("Q: ~p~n", [T]),
+		A;
+	    _ ->
+		expand_macro(A, E, Macros)
+	end,
+    %%io:format("form-E ~p ~nFrom ~p ~n To ~p~n", [E, A, B]),
     R = case is_list(B) of
 	    true -> 
 		Ret = form_trans(B, E),
-		%%io:format("form output: ~p ~n to ~p~n", [B, Ret]),
+		%% io:format("form output: ~p ~n to ~p~n", [B, Ret]),
 		Ret;
 	    false -> 
 		sterm(B, E)
@@ -348,6 +371,23 @@ form_trans([List| T], E) when is_list(List) ->
 %%    erl_syntax:set_pos(erl_syntax:variable(Term), Loc).
 
 %% expand macro in current environment
+%% (macro-expand (macro args))
+macro_expand_(X, [L], E) ->
+    Loc = X#item.loc,
+    M = proplists:get_value(macros, E, maps:new()),
+    B = expand_macro(L, E, M),
+    C = term_to_ast(B, Loc, E, true),
+    %%C = term_to_ast(B, Loc, E, false),
+    erl_syntax:set_pos(C, Loc),
+    %% io:format("L : ~p~n", [C]),
+    C
+    ;
+macro_expand_(X, L, E) ->
+    Loc = X#item.loc,
+    io:format("L : ~p~n", [L]),
+    els_pp:pptr(L, "", "", none).
+
+
 
 export_(X, L, E) ->
     Loc = X#item.loc,
@@ -650,7 +690,7 @@ match_defun_(Name, Clauses, E) ->
     io:format("match-defun ~p~n", [Name]),
     FuncName = erl_syntax:set_pos(erl_syntax:atom(Name#item.value), Name#item.loc),
     ClauseAst0 = lists:map(fun(A) ->
-				   io:format("AST ~p~n", [A]),
+%%				   io:format("AST ~p~n", [A]),
 				   clause_(A, Name#item.loc, E)
 			   end, Clauses),
     Md = erl_syntax:function(FuncName, ClauseAst0),
@@ -761,7 +801,7 @@ defun_(X, L, E) ->
     end.
 
 defmacro_(X, L, E) ->
-    io:format("defmacro_ : ~p~n", [X]),
+    %% io:format("defmacro_ : ~p~n", [X]),
     [Name, Args | Rest] = L,
     Macro = Name#item{value="MACRO_" ++ Name#item.value},
     L2 = [Macro, Args | Rest],
@@ -1361,7 +1401,7 @@ call_function(Fun=#item{value=_X, loc=Loc}, T, E) ->
 %                                                    sterm(Arg, E)
 %                                            end, Elem),
                               A = sterm(Elem, E),
-                              %% io:format("TermAfter ~p~n", [A]),
+                              %% io:format("TermAfter ~p~n", [erl_syntax:revert(A)]),
                               A
                       end, T),
     %%io:format("call X2 ~p~nT ~p~n", [sterm(Fun,E, Loc), FHead]),
@@ -1404,6 +1444,7 @@ getmodfun(#item{type=Type, value=X, loc=Loc}) when Type == atom; Type== module_f
     end.
     
 list_(X, L, Env) ->
+    %% io:format("List Term ~p~n", [L]),
     R = lists:map(fun(Elem) ->
                           %%io:format("List Term ~p~n", [Elem]),
                           A=sterm(Elem, Env),

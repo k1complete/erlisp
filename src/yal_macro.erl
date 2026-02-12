@@ -8,12 +8,13 @@
 'MACRO_backquote'(E)  -> 
     %% io:format("bqquote L:~p~n", [E]),
     R = bc_([yal_util:make_symbol(backquote), E]),
-    %%io:format("quote_ R: ~p~n", [R]),
+    %% io:format("quote_ R: ~p~n", [R]),
     R.
 
 %%% `basic -> 'basic (リストでもベクトルでもない任意の式)
 bc_item([#item{value="backquote", loc=Loc}, Form], Env) when not is_list(Form)->
-    transpile:form([ yal_util:make_symbol(quote, Loc), Form ], Env);
+    %%transpile:form([ yal_util:make_symbol(quote, Loc), Form ], Env);
+    [ yal_util:make_symbol(quote, Loc), Form ];
 %%% `,form -> form (ただしformは@や.で始まらないかぎり)
 bc_item([#item{value="backquote"}, [#item{value="unquote"}, [H|Form]]], Env)
   when  H#item.value =/= "dot", H#item.value =/="splice" ->
@@ -50,6 +51,7 @@ bc_item([#item{value="backquote", loc=Loc}, Xn], Env) when is_list(Xn) ->
 
 %%% `basic -> 'basic (リストでもベクトルでもない任意の式)
 bc_([#item{value="backquote", loc=Loc}, Form]) when not is_list(Form)->
+    %%io:format("bc ~p~n", [Form]),
     [ yal_util:make_symbol(quote, Loc), Form ];
 %%% `,form -> form (ただしformは@や.で始まらないかぎり)
 bc_([#item{value="backquote"}, [#item{value="unquote"}, [H|Form]]])
@@ -74,6 +76,7 @@ bc_([#item{value="backquote", loc=Loc}, Xn]) when is_list(Xn) ->
                           [yal_util:make_symbol(list, Loc), F];
                       %% form -> (list `form)
                       (F) ->
+			  %% io:format("bc normal ~p~n", [F]),
                           [yal_util:make_symbol(list, Loc),
                            bc_([yal_util:make_symbol(backquote, Loc), F])]
                   end, Xn),

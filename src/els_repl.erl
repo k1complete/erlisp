@@ -71,7 +71,7 @@ register_function(Ast, Env) ->
 	    AName = atom_to_list(Name),
 	    NewMacros = if AName =/= MName ->
 				DName = list_to_atom(MName),
-				io:format("Before FunDic: ~p~nDName: ~p~n", [FunDic, DName]),
+				%% io:format("Before FunDic: ~p~nDName: ~p~n", [FunDic, DName]),
 				NewDic = maps:remove({DName, Arity}, FunDic),
 				maps:put(
 				  {MName, Arity},
@@ -124,8 +124,9 @@ execute(Revert, Env) ->
         false ->
 	    Fun = els_localfun:create_valuefun(proplists:get_value(macros, Env, #{})),
 	    Binding = env_to_binding(Env),
-	    %% io:format("execute: ~p~nRecord: ~p~n", [Revert, RecordDefs]),
-	    [Revert2] = extract_record_module(RecordDefs, [Revert]),
+	    %%io:format("execute: ~p~nRecord: ~p~n", [Revert, RecordDefs]),
+	    %%%%% [Revert2] = extract_record_module(RecordDefs, [Revert]),
+	    [Revert2] = [Revert],
 	    %%io:format("Revert2: ~p~nRevert: ~p~n", [Revert2, Revert]),
 	    %%io:format("Binding ~p ~n", [Binding]),
             %%{value, Result, NBinding} = erl_eval:expr(Revert, Binding, {value, Fun}),
@@ -289,10 +290,12 @@ extract_record_clause(RecordDefs, Clause) ->
     erl_syntax:function_clauses(B).
 
 extract_record_function(RecordDefs, Function) ->
+    %% io:format("Rds1: ~p~nF1: ~p~n", [RecordDefs, Function]),
     Rds = lists:map(fun(E) ->
 			    erl_syntax:revert(E)
 		    end, RecordDefs),
     F2 = erl_syntax:revert(Function),
+    %% io:format("Rds: ~p~nF2: ~p~n", [Rds, F2]),
     B = erl_expand_records:module(Rds++[F2], []), 
     lists:last(B).
 
