@@ -12,7 +12,7 @@
     R.
 
 %%% `basic -> 'basic (リストでもベクトルでもない任意の式)
-bc_item([#item{value="backquote", loc=Loc}, Form], Env) when not is_list(Form)->
+bc_item([#item{value="backquote", loc=Loc}, Form], _Env) when not is_list(Form)->
     %%transpile:form([ yal_util:make_symbol(quote, Loc), Form ], Env);
     [ yal_util:make_symbol(quote, Loc), Form ];
 %%% `,form -> form (ただしformは@や.で始まらないかぎり)

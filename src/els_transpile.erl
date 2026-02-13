@@ -309,7 +309,7 @@ form(A, E) ->
     Macros = M,
     %% io:format("A: ~p~n", [A]),
     B = case A of
-	    [#item{value="quote"}|T] ->
+	    [#item{value="quote"}|_T] ->
 		%% io:format("Q: ~p~n", [T]),
 		A;
 	    _ ->
@@ -380,14 +380,7 @@ macro_expand_(X, [L], E) ->
     %%C = term_to_ast(B, Loc, E, false),
     erl_syntax:set_pos(C, Loc),
     %% io:format("L : ~p~n", [C]),
-    C
-    ;
-macro_expand_(X, L, E) ->
-    Loc = X#item.loc,
-    io:format("L : ~p~n", [L]),
-    els_pp:pptr(L, "", "", none).
-
-
+    C.
 
 export_(X, L, E) ->
     Loc = X#item.loc,
