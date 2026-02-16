@@ -126,7 +126,7 @@ file_ast(File, Opt) ->
 
 file_ast(File, Opt, CompileOpt) ->
     {ok, Module, _Binary, Ast} = file(File, Opt),
-    {module, Module, Binary2} = compile_and_write_beam(Ast, Opt, CompileOpt),
+    {module, Module, Binary2} = compile_and_write_beam(Ast, [debug_info|Opt], CompileOpt),
     {ok, Module, Binary2, Ast}.
 %    {ok, Module, Binary, Ast}.
 
