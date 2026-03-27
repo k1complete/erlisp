@@ -8,7 +8,7 @@
 
 -spec formcompile(list(), list(), list()) -> {erl_syntax:syntaxTree(), list(), list()}.
 formcompile(Form, Errors, Env) ->
-    io:format("PRE: ~p~nEnv:(~p)~n", [Form, Env]),
+    %% io:format("PRE: ~p~nEnv:(~p)~n", [Form, Env]),
     R = els_transpile:form(Form, Env),
     M = proplists:get_value(macros, Env),
     case els_localfun:register_local_func(R, M) of
@@ -22,8 +22,7 @@ formcompile(Form, Errors, Env) ->
 				  {MName, Arity},
 				  {{local},  LocalF}, M);
 			   true ->
-				io:format("LocalFDic ~p~n",
-					  [FunDic]),
+				%%io:format("LocalFDic ~p~n", [FunDic]),
 				FunDic
 			end,
 	    OEnv = proplists:delete(macros, Env),
@@ -61,9 +60,9 @@ file(File, Opt) ->
 	      _ ->
 		  throw(Errors)
 	  end,
-    io:format("Ast ~p~n Err ~p~n", [Ast, Errors]),
+    %%io:format("Ast ~p~n Err ~p~n", [Ast, Errors]),
     {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
-    io:format("compiled ~p~n", [Binary]),
+    %% io:format("compiled ~p~n", [Binary]),
     {ok, Module, Binary, Ast}.
 
 			
@@ -100,9 +99,9 @@ compile_and_write_beam(Ast, Options, CompileOpt) ->
     ?LOG_DEBUG(#{compile2 => erl_syntax:revert_forms(Ast), options=>Options, ss => SS}),
     {ok, Binary} =SS,
     Specs = extract_specs(Ast),
-    io:format("before make_doc ~p~nAst ~p~n", [Specs, Ast]),
+    %% io:format("before make_doc ~p~nAst ~p~n", [Specs, Ast]),
     {ok, DocsV1} = make_docs(Ast, Specs),
-    io:format("after make_doc ~p~n", [DocsV1]),
+    %% io:format("after make_doc ~p~n", [DocsV1]),
     {ok, Module, Chunks} = beam_lib:all_chunks(Binary),
     ChunksAdded = lists:append(Chunks, [{"Docs", term_to_binary(DocsV1)}]),
     {ok, Binary2} = beam_lib:build_module(ChunksAdded),
@@ -180,7 +179,7 @@ make_function_spec(Tree, Specs, MetaData) ->
     FName = erl_syntax:function_name(Tree),
     Name=erl_syntax:atom_value(FName),
     Cs = erl_syntax:function_clauses(Tree),
-    io:format("make_function_signature ~p~nCs: ~p~n", [Specs, Cs]),
+    %% io:format("make_function_signature ~p~nCs: ~p~n", [Specs, Cs]),
     Arity = length(erl_syntax:clause_patterns(hd(Cs))),
     case maps:get({Name, Arity}, Specs, none) of
 	none ->
@@ -208,7 +207,7 @@ make_function_signature(Tree, Specs) ->
 
 -spec extract_comment(erl_syntax:tree(), kind(), map()) -> doc_entry().
 extract_comment(Tree, Kind, Specs) ->
-    io:format("CommentTree: ~p~n", [Tree]),
+    %% io:format("CommentTree: ~p~n", [Tree]),
     case erl_syntax:has_comments(Tree) of
         true ->
 	    CommentList = lists:flatten(erl_syntax:comment_text(erl_syntax:get_precomments(Tree))),
@@ -233,12 +232,12 @@ extract_comment(Tree, Kind, Specs) ->
 make_docs(AstList, Specs) ->
     S=lists:foldr(fun(Ast, Acc) ->
                           Doc=maps:get(docs, Acc),
-			  io:format("make_docs ~p~n", [Ast]),
+			  %% io:format("make_docs ~p~n", [Ast]),
                           case erl_syntax:type(Ast) of
                             function ->
-				  io:format("before ~p~n", [Ast]),
+				  %% io:format("before ~p~n", [Ast]),
                                   E = extract_comment(Ast, function, Specs),
-				  io:format("extracted comment ~p~n", [E]),
+				  %% io:format("extracted comment ~p~n", [E]),
 				  case E of
 				      none ->
 					  Acc;
