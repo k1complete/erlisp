@@ -1,0 +1,27 @@
+{
+	"name": "erlisP - Erlang Lisp Interpreter",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"context": "."
+	},
+	"remoteEnv": {
+		"LANG": "C.UTF-8",
+		"LC_ALL": "C.UTF-8"
+	},
+	"postCreateCommand": "rebar3 compile && rebar3 eunit",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"erlang-ls.erlang-ls",
+				"jam1garner.erlang-formatter"
+			],
+			"settings": {
+				"erlang_ls.signatureHelp": true,
+				"erlang_ls.hoverProvider": true,
+				"erlang_ls.documentSymbolProvider": true
+			}
+		}
+	},
+	"forwardPorts": [8000],
+	"remoteUser": "root"
+}
