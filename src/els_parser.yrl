@@ -1,0 +1,151 @@
+
+Nonterminals
+
+expressions expression sexpression elements literal
+term asymbol  lines.
+
+Terminals
+symbol module_function
+integer float string character
+underscore 
+'(' ')' 
+'{' '}' 
+'#{' 
+'[' ']' 
+'\'' 
+'\.'.
+%% ',' 
+%%'#(' 
+%% ',@' 
+%% variable 
+Rootsymbol lines.
+Endsymbol '$end'.
+
+lines ->
+    expressions : 
+        '$1'.
+expressions ->
+    expression : 
+        %% io:format("ExpOK ~p~n", ['$1']),
+        ['$1'].
+expressions ->
+    expressions expression : 
+        lists:append('$1', ['$2']).
+
+expression ->
+    term : 
+        %% io:format("Exp0 ~p~n", ['$1']), 
+        '$1'.
+
+sexpression ->
+    '{' '}' : 
+	%%io:format("{{}}", []),
+	[setline("tuple", '$1')].
+sexpression ->
+    '{' elements '}' : 
+	%%io:format("{{}}", []),
+	[setline("tuple", '$1') | '$2' ].
+sexpression ->
+    '#{' '}' : 
+	[setline("map", '$1')].
+sexpression ->
+    '#{' elements '}' : 
+	[setline("map", '$1') | '$2' ].
+sexpression ->
+    '[' ']' : 
+	[setline("list", '$1')].
+sexpression ->
+    '[' elements ']' : 
+	[setline("list", '$1') | '$2' ].
+sexpression ->
+    '(' ')' : nil.
+sexpression ->
+    '(' elements ')' : 
+        %% io:format("SexpFromElem ~p~n", ['$2']),
+        '$2'.
+sexpression ->
+    '(' elements '\.' term ')' : 
+        %% io:format("SexpFromElem ~p~n", ['$2']),
+        lists:append('$2' , [[#item{value="dot", loc=element(2, '$3'),
+                                    type=atom}, '$4']]).
+
+elements ->
+    term : ['$1'].
+elements ->
+    elements term : lists:append('$1', ['$2']).
+
+term ->
+    asymbol : 
+        %%io:format("Term ~p~n", ['$1']), 
+        '$1'.
+term ->
+    literal : 
+        %% io:format("Term ~p~n", ['$1']), 
+        '$1'.
+term ->
+    string : 
+        %%io:format("Term ~p~n", ['$1']),
+        #item{type=string, value=tokenvalue('$1'), loc=element(2, '$1')}.
+term ->
+    sexpression : 
+        %%io:format("TermFromSexp ~p~n", ['$1']),
+        '$1'.
+term ->
+    '\'' term : 
+        A=[setline("quote", '$1'), '$2'],
+        %%io:format("Term Quote ~p~n", [A]),
+        A.
+
+
+asymbol ->
+    module_function : setline(mf(tokenvalue('$1')), '$1').
+asymbol ->
+    symbol : 
+        setline(tokenvalue('$1'), '$1').
+asymbol ->
+    underscore : 
+        '$1'.
+
+literal ->
+    integer :
+        tokenvalue('$1').
+literal ->
+    float : 
+        tokenvalue('$1').  
+literal ->
+    character : 
+	{character, Pos, Value} = '$1',
+        #item{type=character,
+	      loc=Pos,
+	      value=Value}.
+
+Erlang code.
+
+-include_lib("els.hrl").
+
+-export([setline/2]).
+
+-spec tokenvalue(tuple()) -> string().
+tokenvalue(T) ->
+    element(3, T).
+
+-spec set_pos(string(), erl_anno:pos()) -> #item{}.
+set_pos(Tree, Pos) ->
+    #item{value=Tree, loc=Pos, type=atom}.
+-spec setline({string(), string()}, {atom(), tokenloc(), term()}) -> #item{}.
+setline({Module, Function}, {_Type, Line, _Value}) ->
+    Pos=erl_anno:new(Line),
+    #item{value=Module ++ ":" ++ Function, loc=Pos, type=atom};
+%    #item{value={Module, Function}, loc=Pos, type=Type};
+setline(Tree, {_t, Line}) ->
+    Pos = erl_anno:new(Line),
+    set_pos(Tree, Pos);
+setline(Tree, {_t, Line, _v}) ->
+    Pos = erl_anno:new(Line),
+    set_pos(Tree, Pos).
+
+-spec mf(string()) -> {string(), string()}.
+mf(Text) ->
+    [Module, Function] = string:split(Text, ":"),
+    {Module, Function}.
+

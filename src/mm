@@ -1,3 +1,0 @@
-(defun f1 (A B)
- (add (add A B) 1)
-)

@@ -1,0 +1,58 @@
+# type式
+
+* ann_type: A::T_O
+  (A :: T_0)
+  {ann_type, ANNO, [Rep(A), Rep(T_0)]}
+
+* Tがatom, 文字列, 整数りてらるL の場合 
+  Rep{T} = Rep(L)
+
+* Tがびっとすとりんぐ
+ (binary_range M N), (bitstring N), (nonempty_bitstring N),  (nonempty_binary_range), の場合
+
+* Tが空のりすと ()
+ {type, ANNO, nil, []}
+
+
+* Tが関数(lambda)の場合、
+ 引数が任意で戻り値も任意の関数として扱う。
+ {type, ANNO, 'fun', []}
+* Tが関数(lambda any_arity T_0)の場合
+ 引数が任意で戻り値がT_0の関数として扱う。
+ {type, ANNO, 'fun', [{type, ANNO, any}, Rep(T_0)]}
+* Tが関数(lambda Ft)の場合
+ Ftがfunction_typeの場合、
+ Rep(Ft)となる
+
+# function_type
+ Rep(Ft)が、(args1) (retern1)
+ 
+ 
+ (lambda Args Return ... )
+ 
+
+* Tがユーザ定義型 N(T_1, ...)のとき
+ {user_type, ANNO, N, [Rep(T_1),...]}
+
+*  [Rep(F_1), Rep(F_2)...]
+
+
+ 
+ # spec
+(-spec FunName Args Return)
+(-spec FunName Args Return Args2 Return2 ... (when (:: a (b)) (:: c (d))))
+
+
+* 型変数
+型変数は大文字から始まるアトムとする。
+
+## example:
+
+(-type utype(X) (tuple (list X) X))
+-type utype(X) :: {list(X), X}.
+
+* アノテートタイプ
+(anno :: (type)) の形式でタイプに大して注釈をつけることができる。
+これらは主にrecordや、specで利用する。
+annoに利用できる式はアトムのみであるが、型コンパイル時には、変数としてコンパイルされる。
+

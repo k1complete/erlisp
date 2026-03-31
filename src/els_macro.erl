@@ -1,4 +1,4 @@
--module(macro).
+-module(els_macro).
 -export([expand_forms/2,
          expand_apply/3,
          expand_term/2,
@@ -40,9 +40,10 @@ expand_form(Form, MacroEnv) ->
                             end, T),
     Form2=erl_syntax:cons(H, erl_syntax:copy_pos(T, RT)),
     Form3=erl_syntax:copy_pos(Form, Form2),
+    io:format("Expand ~p~n", [Form3]),
     case erl_syntax:type(H) of
         atom ->
-            EA=expand_apply(Form3, erl_syntax:atom_name(H), MacroEnv);
+            _EA=expand_apply(Form3, erl_syntax:atom_name(H), MacroEnv);
         list ->
             expand_form(H, MacroEnv);
         _ ->

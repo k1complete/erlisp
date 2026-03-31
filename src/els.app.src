@@ -1,15 +1,13 @@
-{application, erlisp,
- [{description, "An OTP application"},
+{application, els,
+ [{description, "els An OTP application"},
   {vsn, "0.1.0"},
   {registered, []},
-  {mod, {erlisp_app, []}},
   {applications,
    [kernel,
     stdlib
    ]},
   {env,[]},
-  {modules, []},
-
+  {modules, [els_app]},
   {licenses, ["Apache 2.0"]},
   {links, []}
  ]}.

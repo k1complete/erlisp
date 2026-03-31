@@ -3,7 +3,7 @@
 %% @end
 %%%-------------------------------------------------------------------
 
--module(erlisp_sup).
+-module(els_sup).
 
 -behaviour(supervisor).
 
@@ -29,7 +29,13 @@ init([]) ->
     SupFlags = #{strategy => one_for_all,
                  intensity => 0,
                  period => 1},
-    ChildSpecs = [],
+    ChildSpecs = [childspec()],
+    %ChildSpecs = [],
+    io:format("started"),
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions
+childspec() ->
+    #{id => els_repl,
+      start => {els_repl, tty, []}     
+      }.

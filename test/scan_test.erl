@@ -18,23 +18,32 @@ loctoline(Tree) ->
         
 process(Expected, Got) ->
     Line=?LINE,
-    {ok, Tokens, _Lines} = scan:string(Got, Line),
-    {ok, Tree} = parser:parse(Tokens),
-    Trees = transpile:form(Tree, []),
+    {ok, Tokens, _Lines} = els_scan:from_string(Got, Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    io:format("Process-form: ~p~n", [Tree]),
+    Trees = els_transpile:form(Tree, []),
 %    {erl_prettypr:format(merl:quote(Expected)),
 %     erl_prettypr:format(Trees)}.
-    {merl:quote(Line, Expected),
+    Mr = merl:quote(Line, Expected),
+    io:format("transpiled: ~p~n~p~n", [Trees, Mr]),
+    MM = merl:quote(Line, Expected),
+    MMM = erl_syntax_lib:map(fun(Y) -> Y end, MM),
+    {erl_syntax:revert(MMM),
      erl_syntax:revert(loctoline(Trees))}.
+
    
 
 utf8_test() ->    
     Line=?LINE,
     Got = "(quote Aあ)",
-    {ok, Tokens, _Lines} = scan:string(Got, Line),
-    {ok, Tree} = parser:parse(Tokens),
-    Trees = transpile:form(Tree, []),
-    io:format("~ts~n", [erl_syntax:variable_literal(Trees)]),
-    ?assertEqual("Aあ", erl_syntax:variable_literal(Trees)).
+    {ok, Tokens, _Lines} = els_scan:string(Got, Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    Trees = els_transpile:form(Tree, []),
+%%    LetHead = erl_syntax:list_head(Trees),
+    LetHead = Trees,
+    io:format("LetHead ~p~n", [LetHead]),
+    Let = erl_syntax:atom_value(LetHead),
+    ?assertEqual('Aあ', Let).
 infix_test() ->
     lists:map(fun({AM, BM}) ->
                       {A, B} = process(AM, BM),
@@ -64,7 +73,7 @@ infix_test() ->
               ]).
 match_test() ->
     {A, B} = process("_ = [1,2,3]", "(match _ (quote (1 2 3)))"),
-    ?assertEqual(A, B).
+    ?assertEqual(erl_syntax:revert(A), B).
 match2_test() ->
     {A, B} = process("[X, Y, 3] = [1,2,3]", "(match (cons X (cons Y (quote (3)))) (quote (1 2 3)))"),
     ?assertEqual(A, B).
@@ -85,14 +94,36 @@ minus_test() ->
 plus_test() ->
     Line=?LINE,
     S="(+ 1 1)",
-    SR = scan:string(S, Line),
+    SR = els_scan:string(S, Line),
     SRR=element(2, SR),
     io:format("SRR:~p~n", [SRR]),
-    {ok, SP}=parser:parse(SRR),
+    {ok, [SP]}=els_parser:parse(SRR),
     io:format("SP:~p~n", [SP]),
-    TP=transpile:form(SP, []),
+    TP=els_transpile:form(SP, []),
     SE = merl:quote(Line, "1+1"),
     A=erl_prettypr:format(SE),
     B=erl_prettypr:format(TP),
     ?assertEqual(A, B).
 
+multi_line_test() ->
+    Line=?LINE,
+    S="(+ 1\n1)",
+    {_RR, R, NextLoc} = els_scan:from_string(S, Line),
+    ?assertEqual([{'(',{Line,1}},
+                      {symbol,{Line,2},"+"},
+                      {integer,{Line,4},1},
+                      {integer,{Line+1,1},1},
+                      {')',{Line+1,2}}],
+            R),
+    ?assertEqual(NextLoc, Line+1).
+    
+utf8_character_literal_test() ->
+    Line=?LINE,
+    S="#\\a #\\あ #\\b c",
+    {_RR, R, NextLoc} = els_scan:from_string(S, Line),
+    ?assertEqual([{character, {Line, 3}, 97},
+		  {character, {Line, 7}, 12354},
+		  {character, {Line, 12}, 98},
+		  {symbol, {Line, 14}, "c"}],R),
+    ?assertEqual(NextLoc, Line).
+    

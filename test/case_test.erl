@@ -1,0 +1,75 @@
+-module(case_test).
+
+-include_lib("eunit/include/eunit.hrl").
+-include_lib("syntax_tools/include/merl.hrl").
+
+case_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(case (== 1 1) ('true 'ok) ('false 'ng))", Line),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    Binding=erl_eval:add_binding('A', 1, erl_eval:new_bindings()),
+    ?assertEqual({value, ok, [{'A', 1}]},
+                 erl_eval:expr(erl_syntax:revert(C), Binding)).
+
+case_with_guard_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(case (== 1 1) (x (when (== x 'true)) 'ok) ('false 'ng))", Line),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    Binding=erl_eval:add_binding('A', 1, erl_eval:new_bindings()),
+    ?assertEqual({value, ok, [{'A', 1}, {x, true}]},
+                 erl_eval:expr(erl_syntax:revert(C), Binding)).
+
+case_with_conjunctive_guard_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(case (> 1 y) (x (when (== x 'true) (== y 0)) 'ok) ('false 'ng))", Line),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    Binding=erl_eval:add_binding('y', 0, erl_eval:new_bindings()),
+    ?assertEqual({value, ok, [{x, true}, {'y', 0}]},
+                 erl_eval:expr(erl_syntax:revert(C), Binding)).
+
+case_with_disjunctive_guard_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(case (> 1 y) (x (whend (== x 'true) (== y 1)) 'ok) ('false 'ng))", Line),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    Binding=erl_eval:add_binding('y', 1, erl_eval:new_bindings()),
+    ?assertEqual({value, ok, [{x, false}, {'y', 1}]},
+                 erl_eval:expr(erl_syntax:revert(C), Binding)).
+
+case_with_disjunctive2_guard_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(case (> 1 y) (x (whend (when (== x 'true) (== y 1)) (when (== x 'false) (=/= y 0))) 'ok) ('false 'ng))", Line),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    Binding=erl_eval:add_binding('y', 1, erl_eval:new_bindings()),
+    ?assertEqual({value, ok, [{x, false}, {'y', 1}]},
+                 erl_eval:expr(erl_syntax:revert(C), Binding)).
+
+case_with_multistatement_test() ->
+    Line = ?LINE,
+    Cmd = ["(case (tl param)",
+           "  (x (when (== (hd x) 2))",
+           "     (match y (* (hd (tl x)) 10))",
+           "     (+ y (hd x)))",
+           "  (s s))"],
+    {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(Cmd), Line),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    Binding=erl_eval:add_binding(param, [1,2,3], erl_eval:new_bindings()),
+    ?assertEqual({value, 32, [{param, [1,2,3]}, {x, [2,3]}, {y, 30}]},
+                 erl_eval:expr(erl_syntax:revert(C), Binding)).
+
+
+case_no_body_test() ->
+    Line = ?LINE,
+    {ok, Tokens, _Line} = els_scan:from_string("(case (== 1 1) ('true) )", Line),
+    {ok, [Tree]} =els_parser:parse(Tokens),
+    ?assertThrow(
+       [{error, {no_body, {Line, 2},
+	 [[[ {item,"quote",{Line,17},atom},
+	   {item,"true",{Line,18},atom} ]]] }}],
+       els_transpile:form(Tree, [])
+    ).

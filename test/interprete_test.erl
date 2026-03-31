@@ -1,0 +1,126 @@
+-module(interprete_test).
+
+-include_lib("eunit/include/eunit.hrl").
+-include_lib("syntax_tools/include/merl.hrl").
+
+
+local_fun_test() ->
+    Line = ?LINE,
+    S = ["(defun fib ((0) 1) ",
+	 "  ((1) 1)",
+	 "  ((n) (io:format \"aa\" ()) (+ (fib (- n 1)) (fib (- n 2))) )",
+	 ")"],
+    {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(lists:join("\n", S)), Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    {NFunDic, _Name, _Arity} = els_localfun:register_local_func(C, #{}),
+    LocalF = els_localfun:create_valuefun(NFunDic),
+    S2 = merl:quote("fib(4)"),
+    Ret2 = erl_eval:expr(S2, [], {value, LocalF}),
+    ?assertEqual({value, 5, []}, Ret2).
+
+local_fun_call_test() ->
+    Line = ?LINE,
+    S = ["(defun fib ((0) 1) ",
+	 "  ((1) 1)",
+	 "  ((n) (io:format \"aa\" ()) (+ (fib (- n 1)) (fib (- n 2))) )",
+	 ")"],
+    S2 = [
+	 "(+ (fib 4) 5)"
+	],
+    {ok, Tokens, Line2} = els_scan:from_string(lists:flatten(lists:join("\n", S)), Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    C = els_transpile:form(Tree, []),
+    io:format("Zero Line: ~p ~n To  ~p~n", [S, C]),
+    {NFunDic, _Name, _Arity} = 
+	els_localfun:register_local_func(C, #{}),
+    io:format("Zero2 Line ~p ~n", [NFunDic]),
+    LocalF = els_localfun:create_valuefun(NFunDic),
+    NewEnv = [{macros, NFunDic}],
+    io:format("First Line~n", []),
+    {ok, Tokens2, _Line} = els_scan:from_string(lists:flatten(lists:join("\n", S2)), Line2),
+    {ok, [Tree2]} = els_parser:parse(Tokens2),
+    C2 = els_transpile:form(Tree2, NewEnv),
+    C2_1 = erl_syntax:revert(C2),
+    Ret2 = erl_eval:expr(C2_1, [], {value, LocalF}),
+    ?assertEqual({value, 10, []}, Ret2).
+
+local_macro_test() ->
+    Line = ?LINE,
+    S = ["(defmacro strlen (s) ",
+	 " `(length ,s))"],
+    S1 = [
+	 "(defun main (a b)", 
+	 "  (strlen a))"
+	 ],
+    Env = els_util:env_init(),
+    {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(lists:join("\n", S)), Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    io:format("CC: ~p~n", [Tree]),
+    C = els_transpile:form(Tree, Env),
+    {NFunDic, _Name, _Arity} = els_localfun:register_local_func(C, #{}),
+    LocalF = els_localfun:create_valuefun(NFunDic),
+    Macros = maps:put({"strlen", 1},{{local},  LocalF}, #{}),
+    {ok, Tokens1, _} = els_scan:from_string(lists:flatten(lists:join("\n", S1)), Line),
+    {ok, [Tree1]} = els_parser:parse(Tokens1),
+    io:format("CC1: ~p~n", [Tree1]),
+    Ret = els_transpile:expand_macro(Tree1, Env, Macros),
+    C2 = els_transpile:form(Ret, Env),
+    io:format("Ret: ~p~n", [Ret]),
+    {NFunDic2, _Name2, _Arity2} = els_localfun:register_local_func(C2, NFunDic),
+    LocalF2 = els_localfun:create_valuefun(NFunDic2),
+    S2 = merl:quote("main(\"c12\", \"d12\")"),
+    Ret2 = erl_eval:expr(S2, [], {value, LocalF2}),
+    ?assertEqual({value, 3, []}, Ret2).
+
+local_macro_form_test() ->
+    Line = ?LINE,
+    S = ["(defmacro strlen (s) ",
+	 " `(length ,s))"],
+    S1 = [
+	 "(defun main (a b)", 
+	 "  (strlen a))"
+	 ],
+    Env0 = els_util:env_init(),
+    {ok, Tokens, _Line} = els_scan:from_string(lists:flatten(lists:join("\n", S)), Line),
+    {ok, [Tree]} = els_parser:parse(Tokens),
+    io:format("CC: ~p~n", [Tree]),
+    C = els_transpile:form(Tree, Env0),
+    {NFunDic, _Name, _Arity} = els_localfun:register_local_func(C, #{}),
+    LocalF = els_localfun:create_valuefun(NFunDic),
+    Macros = maps:put({"strlen", 1},{{local},  LocalF}, #{}),
+    {ok, Tokens1, _} = els_scan:from_string(lists:flatten(lists:join("\n", S1)), Line),
+    {ok, [Tree1]} = els_parser:parse(Tokens1),
+    Env = [{macros, Macros}],
+    io:format("CC1---: ~p~n", [Tree1]),
+    io:format("Env---: ~p~n", [Env]),
+    %Ret = els_transpile:expand_macro(Tree1, [], Macros),
+    C2 = els_transpile:form(Tree1, Env),
+    io:format("Ret: ~p~n", [C2]),
+    {NFunDic2, _Name2, _Arity2} = els_localfun:register_local_func(C2, NFunDic),
+    LocalF2 = els_localfun:create_valuefun(NFunDic2),
+    S2 = merl:quote("main(\"c12\", \"d12\")"),
+    Ret2 = erl_eval:expr(S2, [], {value, LocalF2}),
+    ?assertEqual({value, 3, []}, Ret2).
+
+interprete_test() ->
+    Line = ?LINE,
+    S = "(defun add (a b)
+              (+ a b))
+         (add 2 3)
+
+        ",
+    io:format("~s", [S]),
+    {ok, Tokens, _Line} = els_scan:from_string(S, Line),
+    {ok, Trees} = els_parser:parse(Tokens),
+    Env = [],
+    {Results, _NEnv}  = lists:foldl(fun(I, {Acc, E}) ->
+					   io:format("eval ~p~n", [I]),
+					   {value, Result, NewEnv} = els_repl:eval(I, E),
+					   {[Result|Acc], NewEnv}
+				  end, {[], Env}, Trees),
+    ?assertEqual([5, [ok, add, 2]], Results ).
+
+	 
+    
+

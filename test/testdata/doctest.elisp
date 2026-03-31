@@ -1,0 +1,36 @@
+(-module doctest
+"""
+doctest module
+
+this is a module
+"""
+)
+(-export (main 1) (triple 1) (getdoc 3))
+(-spec main ((a :: 1)) 2 ((integer)) (integer))
+(defun main ((1)
+"""
+main is double a
+
+Example:
+
+"""
+2)
+((a)
+ (+ a a)))
+
+(defun triple (a)
+"""
+triple is triple a
+
+Example:
+
+"""
+(+ (main a) a))
+
+(defun getdoc (module func arity)
+   (case (code:get_doc module) 
+     ((tuple 'ok Res)
+         Res)
+     (_ 'ng)))
+     
+   	

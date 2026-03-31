@@ -17,7 +17,8 @@ _build
 *.iml
 rebar3.crashdump
 *~
-scan.erl
+bin/erlisp
+src/els_scan.erl
+src/els_parser.erl
 tlisp.erl
-parser.erl
 attic/
