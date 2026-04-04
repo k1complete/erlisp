@@ -20,5 +20,6 @@ rebar3.crashdump
 bin/erlisp
 src/els_scan.erl
 src/els_parser.erl
+src/els_erlformat.erl
 tlisp.erl
 attic/
