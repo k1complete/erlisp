@@ -11,26 +11,40 @@ version(A, B) ->
     io:format("version~p~n~p~n", [A, B]).
 compile(A) ->
     B = maps:get(file, A),
-    lists:map(fun(E) ->
-		      {ok, Module, _Beam, _Ast} = els_compile:file_ast(E,[], A),
-		      io:format("compile <~s>~n", [ Module])
-	      end, B),
-    halt(0).
+    Result = lists:map(fun(E) ->
+			       try els_compile:file_ast(E,[], A) of
+				   {ok, Module, _Beam, _Ast} ->
+				       {ok, Module}
+			       catch
+				   Error ->
+				       {error, Error}
+			       end
+		       end, B),
+    case lists:all(fun(R) -> element(1, R) == ok end, Result) of
+	true ->	   
+	    0;
+	false ->
+	    1
+    end.
+		   
 
 run(A) ->
     B = maps:get(file, A),
     case file:open(B, [read, {encode, utf8}]) of
 	{ok, F} ->
-	    case els_repl:source(F,[]) of
-		{value, _Value, _} ->
-		    halt(0);
+	    try 
+		case els_repl:source(F,[]) of
+		    {value, _Value, _} ->
+			0
+		end
+	    catch 
 		Error ->
-		    io:format("<~p>~n", [Error]),
-		    halt(1)
+		    io:format("Exception: ~p~n", [Error]),
+		    1
 	    end;
 	{error, Reason} ->
 	    io:format("Error: ~p~n", [Reason]),
-	    halt(0)
+	    0
     end.
 
     
@@ -54,8 +68,7 @@ main(Args) ->
 		      #{help => "print version",
 			handler =>
 			    fun(A) ->
-				    version(A, VSN),
-				    halt(0)
+				    {done, version(A, VSN)}
 			    end
 		       },
 		  "help" => 
@@ -86,7 +99,7 @@ main(Args) ->
 			       nargs => all,
 			       type => string}],
 			handler => fun(A) -> 
-					   compile(A)
+					   {done, compile(A)}
 				   end},
 		  "run" => 
 		      #{help=>"run script file",
@@ -96,7 +109,7 @@ main(Args) ->
 			       type => string}],
 			required => false,
 			handler => fun(A) ->
-					   run(A)
+					   {done, run(A)}
 				   end}
 		 },
 	    help => "Ccommand"
@@ -105,14 +118,14 @@ main(Args) ->
     OptH = #{progname => S, command =>[S]},
     Res = argparse:run(Args, Cmd, Opt),
     case Res of
+	{done, N} ->
+	    halt(N);
 	{ok, #{'help' := true}, _, _} ->
 	    io:format("~s~n", [argparse:help(Cmd, Opt)]),
 	    halt(0);
 	{ok, #{version := true}, _, _} ->
 	    io:format("version~n", []),
 	    halt(0);
-	{ok, #{}, _, _} ->
-	    Res;
 	ok ->
 	    io:format("~s~n", [argparse:help(Cmd, OptH)]),
 	    halt(0);

@@ -12,6 +12,7 @@
 start_link(String) ->
     spawn_link(?MODULE,init,[String]).
 
+-spec init(string()) -> no_return().
 init(String) ->
     {ok, Fd} = file:open(unicode:characters_to_binary(String), [read, ram]),
     %% io:format("Inited: <~p>~n", [String]),
@@ -26,23 +27,24 @@ loop(State) ->
 	{io_request, From, ReplyAs, Request} ->
 	    case request(Request,State) of
 		{ok, {eof, A}, _NewState} ->
-		    reply(From, ReplyAs, {eof, A}),
+		    {io_reply,_, _} = reply(From, ReplyAs, {eof, A}),
 		    exit(normal);
 		{Tag, Reply, NewState} when Tag =:= ok; Tag =:= error ->
-		    reply(From, ReplyAs, Reply),
-		    ?MODULE:loop(NewState);
-		{stop, Reply, _NewState} ->
-		    reply(From, ReplyAs, Reply),
-		    exit(Reply)
+		    {io_reply,_, _} = reply(From, ReplyAs, Reply),
+		    ?MODULE:loop(NewState)
+		%% ;
+		%% {stop, Reply, _NewState} ->
+		%%    reply(From, ReplyAs, Reply),
+		%%    exit(Reply)
 	    end;
 	stop ->
             %%io:format(standard_error, "terminated!!!!", []),
-            file:close(State#state.fd),
+            ok = file:close(State#state.fd),
             exit(normal);
 	%% Private message
 	{From, rewind} ->
 	    From ! {self(), ok},
-            ram_file:seek_posision(State#state.fd, 0);
+            ram_file:position(State#state.fd, 0);
 	_Unknown ->
             io:format(standard_error, "Recieved!!!! ~p~n", [_Unknown]),
 	    ?MODULE:loop(State)
@@ -123,7 +125,7 @@ getopts(#state{mode=M} = S) ->
 		  end}],S}.
 
 put_chars(Chars, #state{fd = T} = State) ->
-    ram_file:write(T, Chars),
+    ok = ram_file:write(T, Chars),
     {ok, ok, State}.
 
 
@@ -176,10 +178,7 @@ get_loop(M,F,A,T,C, LookAhead) ->
                 _Errors ->
                     % io:format(standard_error, "error ~p~n", [Errors]),
                     {error, {eof, hd(A)}}
-            end;
-        Error ->
-            %% io:format(standard_error, "Error ~p~n", [Error]),
-            {error, Error}
+            end
     end.
 
 check(unicode, List) ->
@@ -240,11 +239,11 @@ utfcheck(Bs) ->
 	    0
     end.
 
--spec getc(io:device(), list()) -> {ok, list()}.
+-spec getc(io:device(), list()) -> {ok, list()} | eof.
 getc(Fd, []) ->
     case ram_file:read(Fd, 1) of
         eof ->
-            {ok, eof};
+            eof;
 	{ok, [Rest]} ->
 	    {ok, D2} = case utfcheck(Rest) of 
 			   0 ->

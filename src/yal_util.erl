@@ -13,10 +13,11 @@ proplists_replace(Key, Value, Prop) ->
 make_macro_funcname(Name) ->
     list_to_atom("MACRO_" ++ Name).
 
-make_symbol(S, Pos) ->
-    #item{value=atom_to_list(S), loc=Pos, type=atom}.
+   
 make_symbol(S) ->
-    #item{value=atom_to_list(S), loc=0, type=atom}.
+    make_symbol(S, 0).
+make_symbol(S, Pos) when is_atom(S) ->
+    #item{value=atom_to_list(S), loc=Pos, type=atom}.
 
 required_macros(M) ->
     case code:ensure_loaded(M) of

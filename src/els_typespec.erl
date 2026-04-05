@@ -76,7 +76,7 @@ fun_to_string2(Name, Arity, Specs) ->
     Attribute = {attribute, 0, spec, {{Name,Arity}, LSpecs}},
     
     %%Attribute = erl_syntax:attribute(SpecName, [Name, Spec]),
-    S = erl_prettypr:format(Attribute),
+    S = erl_prettypr:format([Attribute]),
     io:format("FuntoString2: ~p~n", [S]),
     S.
 
@@ -312,21 +312,14 @@ record_field_rep([#item{type=atom} = Name, #item{value="::", loc=Loc}, Type], E)
     TypeAst = rep(Type, E),
     erl_syntax:set_pos(erl_syntax:record_type_field(NameAst, TypeAst), Loc).
 
--spec rep(#item{}, []) -> erl_syntax:tree().
+-spec rep(#item{}, []) -> erl_syntax:syntaxTree().
 
 %% annoteted type A :: T_0 type
 rep([#item{type=atom, loc=Loc}=N, #item{type=atom, value="::"}, [T | Arguments]], E) ->
     %%Nast = term_make_atom(N),
     Nast = els_util:term_make_variable(N),
     %%io:format("anonted ~p~n~p~n", [T, Arguments]),
-    Type = case builtin_rep(T, Arguments, E) of
-	       userdefined ->
-		   %%userdefined(T, Arguments);
-		   %%io:format("T ~p~n Arguments~p~n", [T, Arguments]),
-		   
-		   userdefined;
-	       R -> R
-	   end,
+    Type = builtin_rep(T, Arguments, E),
     erl_syntax:set_pos(erl_syntax:annotated_type(Nast, Type), Loc);
 rep([#item{type=atom, loc=Loc}=N, #item{type=atom, value="::"}, L], E) ->
     %%Nast = term_make_atom(N),
@@ -358,13 +351,7 @@ rep(T, _E) when is_integer(T) ->
 %%         else... userdefined type
 rep([#item{type=atom}=T|Arguments], E) ->
     %%io:format("in ~p~n~p~n", [T, Arguments]),
-    case builtin_rep(T, Arguments, E) of
-	userdefined ->
-	    %%userdefined(T, Arguments);
-	    %%io:format("T ~p~n Arguments~p~n", [T, Arguments]),
-	    userdefined;
-	R -> R
-    end;
+    builtin_rep(T, Arguments, E);
 rep([], _E) ->
     erl_syntax:nil();
 rep(nil, _E) ->

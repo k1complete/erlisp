@@ -1,11 +1,11 @@
 
--type location() :: erl_anno:location().
--type atype() :: variable | function | atom | 
-		 string | integer | character.
+-type location() :: erl_syntax:annotaion_or_location() | erl_anno:location() |  'undefined' | 'nil'.
+-type atype() :: variable | function | atom | float |
+		 string | integer | character | module_function.
 
 -record(item, 
-        {value :: atom(),
-         loc :: location(),
+        {value :: any(),
+         loc :: location(), 
          type :: atype()}).
 
 -record(compile_info, 

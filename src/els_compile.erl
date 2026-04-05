@@ -124,9 +124,10 @@ file_ast(File, Opt) ->
 
 
 file_ast(File, Opt, CompileOpt) ->
-    {ok, Module, _Binary, Ast} = file(File, Opt),
-    {module, Module, Binary2} = compile_and_write_beam(Ast, [debug_info|Opt], CompileOpt),
-    {ok, Module, Binary2, Ast}.
+    {ok, ModuleFile, _Binary, Ast} = file(File, Opt),
+    {module, Module2, Binary2} = compile_and_write_beam(Ast, [debug_info|Opt], CompileOpt),
+    io:format("File_ast ~p~n", [{ModuleFile, Module2}]),
+    {ok, ModuleFile, Binary2, Ast}.
 %    {ok, Module, Binary, Ast}.
 
 
