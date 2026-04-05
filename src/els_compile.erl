@@ -60,7 +60,7 @@ file(File, Opt) ->
 	      _ ->
 		  throw(Errors)
 	  end,
-    %%io:format("Ast ~p~n Err ~p~n", [Ast, Errors]),
+    io:format("Ast ~p~n Err ~p~n", [Ast, Errors]),
     {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
     %% io:format("compiled ~p~n", [Binary]),
     {ok, Module, Binary, Ast}.
@@ -99,9 +99,9 @@ compile_and_write_beam(Ast, Options, CompileOpt) ->
     ?LOG_DEBUG(#{compile2 => erl_syntax:revert_forms(Ast), options=>Options, ss => SS}),
     {ok, Binary} =SS,
     Specs = extract_specs(Ast),
-    %% io:format("before make_doc ~p~nAst ~p~n", [Specs, Ast]),
+    io:format("before make_doc ~p~nAst ~p~n", [Specs, Ast]),
     {ok, DocsV1} = make_docs(Ast, Specs),
-    %% io:format("after make_doc ~p~n", [DocsV1]),
+    io:format("after make_doc ~p~n", [DocsV1]),
     {ok, Module, Chunks} = beam_lib:all_chunks(Binary),
     ChunksAdded = lists:append(Chunks, [{"Docs", term_to_binary(DocsV1)}]),
     {ok, Binary2} = beam_lib:build_module(ChunksAdded),
@@ -125,6 +125,7 @@ file_ast(File, Opt) ->
 
 file_ast(File, Opt, CompileOpt) ->
     {ok, ModuleFile, _Binary, Ast} = file(File, Opt),
+    io:format("Compile Ast ~p~n", [Ast]),
     {module, Module2, Binary2} = compile_and_write_beam(Ast, [debug_info|Opt], CompileOpt),
     io:format("File_ast ~p~n", [{ModuleFile, Module2}]),
     {ok, ModuleFile, Binary2, Ast}.
@@ -211,7 +212,16 @@ extract_comment(Tree, Kind, Specs) ->
     %% io:format("CommentTree: ~p~n", [Tree]),
     case erl_syntax:has_comments(Tree) of
         true ->
-	    CommentList = lists:flatten(erl_syntax:comment_text(erl_syntax:get_precomments(Tree))),
+%%	    CommentList = lists:flatten(erl_syntax:comment_text(erl_syntax:get_precomments(Tree))),
+	    io:format("PreCommentsT: ~p~n", [Tree]),
+	    PreComments = erl_syntax:get_precomments(Tree),
+	    io:format("PreComments: ~p~n", PreComments),
+	    CommentList = lists:foldl(fun(CT, Acc) ->
+					      io:format("ExtractComment: ~p~n", [CT]),
+					      CText =erl_syntax:comment_text(CT),
+					      io:format("ExtractCommentText: ~p~n", [CText]),
+					      Acc ++CText
+				      end, [], erl_syntax:get_precomments(Tree)),
 	    io:format("Comments: ~p~n", [CommentList]),
 	    io:format("Tree: ~p~n", [{erl_syntax:function_name(Tree),
 				     erl_syntax:function_arity(Tree)

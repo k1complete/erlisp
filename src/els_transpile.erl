@@ -499,7 +499,7 @@ module_(X, L, _E) ->
                          E1;
                      S ->
                          {Line, Column} = Loc,
-                         Comment = {Line,Column, 0, S#item.value},
+                         Comment = {Line,Column, 0, [S#item.value]},
                          {R,_} = erl_recomment:recomment_tree(E1, [Comment]),
                          R
                  end
@@ -696,12 +696,20 @@ match_defun_(Name, Clauses, E) ->
 					      case erl_syntax:has_comments(Tree) of
 						  true ->
 						      C = erl_syntax:get_precomments(Tree),
-						      io:format(standard_error, "Md Tree ~p~n", [Tree]),
-						      io:format(standard_error, "Md precomments ~p~n", [C]),
-						      NC = lists:foldr(fun(CE, A) ->
-									       [erl_syntax:comment_text(CE)|A]
+						      io:format( "Md Tree ~p~n", [Tree]),
+						      io:format( "Md precomments ~p~n", [C]),
+						      NC = lists:foldl(fun(CE, A) ->
+									       io:format( "Md comment_tree ~p~n", [CE]),
+									       CT = erl_syntax:comment_text(CE),
+									       io:format( "Md comment_text ~p~n", [CT]),
+									       io:format( "Md comment_text_acc ~p~n", [A]),
+									       io:format( "Md comment_text_ct ~p~n", [A++CT]),
+									       A++CT
 								       end, [], C),
 						      %% NC = erl_syntax:comment_text(hd(C)),
+						      io:format( "Md acc ~p~n~p~n~p~n", [Acc, NC, Acc++NC]),
+						      io:format( "Md Tree ~p~n", [Tree]),
+						      
 						      {erl_syntax:set_precomments(Tree, []), Acc++NC};
 						  false ->
 						      {Tree, Acc}
@@ -731,6 +739,7 @@ match_defun_comment(Name, Com, Clauses, E) ->
             Comment = {1, 1, 
                        0, Com#item.value},
             R=erl_recomment:recomment_forms(Tree, [Comment]),
+	    io:format("reccoment ~p~n", [R]),
             R
     end.
 
