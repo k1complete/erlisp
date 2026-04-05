@@ -226,7 +226,8 @@ ppsexp(S) when is_list(S) andalso length(S) == 1 ->
                      end, S),
     prettypr:par(Pars);
 ppsexp([]) ->
-    prettypr:null_text();
+    %%prettypr:null_text();
+    prettypr:empty();
 ppsexp(#item{type=atom, value=V}) when is_atom(V) ->    
     prettypr:text(atom_to_list(V));
 ppsexp(#item{type=atom, value=V}) ->

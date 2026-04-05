@@ -42,17 +42,21 @@ create_localvaluefun(Locals) ->
 	    {value, Value, _NewBinding} = erl_eval:expr(Func, Arg, {value, create_localvaluefun(Locals)}),
 	    Value
     end.
-
+-spec create_valuefun(Locals::map()) -> fun((atom(), list()) -> any()).
 create_valuefun(Locals) ->
     fun(Name, Arg) ->
-	    {Kind, Func} = maps:get({Name, length(Arg)}, Locals, {{error},undefined}),
+	    Arity = case Arg of
+			Arg when is_map(Arg) -> maps:size(Arg);
+			Arg when is_list(Arg) -> length(Arg)
+		    end,
+	    {Kind, Func} = maps:get({Name, Arity}, Locals, {{error},undefined}),
 	    case {Kind, Func} of
 		{{error}, undefined} ->
-		    Command = lists:flatten(io_lib:format("~p/~p", [Name, length(Arg)])),
+		    Command = lists:flatten(io_lib:format("~p/~p", [Name, Arity])),
 		    throw({'undefined shell command', Command});
 		{{local}, Func} when is_function(Func) ->
 		    Q = merl:qquote(?LINE, "apply(_@Func, _@Arg)", [{'Func', Func}, {'Arg', Arg}]),
-		    {value, Value, _NewEnv} = erl_eval:expr(Q, Arg, create_valuefun(Locals)),
+		    {value, Value, _NewEnv} = erl_eval:expr(hd(Q), Arg, create_valuefun(Locals)),
 		    Value;
 		{{local},_} ->
 		    QArg = erl_syntax:revert(erl_syntax:abstract(Arg)),

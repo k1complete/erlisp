@@ -1,3 +1,4 @@
+
 -type kind() :: 'function' | 'callback'| 'type' | 'macro' | atom().
 -type name() :: atom().
 -type signature() :: [binary()].
@@ -7,14 +8,14 @@
 -type metadata() :: map().
 -type doc() :: #{doclanguage() := docvalue()} | none |hidden.
 -type doc_entry() :: {{kind(), name(), arity()},
-                      erl_anno:anno(),
+                      erl_anno:location(),
                       signature(),
                       doc(),
                       metadata()}.
--record(docs_v1, {anno :: erl_anno:anno(),
+-record(docs_v1, {anno =  0:: erl_anno:location(),
                   beam_language :: atom(),
-                  format :: mime_type(),
-                  module_doc :: doc(),
+                  format = <<>> :: mime_type(),
+                  module_doc = none :: doc(),
                   metadata = #{} :: metadata(),
                   docs = [] :: [doc_entry()] }).
 -type docs_v1() :: #docs_v1{}.
