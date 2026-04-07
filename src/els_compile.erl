@@ -6,7 +6,7 @@
 	 extract_specs/3
         ]).
 
--spec formcompile(list(), list(), list()) -> {erl_syntax:syntaxTree(), list(), list()}.
+-spec formcompile(list(), list(), list()) -> {erl_syntax:syntaxTree(), {list(), list()}}.
 formcompile(Form, Errors, Env) ->
     %% io:format("PRE: ~p~nEnv:(~p)~n", [Form, Env]),
     R = els_transpile:form(Form, Env),
@@ -33,11 +33,10 @@ formcompile(Form, Errors, Env) ->
     end.
 
 
--spec file(string()) -> {ok, module(), binary()}.
 file(File) ->
     file(File, []).
 
--spec file(string(), list()) -> {ok, module(), binary()}.
+-spec file(string(), list()) -> {ok, module(), binary(), list()}.
 file(File, Opt) ->
     io:format("cwd ~p~n", [file:get_cwd()]),
     Module = list_to_atom(filename:basename(File, ".elisp")),
@@ -60,7 +59,7 @@ file(File, Opt) ->
 	      _ ->
 		  throw(Errors)
 	  end,
-    %%io:format("Ast ~p~n Err ~p~n", [Ast, Errors]),
+    io:format("Ast ~p~n Err ~p~n", [Ast, Errors]),
     {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
     %% io:format("compiled ~p~n", [Binary]),
     {ok, Module, Binary, Ast}.
@@ -99,17 +98,17 @@ compile_and_write_beam(Ast, Options, CompileOpt) ->
     ?LOG_DEBUG(#{compile2 => erl_syntax:revert_forms(Ast), options=>Options, ss => SS}),
     {ok, Binary} =SS,
     Specs = extract_specs(Ast),
-    %% io:format("before make_doc ~p~nAst ~p~n", [Specs, Ast]),
+    io:format("before make_doc ~p~nAst ~p~n", [Specs, Ast]),
     {ok, DocsV1} = make_docs(Ast, Specs),
-    %% io:format("after make_doc ~p~n", [DocsV1]),
+    io:format("after make_doc ~p~n", [DocsV1]),
     {ok, Module, Chunks} = beam_lib:all_chunks(Binary),
     ChunksAdded = lists:append(Chunks, [{"Docs", term_to_binary(DocsV1)}]),
     {ok, Binary2} = beam_lib:build_module(ChunksAdded),
 
     File = make_output_file_name(Module, CompileOpt),
 
-    file:write_file(File, Binary2),
-    code:ensure_loaded(Module),
+    ok = file:write_file(File, Binary2),
+    _ = code:ensure_loaded(Module),
     {module, Module, Binary2}.
 
 make_output_file_name(Module, CompileOpt) ->				      
@@ -118,19 +117,20 @@ make_output_file_name(Module, CompileOpt) ->
 
 
     
--spec file_ast(string, options()) -> {module, module(), binary(), sexp()}.
 file_ast(File, Opt) ->
     file_ast(File, Opt, #{}).
 
 
 file_ast(File, Opt, CompileOpt) ->
-    {ok, Module, _Binary, Ast} = file(File, Opt),
-    {module, Module, Binary2} = compile_and_write_beam(Ast, [debug_info|Opt], CompileOpt),
-    {ok, Module, Binary2, Ast}.
+    {ok, ModuleFile, _Binary, Ast} = file(File, Opt),
+    io:format("Compile Ast ~p~n", [Ast]),
+    {module, Module2, Binary2} = compile_and_write_beam(Ast, [debug_info|Opt], CompileOpt),
+    io:format("File_ast ~p~n", [{ModuleFile, Module2}]),
+    {ok, ModuleFile, Binary2, Ast}.
 %    {ok, Module, Binary, Ast}.
 
 
--spec extract_specs(list(erl_syntax:tree())) -> map().
+-spec extract_specs(list(erl_syntax:syntaxTree())) -> map().
 extract_specs(Trees) ->
     R = lists:filtermap(fun(E) ->
                                 case erl_syntax:type(E) == attribute andalso 
@@ -144,7 +144,7 @@ extract_specs(Trees) ->
                         end, Trees),
     maps:from_list(R).
 
--spec extract_specs(list(erl_syntax:tree()), atom(), integer()) -> map().
+-spec extract_specs(list(erl_syntax:syntaxTree()), atom(), integer()) -> map().
 extract_specs(Trees, Function, Arity) ->
     R = lists:filtermap(fun(E) ->
                                 case erl_syntax:type(E) == attribute andalso 
@@ -164,7 +164,7 @@ extract_specs(Trees, Function, Arity) ->
                         end, Trees),
     maps:from_list(R).
 
--spec extract_module_comment(erl_syntax:tree()) -> map() | none.
+-spec extract_module_comment(erl_syntax:syntaxTree()) -> #{<<_:16>> => binary()} | none.
 extract_module_comment(Tree) ->
     case erl_syntax:has_comments(Tree) of
         true ->
@@ -191,7 +191,7 @@ make_function_spec(Tree, Specs, MetaData) ->
 	    maps:put(signature, [{attribute, 0, spec, {{Name, Arity}, A}}], MetaData)
     end.
     
--spec make_function_signature(erl_syntax:tree(), map()) -> signature().
+-spec make_function_signature(erl_syntax:syntaxTree(), map()) -> signature().
 make_function_signature(Tree, Specs) ->
     FName = erl_syntax:function_name(Tree),
     %% Name=erl_syntax:atom_value(FName),
@@ -205,12 +205,21 @@ make_function_signature(Tree, Specs) ->
     io:format("make_function_signatureR ~p~n", [R]),
     lists:flatten(R).
 
--spec extract_comment(erl_syntax:tree(), kind(), map()) -> doc_entry().
+%% -spec extract_comment(erl_syntax:syntaxTree(), kind(), map()) -> doc_entry() | none.
 extract_comment(Tree, Kind, Specs) ->
     %% io:format("CommentTree: ~p~n", [Tree]),
     case erl_syntax:has_comments(Tree) of
         true ->
-	    CommentList = lists:flatten(erl_syntax:comment_text(erl_syntax:get_precomments(Tree))),
+%%	    CommentList = lists:flatten(erl_syntax:comment_text(erl_syntax:get_precomments(Tree))),
+	    io:format("PreCommentsT: ~p~n", [Tree]),
+	    PreComments = erl_syntax:get_precomments(Tree),
+	    io:format("PreComments: ~p~n", PreComments),
+	    CommentList = lists:foldl(fun(CT, Acc) ->
+					      io:format("ExtractComment: ~p~n", [CT]),
+					      CText =erl_syntax:comment_text(CT),
+					      io:format("ExtractCommentText: ~p~n", [CText]),
+					      Acc ++CText
+				      end, [], erl_syntax:get_precomments(Tree)),
 	    io:format("Comments: ~p~n", [CommentList]),
 	    io:format("Tree: ~p~n", [{erl_syntax:function_name(Tree),
 				     erl_syntax:function_arity(Tree)
@@ -238,12 +247,7 @@ make_docs(AstList, Specs) ->
 				  %% io:format("before ~p~n", [Ast]),
                                   E = extract_comment(Ast, function, Specs),
 				  %% io:format("extracted comment ~p~n", [E]),
-				  case E of
-				      none ->
-					  Acc;
-				      _ ->
-					  Acc#{docs=> els_docs:add_docentry(Doc, E)}
-				  end;
+				  Acc#{docs=> els_docs:add_docentry(Doc, E)};
 			      attribute  ->
 				  case erl_syntax:atom_value(erl_syntax:attribute_name(Ast)) of
 				      module ->

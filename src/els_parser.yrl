@@ -129,7 +129,7 @@ Erlang code.
 tokenvalue(T) ->
     element(3, T).
 
--spec set_pos(string(), erl_anno:pos()) -> #item{}.
+-spec set_pos(string(), location()) -> #item{}.
 set_pos(Tree, Pos) ->
     #item{value=Tree, loc=Pos, type=atom}.
 -spec setline({string(), string()}, {atom(), tokenloc(), term()}) -> #item{}.

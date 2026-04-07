@@ -8,7 +8,7 @@
 
 -include_lib("els_docs.hrl").
 
--spec new_docs_v1() -> #docs_v1{}.
+-spec new_docs_v1() -> docs_v1().
 new_docs_v1() ->
     #docs_v1{}.
 
@@ -18,10 +18,12 @@ set_moduledoc(D, M) ->
     DDocentry = M#docs_v1.docs,
     M#docs_v1{docs=Docentry++DDocentry}.
 
--spec add_docentry(#docs_v1{}, binary()) -> #docs_v1{}.
+-spec add_docentry(#docs_v1{}, doc_entry()) -> #docs_v1{}.
 add_docentry(D, E) ->
-    D#docs_v1{docs=[E|D#docs_v1.docs]}.
+    D1 = D#docs_v1.docs,
+    D#docs_v1{docs=D1++[E]}.
 
+    
 -spec make_docentry(kind(), name(), arity(), erl_anno:anno(), 
                     signature(), doc(), metadata()) -> doc_entry().
 make_docentry(Kind, Name, Arity, Anno, Signature, Doc, Meta) ->
