@@ -56,7 +56,8 @@ create_valuefun(Locals) ->
 		    throw({'undefined shell command', Command});
 		{{local}, Func} when is_function(Func) ->
 		    Q = merl:qquote(?LINE, "apply(_@Func, _@Arg)", [{'Func', Func}, {'Arg', Arg}]),
-		    {value, Value, _NewEnv} = erl_eval:expr(hd(Q), Arg, create_valuefun(Locals)),
+		    QQ = erl_syntax:revert(Q),
+		    {value, Value, _NewEnv} = erl_eval:expr(QQ, Arg, {value, create_valuefun(Locals)}),
 		    Value;
 		{{local},_} ->
 		    QArg = erl_syntax:revert(erl_syntax:abstract(Arg)),

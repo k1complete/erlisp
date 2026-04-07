@@ -4,14 +4,15 @@
 
 to_list(Tree) ->
     to_list(Tree, fun(E) -> E end).
-
+to_list(none, _F) ->
+    [];
 to_list(Tree, F) ->
     case erl_syntax:type(Tree) of
         atom ->
             erl_syntax:atom_value(Tree);
         attribute ->
             ["-"++to_list(erl_syntax:attribute_name(Tree), F),
-             to_list(erl_syntax:attribute_argments(Tree), F)];
+             to_list(erl_syntax:attribute_arguments(Tree), F)];
         integer ->
             erl_syntax:integer_value(Tree);
         list ->

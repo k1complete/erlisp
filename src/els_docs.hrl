@@ -7,7 +7,7 @@
 -type mime_type() :: binary().
 -type metadata() :: map().
 -type doc() :: #{doclanguage() := docvalue()} | none |hidden.
--type doc_entry() :: {{kind(), name(), arity()},
+-type doc_entry() :: {{kind(), name(), integer()},
                       erl_anno:location(),
                       signature(),
                       doc(),

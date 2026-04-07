@@ -30,7 +30,15 @@ compile(A) ->
 
 run(A) ->
     B = maps:get(file, A),
-    case file:open(B, [read, {encode, utf8}]) of
+    
+    S = try 
+	file:open(B, [read, {encode, utf8}])
+	catch 
+	    Error0 ->
+		{error, Error0}
+	end,
+    
+    case S of
 	{ok, F} ->
 	    try 
 		case els_repl:source(F,[]) of
@@ -50,9 +58,14 @@ run(A) ->
     
 main(Args) ->
     S=escript:script_name(),
-    ok = application:load(els),
-    ok = application:ensure_started(els),
-    VSN = application:get_all_key(els),
+    VSN = try
+	      ok = application:load(els),
+	      ok = application:ensure_started(els),
+	      application:get_all_key(els)
+	  catch
+	      _ExeptionPattern ->
+		  halt(0)
+	  end,
     Opt = #{progname => S, command =>[S, "help"]},
     Cmd = #{arguments => 
 		[
@@ -135,7 +148,6 @@ main(Args) ->
 	    io:format("Reason ~s~n~n", [Er]),
 	    exit(1)
     end,
-    io:format("res: ~p~n",[Res]),
-    els_repl:start().
+    io:format("res: ~p~n",[Res]).
  
     
