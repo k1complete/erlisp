@@ -16,6 +16,6 @@ RUN curl -fsSL https://s3.amazonaws.com/rebar3/rebar3 -o /usr/local/bin/rebar3 &
     chmod +x /usr/local/bin/rebar3
 
 # Create a non-root user for development (optional, adjust if needed)
-# RUN useradd -m -s /bin/bash erldev
+RUN useradd -m -s /bin/bash erldev
 
 WORKDIR /workspace
