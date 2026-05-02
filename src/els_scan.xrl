@@ -86,6 +86,7 @@ Rules.
 
 Erlang code.
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("els_scan.hrl").
 -include_lib("els.hrl").
 -export([file/2]).
@@ -183,9 +184,9 @@ set_col_offset(List, Offset) when is_list(List) ->
 
 character_literal({IO, _Prompt0}, _M, _F, Loc, _MChar) ->
     %% io:format("Loc: ~p, MChar: ~p~n", [Loc, MChar]),
-    set_echo(IO, false),
+    _ = set_echo(IO, false),
     [C] = io:get_chars(IO, "", 1),
-    set_echo(IO, true),
+    _ = set_echo(IO, true),
     %% #\ab
     %%  012
     {Line, Col} = Loc,
@@ -211,7 +212,6 @@ set_echo(IO, Bool) ->
 	   S -> proplists:get_value(echo, S, false)
        end,
     Opts = case io:getopts(IO) of
-	       undefined -> false;
 	       S2 -> proplists:get_value(echo, S2, false)
 	   end,
     %% io:format("on befgore Opts: ~p~n~p~n", [Opts, R]),
@@ -370,10 +370,10 @@ tokens2(Cont, Chars, Line) ->
 read_do(IO, Prompt0, {Line, Col}, PrevTokens, PrevLevel) ->
     Prompt = case Col of
 		 0 -> 
-		     set_echo_on(IO),
+		     _ = set_echo_on(IO),
 		     make_prompt(IO, Prompt0, Line, PrevTokens, PrevLevel);
 		 _ -> 
-		     set_echo_off(IO),
+		     _ = set_echo_off(IO),
 		     ""
 	     end,
     %% io:format("read req ~p~n", [{Prompt0, {Line, Col}, PrevTokens, PrevLevel}]),
@@ -387,7 +387,7 @@ read_do(IO, Prompt0, {Line, Col}, PrevTokens, PrevLevel) ->
         {ok, NewTokens, NextLine} ->
             %%?LOG_DEBUG(#{prevlevel => PrevLevel,
 	    %%io:format("get tokens Col: ~p ~p ~p~n", [Col, NewTokens, NextLine]),
-	    set_echo_on(IO),
+	    _ = set_echo_on(IO),
 	    N2NextLine=set_col_offset(NextLine, {Line, Col}),
 	    N2NewTokens=set_col_offset(NewTokens, {Line, Col}),
             {NewTokens2, NextLine2} =  multiline_quote(IO, Prompt0, N2NextLine, N2NewTokens),
@@ -444,7 +444,7 @@ reads(IO, File, Line, PrevTokens, Acc) ->
             %%io:format("ReadsRET: ~p~n", [{Acc, RestTokens}]),
             {ok, Acc++RestTokens};
         {ok, Tokens, NextLine, RestTokens} ->
-            logger:degbug(#{reads=> Tokens}),
+            ?LOG_DEBUG(#{reads=> Tokens}),
             R = reads(IO, File, NextLine+1, RestTokens, Acc ++ Tokens),
             {ok, element(2, R)}
     end.
@@ -458,7 +458,7 @@ file_rest(IO, Line, Acc0) ->
             Error
     end.
 file(File, _Option) ->
-    {ok, IO} = file:open(File, "r"),
+    {ok, IO} = file:open(File, [read]),
     {ok, Acc, _Line} = file_rest(IO, 1, []),
-    file:close(IO),
+    ok = file:close(IO),
     {ok, Acc}.

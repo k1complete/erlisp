@@ -3,7 +3,6 @@
 -include_lib("syntax_tools/include/merl.hrl").
 -include_lib("els.hrl").
 -compile([{debug_info, true}]).
--export([lst/0]).
 -include("els_scan.hrl").
 -export([clause_/3]).
 -export([form/2, form_trans/2, sterm/2, infix_op/4,
@@ -18,7 +17,7 @@
 -export([if_/3]).
 -export([record_field_rep/2, record_/3, spec_/3, type_/3]).
 
--spec module_function(#item{}, erl_anno:pos()) -> erl_tree().
+-spec module_function(#item{}, location()) -> erl_tree().
 module_function(#item{value={M, F}}, Loc) ->
     erl_syntax:set_pos(erl_syntax:module_qualifier(
                          erl_syntax:atom(M),
@@ -378,9 +377,9 @@ macro_expand_(X, [L], E) ->
     B = expand_macro(L, E, M),
     C = term_to_ast(B, Loc, E, true),
     %%C = term_to_ast(B, Loc, E, false),
-    erl_syntax:set_pos(C, Loc),
+    C2 = erl_syntax:set_pos(C, Loc),
     %% io:format("L : ~p~n", [C]),
-    C.
+    C2.
 
 export_(X, L, E) ->
     Loc = X#item.loc,
@@ -500,7 +499,7 @@ module_(X, L, _E) ->
                          E1;
                      S ->
                          {Line, Column} = Loc,
-                         Comment = {Line,Column, 0, S#item.value},
+                         Comment = {Line,Column, 0, [S#item.value]},
                          {R,_} = erl_recomment:recomment_tree(E1, [Comment]),
                          R
                  end
@@ -535,8 +534,9 @@ spec_(X, L, E) ->
     M = {attribute, Loc, spec, {{erl_syntax:concrete(FuncName),ArgsLen}, FFtype}},
     %%M = erl_syntax:attribute(Spec, [erl_syntax:tuple([SpecArg, Ftype])]),
     io:format("Spec: ~p~n", [M]),
-    erl_syntax:revert(M),
-    M.
+    M2 = erl_syntax:revert(M),
+    %% M.
+    M2.
 %%
 type_(X, L, E) ->
     Loc = X#item.loc,
@@ -690,23 +690,37 @@ match_defun_(Name, Clauses, E) ->
     io:format("Md ~p~n", [Md]),
     {MdTree, Comment} = erl_syntax_lib:mapfold_subtrees(
 			      fun(Tree, Acc) ->
+				      io:format(standard_error, "Md SubTree ~p~n", [Tree]),
 				      case erl_syntax:type(Tree) of
 					  clause -> 
 					      case erl_syntax:has_comments(Tree) of
 						  true ->
 						      C = erl_syntax:get_precomments(Tree),
-						      io:format("Md precomments ~p~n", [C]),
-						      NC = erl_syntax:comment_text(C),
-						      {erl_syntax:set_precomments(Tree, []), Acc++ NC};
+						      io:format( "Md Tree ~p~n", [Tree]),
+						      io:format( "Md precomments ~p~n", [C]),
+						      NC = lists:foldl(fun(CE, A) ->
+									       io:format( "Md comment_tree ~p~n", [CE]),
+									       CT = erl_syntax:comment_text(CE),
+									       io:format( "Md comment_text ~p~n", [CT]),
+									       io:format( "Md comment_text_acc ~p~n", [A]),
+									       io:format( "Md comment_text_ct ~p~n", [A++CT]),
+									       A++CT
+								       end, [], C),
+						      %% NC = erl_syntax:comment_text(hd(C)),
+						      io:format( "Md acc ~p~n~p~n~p~n", [Acc, NC, Acc++NC]),
+						      io:format( "Md Tree ~p~n", [Tree]),
+						      
+						      {erl_syntax:set_precomments(Tree, []), Acc++NC};
 						  false ->
 						      {Tree, Acc}
 					      end;
 					  _  -> {Tree, Acc}
 				      end
 			      end, [], Md),
+    
     CommentNode = erl_syntax:comment(Comment),
-    io:format("~nmatch_defun_comment ~p~n", [CommentNode]),
-    MdTreeComment = erl_syntax:set_precomments(MdTree, CommentNode),
+    io:format("~nmatch_defun_comment ~p~ncomment: ~p~n", [CommentNode, Comment]),
+    MdTreeComment = erl_syntax:set_precomments(MdTree, [CommentNode]),
     Ret=erl_syntax:copy_pos(FuncName, MdTreeComment),
     
     io:format("~nmatch_defun_output ~p~n", [erl_syntax:get_pos(Ret)]),
@@ -725,6 +739,7 @@ match_defun_comment(Name, Com, Clauses, E) ->
             Comment = {1, 1, 
                        0, Com#item.value},
             R=erl_recomment:recomment_forms(Tree, [Comment]),
+	    io:format("reccoment ~p~n", [R]),
             R
     end.
 
@@ -783,7 +798,7 @@ defun_(X, L, E) ->
                       {_, _, _, Comment} ->
 			  Com = erl_syntax:comment(Comment),
 			  %%io:format("PreComment ~p~n", [Com]),
-                          R = erl_syntax:set_precomments(MQ,Com), 
+                          R = erl_syntax:set_precomments(MQ,[Com]), 
 			  %%io:format("PreCommentAfter ~p~n", [R]),
                           %%io:format(standard_error, "PreComment ~p~n", [R]),
                           R
@@ -1066,7 +1081,7 @@ clause_ast_guard_body(Pattern, Test, Body, GL, E) ->
 	    R;
 	{_,_,_,Comment} ->
 	    C = erl_syntax:comment(0, Comment),
-	    R2 = erl_syntax:set_precomments(R, C),
+	    R2 = erl_syntax:set_precomments(R, [C]),
 	    R2
     end.
 
@@ -1256,12 +1271,12 @@ parse_types(#item{loc=Loc, value=Val}) ->
 binary_field_(#item{loc=Loc}, [Value], E) ->
     Body = sterm(Value, E),
     R = erl_syntax:binary_field(Body),
-    erl_erl_syntax:set_pos(R, Loc);
+    erl_syntax:set_pos(R, Loc);
 binary_field_(#item{loc=Loc}, [Value, Size], E) ->
     Body = sterm(Value, E),
     Size = sterm(Size, E),
     R = erl_syntax:binary_field(Body),
-    erl_erl_syntax:set_pos(R, Loc);
+    erl_syntax:set_pos(R, Loc);
 binary_field_(#item{loc=Loc}, [Value, #item{value="/"}, Types], E) ->
     Body = sterm(Value, E),
     TypeList = parse_types(Types),
@@ -1373,10 +1388,7 @@ locconv(ES) ->
     E = erl_syntax_lib:map_subtrees(fun(E2) ->
                                            locconv(E2)
                                    end, ES),
-    Loc = case erl_syntax:get_pos(E) of
-              undefined -> 0;
-              X -> X
-          end,
+    Loc = erl_syntax:get_pos(E),
     Line = erl_anno:line(Loc),
     Pos = erl_anno:new(Line),
     erl_syntax:set_pos(E, Pos).
@@ -1541,13 +1553,4 @@ import_(#item{loc=_Loc}, L, Env) ->
                                end, Macros),
     ets:insert(MacroTable, ImportedMacros),
     erl_syntax:nil().
-
-lst() ->
-    E = [],
-    ?Q("B+1+1"),
-    C=form(?Q("[add, 1, 2, 3]"), E),
-    C2=form(?Q("[mul, 1, 2, 3]"), E),
-    C3=form(?Q("[cons, 1, 2]"), E),
-    C4=form(?Q("[length, [cons, 1, [cons, 2, []]]]"), E),
-    {C, C2, C3, C4}.
 

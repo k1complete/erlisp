@@ -5,7 +5,7 @@
          expand_form/2]).
 
 
--type tree() :: erl_syntarx:syntaxTree().
+-type tree() :: erl_syntax:syntaxTree().
 
 -type macroenv() :: #{atom() => 
                           fun((tree()) -> tree())
@@ -17,7 +17,7 @@ expand_forms(Forms, MacroEnv) ->
     erl_syntax_lib:map(fun(F) ->
                                expand_form(F, MacroEnv)
                        end, Forms).
--spec expand_apply(tree(), atom(), macroenv()) -> tree().
+-spec expand_apply(tree(), string(), macroenv()) -> tree().
 expand_apply(Form, M, MacroEnv) ->
     B = maps:get(M, MacroEnv),
     B(Form).

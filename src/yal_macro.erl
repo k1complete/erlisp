@@ -13,12 +13,12 @@
 
 %%% `basic -> 'basic (リストでもベクトルでもない任意の式)
 bc_item([#item{value="backquote", loc=Loc}, Form], _Env) when not is_list(Form)->
-    %%transpile:form([ yal_util:make_symbol(quote, Loc), Form ], Env);
+    %%els_transpile:form([ yal_util:make_symbol(quote, Loc), Form ], Env);
     [ yal_util:make_symbol(quote, Loc), Form ];
 %%% `,form -> form (ただしformは@や.で始まらないかぎり)
 bc_item([#item{value="backquote"}, [#item{value="unquote"}, [H|Form]]], Env)
   when  H#item.value =/= "dot", H#item.value =/="splice" ->
-    transpile:form([H|Form], Env);
+    els_transpile:form([H|Form], Env);
 %%% `(a b c . atom) --> `(a b c (dot atom))--> (append a b c (quote atom))
 %%% `(a b c . ,form) --> `(a b c (dot (unquote form)))--> (append a b c (quote atom))
 bc_item([#item{value="backquote", loc=Loc}, Xn], Env) when is_list(Xn) ->
@@ -26,18 +26,18 @@ bc_item([#item{value="backquote", loc=Loc}, Xn], Env) when is_list(Xn) ->
     R = lists:map(fun 
                       %% . ,form -> form
                       ([#item{value="dot"}, [#item{value="unquote"}, F]])  ->
-                          transpile:sterm(F, Env);
+                          els_transpile:sterm(F, Env);
                       %% . atom -> quote atom 
                       ([#item{value="dot"}, #item{type=atom} = F])  ->
-                          S = transpile:sterm([yal_util:make_symbol(quote, Loc), F], Env),
+                          S = els_transpile:sterm([yal_util:make_symbol(quote, Loc), F], Env),
                           erl_syntax:set_pos(S, Loc);
                       %% ,@form -> form
                       ([#item{value="unquote_splice"}, F]) ->
-                          M=transpile:sterm(F, Env),
+                          M=els_transpile:sterm(F, Env),
                           M;
                       %% ,form -> (list form)
                       ([#item{value="unquote"}, F]) ->
-                          S = erl_syntax:list([transpile:sterm(F, Env)]),
+                          S = erl_syntax:list([els_transpile:sterm(F, Env)]),
                           erl_syntax:set_pos(S, Loc);
                       %% form -> (list `form)
                       (F) ->

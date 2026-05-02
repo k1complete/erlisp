@@ -1,7 +1,7 @@
 -module(els_repl).
 -include_lib("els.hrl").
 
--type tree():: syntax_tool:tree().
+-type tree():: erl_syntax:syntaxTree().
 -export([
 	 start/1,
 	 start/0,
@@ -42,8 +42,8 @@ start_tty(Args) ->
 init() ->
     Tab = ets:new(?TABLE(), [named_table]),
     InitAst=merl:qquote("-module('@Lobby').", [{'Lobby', merl:term(?DEFAULT_MODULE())}]),
-    compile_and_register(Tab, ?DEFAULT_MODULE(), InitAst),
-    Tab,
+    {ok, lobby, _} = compile_and_register(Tab, ?DEFAULT_MODULE(), InitAst),
+    %%Tab,
     #{}.
 
 -spec is_ddl(term()) -> {ok, term(), term()} | false.
@@ -214,8 +214,8 @@ source_acc(Io, Out, Nline, Env0, RetAcc, OutFun) ->
 	{error, Reason, _NextLoc, Env} ->
 	    OutFun(Out, {error, Reason, Env}),
 	    source_acc(Io, Out, get_line(Env), Env, RetAcc, OutFun);
-	{error, Ret, Env} ->
-	    OutFun(Out, {error, Ret, Env});
+	%%{error, Ret, Env} ->
+	%%  OutFun(Out, {error, Ret, Env});
 	%%{error, Ret, Env};
 	%%source_acc(Io, Out, get_line(Env), Env, Ret, OutFun);
 	{eof, Ret, Env}  ->
@@ -244,7 +244,7 @@ repl(Io, Out, Line, Env0) ->
 						
 source(Src, Opt) ->
     S = logger:get_primary_config(),
-    logger:update_primary_config(S#{level => info}),
+    ok = logger:update_primary_config(S#{level => info}),
     Line = proplists:get_value('?Line', Opt, 1),
     io:format("Source: Line ~p~n", [Line]),
     Io = case Src of
@@ -273,7 +273,7 @@ tty(Args) ->
     S = logger:get_primary_config(),
     %%io:format("getopts ~p~n", [io:getopts(standard_io)]),
     %%io:format("keymap ~p~n", [edlin:keymap()]),
-    logger:update_primary_config(S#{level => debug}),
+    ok = logger:update_primary_config(S#{level => debug}),
 
     repl(standard_io, standard_io, 1, init(Args)).
 
