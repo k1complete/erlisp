@@ -24,6 +24,6 @@
 	"forwardPorts": [8000],
 	"remoteUser": "vscode",
 	"updateRemoteUserUID": true,
-	"workspaceFolder": "/workspace",
-	"postCreateCommand": "sudo chown -R vscode:vscode /workspace"
+	//"workspaceFolder": "/workspace",
+	"postCreateCommand": "sudo chown -R vscode:vscode ."
 }
