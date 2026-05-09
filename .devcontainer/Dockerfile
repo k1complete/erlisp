@@ -1,5 +1,7 @@
 FROM erlang:latest
 
+ARG USERNAME=vscode
+
 # Install additional dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -17,9 +19,14 @@ RUN curl -fsSL https://s3.amazonaws.com/rebar3/rebar3 -o /usr/local/bin/rebar3 &
 
 # Create a non-root user for development (optional, adjust if needed)
 #RUN useradd -m -s /bin/bash erldev
-ARG USERNAME=devuser
+ARG USERNAME=vscode
 RUN useradd -m -s /bin/bash $USERNAME && \
-     mkdir /home/$USERNAME/.ssh && \
-     chown $USERNAME /home/$USERNAME/.ssh
+    mkdir /home/$USERNAME/.ssh && \
+    chown $USERNAME /home/$USERNAME/.ssh
 
-WORKDIR /workspace
+## install sudo and sudoers no passsword
+RUN apt-get update && apt-get install -y sudo \
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+WORKDIR /workspaces/erlisp

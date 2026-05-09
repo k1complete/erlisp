@@ -8,7 +8,6 @@
 		"LANG": "C.UTF-8",
 		"LC_ALL": "C.UTF-8"
 	},
-	"postCreateCommand": "rebar3 compile && rebar3 eunit",
 	"customizations": {
 		"vscode": {
 			"extensions": [
@@ -23,5 +22,8 @@
 		}
 	},
 	"forwardPorts": [8000],
-	"remoteUser": "root"
+	"remoteUser": "vscode",
+	"updateRemoteUserUID": true,
+	//"workspaceFolder": "/workspace",
+	"postCreateCommand": "sudo chown -R vscode:vscode ."
 }
