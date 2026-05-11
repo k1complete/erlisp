@@ -17,15 +17,15 @@ to_binary(L) ->
 from_ast({ann_type, Loc, [A, T]}) ->
     [from_ast(A), #item{value="::", loc=Loc, type=atom}, from_ast(T)];
 from_ast({type, _, 'bounded_fun', [Ft, Fcs]}) ->
-    io:format("Bounded: ~p~n~p~n", [Ft, Fcs]),
+    %% io:format("Bounded: ~p~n~p~n", [Ft, Fcs]),
     [FtM, RetM] = from_ast(Ft),
-    io:format("BoundedRet: ~p~n~p~n", [FtM, RetM]),
+    %% io:format("BoundedRet: ~p~n~p~n", [FtM, RetM]),
     FcM0= lists:map(fun(E) -> from_ast(E) end, Fcs),
     FcM = [#item{type=atom, value="when"} | FcM0],
     [FtM, RetM, FcM];
 from_ast({type, _, 'fun', [{type, _, product, Args}, Ret]}) ->
     ArgM = lists:map(fun(E) -> from_ast(E) end, Args),
-    io:format("RetIn: ~p~n", [Ret]),
+    %% io:format("RetIn: ~p~n", [Ret]),
     RetM =  from_ast(Ret),
     [ArgM, RetM];
 from_ast({type, _Loc, constraint, [{atom, _Loc2, is_subtype}, [V, T]]}) ->
@@ -37,10 +37,10 @@ from_ast({var, Loc, Arg}) ->
 from_ast({atom, Loc, Arg}) ->
     #item{type=atom, value=atom_to_list(Arg), loc=Loc};
 from_ast({type, Loc, Fun, Arg}) ->
-    io:format("Toast: ~p~n~p~n", [Fun, Loc]),
+    %% io:format("Toast: ~p~n~p~n", [Fun, Loc]),
     ArgTerms = lists:map(fun(E) -> from_ast(E) end, Arg),
     R = [#item{type=function, value=atom_to_list(Fun), loc=Loc}| ArgTerms],
-    io:format("ToastR: ~p~n", [R]),
+    %% io:format("ToastR: ~p~n", [R]),
     R;
 from_ast({float, Loc, L}) ->
     #item{type=float, value=L, loc=Loc};
@@ -57,8 +57,8 @@ fun_to_list(Name, Spec, _F) when is_list(Spec) ->
     Clauses = lists:foldl(fun(E, A) -> A++from_ast(E) end, [], Spec),
     M = [#item{value="-spec", type=function, loc=nil}, 
 	 #item{value=atom_to_list(Name), type=function, loc=nil}| Clauses],
-    io:format("FTL: ~p", [M]),
-    io:format("FTLPP: ~p", [els_pp:pp(M)]),
+    %% io:format("FTL: ~p", [M]),
+    %% io:format("FTLPP: ~p", [els_pp:pp(M)]),
     %%M2 = lists:foldl(fun(E, A) -> A ++ binary:bin_to_list(E) end, "", lists:flatten(els_pp:pp(M))),
     %%M2 = lists:flatten(io_lib:format("~s", [els_pp:pp(M)])),
     M2 = lists:flatten(io_lib:format("~s", [els_pp:pp(M)])),
@@ -77,7 +77,7 @@ fun_to_string2(Name, Arity, Specs) ->
     
     %%Attribute = erl_syntax:attribute(SpecName, [Name, Spec]),
     S = erl_prettypr:format([Attribute]),
-    io:format("FuntoString2: ~p~n", [S]),
+    %% io:format("FuntoString2: ~p~n", [S]),
     S.
 
 variable_titled(A) ->
@@ -142,7 +142,7 @@ to_list({type, _, 'bounded_fun', Args}, F) ->
 to_list({type, _, 'constraint', [{atom, _, 'is_subtype'}, [V, T]]}, F) ->
     M = case is_list(T) of 
 	    true ->
-		io:format("LIST ~p~n", [T]),
+		%% io:format("LIST ~p~n", [T]),
 		lists:map(fun(E) -> to_list(E, F) end, T);
 	    false ->
 		to_list(T, F)
@@ -157,11 +157,11 @@ to_list({type, _, 'fun', [{type, _, product, Args}, Ret]}, F) ->
     %% io:format("FUNRET: ~p~n", [[A, Return]]),
     [A, Return];
 to_list({type, _, 'fun', Args}, F) ->
-    io:format("FUN: ~p~n", [Args]),
+    %% io:format("FUN: ~p~n", [Args]),
     [A, Return] = lists:map(fun(E) ->
                           to_list(E, F)
                   end, Args),
-    io:format("FUNRET: ~p~n", [[A, Return]]),
+    %% io:format("FUNRET: ~p~n", [[A, Return]]),
     [A, Return];
 to_list({type, _, 'union', List}, F) when is_list(List) ->
     [F('|') | lists:map(fun(E) ->  to_list(E) end, List)];
@@ -355,7 +355,7 @@ rep([#item{type=atom}=T|Arguments], E) ->
 rep([], _E) ->
     erl_syntax:nil();
 rep(nil, _E) ->
-    io:format("inNILL ~n", []),
+    %% io:format("inNILL ~n", []),
     Nil= erl_syntax:atom("nil"),
     erl_syntax:type_application(Nil, []);
 rep(#item{type=string, value=V}, _E) ->
@@ -375,7 +375,7 @@ fun_clause_arity([Param, Ret|Rest], #{funtype := Acc}, E, Loc) ->
 			     els_typespec:rep(Elem, E)
                      end, Param),
     FFtype = erl_syntax:set_pos(erl_syntax:function_type(Args, Return), Loc),
-    io:format("fun_clause_arity ~p~n", [Rest]),
+    %% io:format("fun_clause_arity ~p~n", [Rest]),
     {FT, Rest3} = case Rest of 
 		      [[#item{value="when", type=atom} | WhenValues] | Rest2] ->
 			  Cls = function_constraint(WhenValues, E),
@@ -385,10 +385,10 @@ fun_clause_arity([Param, Ret|Rest], #{funtype := Acc}, E, Loc) ->
 		       _ ->
 			  {FFtype, Rest}
 		  end,
-    io:format("fun_clause_arity Result ~p~n", [FT]),
+    %% io:format("fun_clause_arity Result ~p~n", [FT]),
     FF = erl_syntax:revert(FT),
-    io:format("fun_clause_arity RFF ~p~n", [FF]),
-    io:format("fun_clause_arity Rest3 ~p~n", [Rest3]),
+    %% io:format("fun_clause_arity RFF ~p~n", [FF]),
+    %% io:format("fun_clause_arity Rest3 ~p~n", [Rest3]),
     fun_clause_arity(Rest3, #{funtype => [FF|Acc], arity => length(Args)}, E, Loc).
 
 function_constraint(When, Env) ->

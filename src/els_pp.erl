@@ -12,16 +12,16 @@
 -define(LISTMAX, 10).
 
 
-npp([H], Left, Right, Direct) ->
-    io:format("in single open ~p ~p~n", [H, {Left, Right, Direct}]),
+npp([H], Left, Right, _Direct) ->
+    %% io:format("in single open ~p ~p~n", [H, {Left, Right, Direct}]),
     R = npp(H, Left+1, Right+1, both),
     [R];
-npp([H|T], Left, Right, Direct) ->
-    io:format("list ~p, ~p ~p~n", [H, T, {Left, Right, Direct}]),
+npp([H|T], Left, Right, _Direct) ->
+    %% io:format("list ~p, ~p ~p~n", [H, T, {Left, Right, Direct}]),
     %Head = npp(H, Left+1, Right, open),
     Head = npp(H, Left+1, 0, open),
-    LLast = lists:last(T),
-    io:format("listlast  ~p~n", [LLast]),
+    %% LLast = lists:last(T),
+    %%io:format("listlast  ~p~n", [LLast]),
     Last = npp(lists:last(T), 0, Right+1, close),
     Mid = lists:map(fun(E) -> npp(E, Left, Right, none) end, lists:sublist(T, 1, length(T) -1)),
     [Head]++Mid++[Last];
@@ -32,7 +32,7 @@ npp({H}, _Left, Right, close) ->
     R = lists:foldl(fun(_E, A) -> A++ ")" end, H, lists:seq(1, Right)),
     {R};
 npp({H}, Left, Right, both) ->
-    io:format("leaf both ~p ~p ~p~n", [H, Left, Right]),
+    %%io:format("leaf both ~p ~p ~p~n", [H, Left, Right]),
     R = npp(npp({H}, Left, Right, open), Left, Right, close),
     R;
 npp({H}, _Left, _Right, none) ->
@@ -147,19 +147,19 @@ ppclause([Pattern | Body]) ->
 		  ppbody(Body)], 2).
 
 pparg_returntype([], Acc) ->
-    io:format("returntype[~p] ~p~n", [length(Acc), Acc]),
+    %%io:format("returntype[~p] ~p~n", [length(Acc), Acc]),
     lists:reverse(Acc);
 pparg_returntype([Arg, Return, When=[#item{value="("++W}|_]|Rest], Acc) when W=:="when" ->
-    io:format("When: ~p~n", [When]),
+    %%io:format("When: ~p~n", [When]),
     E = prettypr:par([ppsexp(Arg), ppsexp(Return), ppsexp(When)], 0),
     pparg_returntype(Rest, [E|Acc]);
 pparg_returntype([Arg, Return|Rest], Acc) ->
-    io:format("Arg: ~p~n", [Arg]),
-    io:format("Return: ~p~n", [Return]),
+    %%io:format("Arg: ~p~n", [Arg]),
+    %%io:format("Return: ~p~n", [Return]),
     E = prettypr:par([ppsexp(Arg), ppsexp(Return)], 0),
     pparg_returntype(Rest, [E|Acc]);
 pparg_returntype([Arg|Rest], Acc) ->
-    io:format("Arg: ~p~n", [Arg]),
+    %%io:format("Arg: ~p~n", [Arg]),
     E = prettypr:par([ppsexp(Arg)], 0),
     pparg_returntype(Rest, [E|Acc]).
 
@@ -169,13 +169,13 @@ pparg_returntype(A) ->
 ppsexp([#item{value="(-spec"}=H1, #item{} = H2, Args=[[#item{value="(("++_N}|_]|_], Return |  Body]) 
 %%  when hd(N)=/=$( ->
   ->
-    io:format("spec ~p ~n", [Args]),
+    %%io:format("spec ~p ~n", [Args]),
     H1S = ppsexp(H1),
     H2S = ppsexp(H2),
     Sep = pparg_returntype([Args, Return| Body]),
     ReturnType = case length(Sep) of
 		     1 -> 
-			 io:format("single", []),
+			 %% io:format("single", []),
 			 hd(Sep);
 		     _ ->
 			 C = lists:map(fun(E) -> prettypr:break(E) end, Sep),

@@ -316,11 +316,11 @@ adjust_level(IO, Prompt0, PrevTokens, PrevLevel, Line) ->
             %% io:format("After ~p~n", [S]),
 	    S;
         {Rest, 0} ->
-            %io:format("Token ~p Rest ~p~n", [Tokens, Rest]),
+            %%io:format("Token ~p Rest ~p~n", [Tokens, Rest]),
             %%?LOG_DEBUG(#{ajust_level => [Tokens, Rest]}),
             {ok, Tokens, NewLine, Rest};
         _  ->
-            %io:format("readRet ~p~n", [{ok, Tokens, NewLine, Rest}]),
+            %%io:format("readRet ~p~n", [{ok, Tokens, NewLine, Rest}]),
             {ok, Tokens, NewLine, Rest} 
     end.
 
@@ -400,7 +400,7 @@ read_do(IO, Prompt0, {Line, Col}, PrevTokens, PrevLevel) ->
             %io:format("PrevTokens ~p~n", [PrevTokens]),
             {eof, PrevTokens, Line, []};
         Error ->
-            io:format(
+            io:format(standard_error,
                       "Error! sss ~p, ~p, ~p ~n",[Error, PrevTokens, PrevLevel]),
             Error
     end;
