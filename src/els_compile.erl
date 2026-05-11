@@ -15,7 +15,7 @@ formcompile(Form, Errors, Env) ->
 	{FunDic, Name, Arity} ->
 	    LocalF = els_localfun:create_valuefun(FunDic),
 	    MName = els_localfun:strip_macroname_string(Name),
-	    io:format("NName(~p):Name(~p)~n", [MName, Name]),
+	    %% io:format("NName(~p):Name(~p)~n", [MName, Name]),
 	    AName = atom_to_list(Name),
 	    NewMacros = if AName =/= MName ->
 				maps:put(
@@ -38,10 +38,10 @@ file(File) ->
 
 -spec file(string(), list()) -> {ok, module(), binary(), list()}.
 file(File, Opt) ->
-    io:format("cwd ~p~n", [file:get_cwd()]),
+    %%io:format("cwd ~p~n", [file:get_cwd()]),
     Module = list_to_atom(filename:basename(File, ".elisp")),
     {ok, Tokens} = els_scan:file(File, Opt),
-    io:format("scan ~p~n", [Tokens]),
+    %%io:format("scan ~p~n", [Tokens]),
     {ok, Forms} = els_parser:parse(Tokens),
     Env=[{macros, els_util:macro_init()}],
     {Ast0, {Errors, _Env}} = lists:mapfoldl(fun(F, {A, E}) ->
@@ -49,7 +49,7 @@ file(File, Opt) ->
 					      formcompile(F, A, E)
 					  catch
 					      throw:Error when is_list(Error) ->
-						  io:format("catched : ~p~n", [Error]),
+						  %% io:format("catched : ~p~n", [Error]),
 						  {[],  {A ++ Error, E}}
 					  end
 				  end, {[], Env}, Forms),
@@ -59,7 +59,7 @@ file(File, Opt) ->
 	      _ ->
 		  throw(Errors)
 	  end,
-    io:format("Ast ~p~n Err ~p~n", [Ast, Errors]),
+    %%io:format("Ast ~p~n Err ~p~n", [Ast, Errors]),
     {ok, Binary} = merl:compile_and_load(Ast, [debug_info]),
     %% io:format("compiled ~p~n", [Binary]),
     {ok, Module, Binary, Ast}.
@@ -98,9 +98,9 @@ compile_and_write_beam(Ast, Options, CompileOpt) ->
     ?LOG_DEBUG(#{compile2 => erl_syntax:revert_forms(Ast), options=>Options, ss => SS}),
     {ok, Binary} =SS,
     Specs = extract_specs(Ast),
-    io:format("before make_doc ~p~nAst ~p~n", [Specs, Ast]),
+    %%io:format("before make_doc ~p~nAst ~p~n", [Specs, Ast]),
     {ok, DocsV1} = make_docs(Ast, Specs),
-    io:format("after make_doc ~p~n", [DocsV1]),
+    %%io:format("after make_doc ~p~n", [DocsV1]),
     {ok, Module, Chunks} = beam_lib:all_chunks(Binary),
     ChunksAdded = lists:append(Chunks, [{"Docs", term_to_binary(DocsV1)}]),
     {ok, Binary2} = beam_lib:build_module(ChunksAdded),
@@ -123,9 +123,9 @@ file_ast(File, Opt) ->
 
 file_ast(File, Opt, CompileOpt) ->
     {ok, ModuleFile, _Binary, Ast} = file(File, Opt),
-    io:format("Compile Ast ~p~n", [Ast]),
-    {module, Module2, Binary2} = compile_and_write_beam(Ast, [debug_info|Opt], CompileOpt),
-    io:format("File_ast ~p~n", [{ModuleFile, Module2}]),
+    %%io:format("Compile Ast ~p~n", [Ast]),
+    {module, _Module2, Binary2} = compile_and_write_beam(Ast, [debug_info|Opt], CompileOpt),
+    %%io:format("File_ast ~p~n", [{ModuleFile, _Module2}]),
     {ok, ModuleFile, Binary2, Ast}.
 %    {ok, Module, Binary, Ast}.
 
@@ -192,17 +192,17 @@ make_function_spec(Tree, Specs, MetaData) ->
     end.
     
 -spec make_function_signature(erl_syntax:syntaxTree(), map()) -> signature().
-make_function_signature(Tree, Specs) ->
+make_function_signature(Tree, _Specs) ->
     FName = erl_syntax:function_name(Tree),
     %% Name=erl_syntax:atom_value(FName),
     Cs = erl_syntax:function_clauses(Tree),
-    io:format("make_function_signature ~p~nCs: ~p~n", [Specs, Cs]),
+    %%io:format("make_function_signature ~p~nCs: ~p~n", [_Specs, Cs]),
     %% Arity = length(erl_syntax:clause_patterns(hd(Cs))),
     R = lists:map(fun(C) ->
 			  Tc = els_typespec:variable_titled(C),
                           unicode:characters_to_binary(els_pp:erlast_to_str(FName, Tc), utf8)
                   end, Cs),
-    io:format("make_function_signatureR ~p~n", [R]),
+    %%io:format("make_function_signatureR ~p~n", [R]),
     lists:flatten(R).
 
 %% -spec extract_comment(erl_syntax:syntaxTree(), kind(), map()) -> doc_entry() | none.
@@ -211,19 +211,19 @@ extract_comment(Tree, Kind, Specs) ->
     case erl_syntax:has_comments(Tree) of
         true ->
 %%	    CommentList = lists:flatten(erl_syntax:comment_text(erl_syntax:get_precomments(Tree))),
-	    io:format("PreCommentsT: ~p~n", [Tree]),
-	    PreComments = erl_syntax:get_precomments(Tree),
-	    io:format("PreComments: ~p~n", PreComments),
+	    %% io:format("PreCommentsT: ~p~n", [Tree]),
+	    %% PreComments = erl_syntax:get_precomments(Tree),
+	    %% io:format("PreComments: ~p~n", PreComments),
 	    CommentList = lists:foldl(fun(CT, Acc) ->
-					      io:format("ExtractComment: ~p~n", [CT]),
+					      %% io:format("ExtractComment: ~p~n", [CT]),
 					      CText =erl_syntax:comment_text(CT),
-					      io:format("ExtractCommentText: ~p~n", [CText]),
+					      %% io:format("ExtractCommentText: ~p~n", [CText]),
 					      Acc ++CText
 				      end, [], erl_syntax:get_precomments(Tree)),
-	    io:format("Comments: ~p~n", [CommentList]),
-	    io:format("Tree: ~p~n", [{erl_syntax:function_name(Tree),
-				     erl_syntax:function_arity(Tree)
-				     }]),
+	    %% io:format("Comments: ~p~n", [CommentList]),
+	    %%io:format("Tree: ~p~n", [{erl_syntax:function_name(Tree),
+	    %% erl_syntax:function_arity(Tree)
+	    %% 			     }]),
 	    MetaData = make_function_spec(Tree, Specs, #{}),
             els_docs:make_docentry(Kind, 
 				   erl_syntax:atom_value(erl_syntax:function_name(Tree)),

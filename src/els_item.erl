@@ -61,7 +61,10 @@ from_erl({'clauses', _L, Clauses}, _F) ->
 from_erl({'clause', _L, Patterns, Guards, Bodies}, F) ->
     P = lists:map(fun(C) -> from_erl(C) end, Patterns),
     G = lists:map(fun(C) -> from_erl(C) end, Guards),
-    B = lists:map(fun(C) -> io:format("Body: ~p~n", [C]), from_erl(C, F) end, Bodies),
+    B = lists:map(fun(C) -> 
+			  %% io:format("Body: ~p~n", [C]),
+			  from_erl(C, F) 
+		  end, Bodies),
     case G of
 	[] -> [P | B];
 	_ -> [P, ["when", G] | B]
@@ -69,11 +72,11 @@ from_erl({'clause', _L, Patterns, Guards, Bodies}, F) ->
 from_erl({cons, _L, H, T}, F) ->
     Head = from_erl(H, F),
     Tail = from_erl(T, F),
-    io:format("Cons ~p~n", [H]),
+    %% io:format("Cons ~p~n", [H]),
     sexp_to_list([Head|Tail], F);
 from_erl({tuple, L, List}, F) ->
     Tuple = lists:map(fun(E) -> from_erl(E, F) end, List),
-    io:format("Tuple ~p~n", [Tuple]),
+    %% io:format("Tuple ~p~n", [Tuple]),
     sexp_to_list([#item{type=atom, value="tuple", loc=L} |Tuple], F);
 from_erl({op, Loc, Op, L}, F) ->
     Left = from_erl(L, F),
@@ -108,7 +111,7 @@ from_erl({type, _, 'product', Args}, F) ->
 from_erl({type, _, 'bounded_fun', [Ft, Fc]}, F) ->
     Constraint = lists:map(fun(E) -> 
 				   FC = from_erl(E, F), 
-				   io:format("F: ~p ~n--> FC: ~p~n", [E, FC]),
+				   %% io:format("F: ~p ~n--> FC: ~p~n", [E, FC]),
 				   FC
 			   end, Fc),
     Ftype = from_erl(Ft, F),
@@ -121,7 +124,7 @@ from_erl({type, _, 'bounded_fun', Args}, F) ->
 from_erl({type, _, 'constraint', [{atom, _, 'is_subtype'}, [V, T]]}, F) ->
     M = case is_list(T) of 
 	    true ->
-		io:format("LIST ~p~n", [T]),
+		%% io:format("LIST ~p~n", [T]),
 		lists:map(fun(E) -> from_erl(E, F) end, T);
 	    false ->
 		from_erl(T, F)
@@ -136,11 +139,11 @@ from_erl({type, _, 'fun', [{type, _, product, Args}, Ret]}, F) ->
     %% io:format("FUNRET: ~p~n", [[A, Return]]),
     sexp_to_list([A, Return], F);
 from_erl({type, _, 'fun', Args}, F) ->
-    io:format("FUN: ~p~n", [Args]),
+    %% io:format("FUN: ~p~n", [Args]),
     [A, Return] = lists:map(fun(E) ->
 				    from_erl(E, F)
 			    end, Args),
-    io:format("FUNRET: ~p~n", [[A, Return]]),
+    %% io:format("FUNRET: ~p~n", [[A, Return]]),
     sexp_to_list([A, Return], F);
 from_erl({type, _, 'union', List}, F) when is_list(List) ->
     [from_erl('|', F) | lists:map(fun(E) ->  from_erl(E, F) end, List)];
