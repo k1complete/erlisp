@@ -40,9 +40,9 @@ scanlist([H|T], K, {AccKey, R}, R2, LocH) ->
 	{acc, _A, K} ->
 	    scanlist(T, K, {AccKey, [H|R]}, R2, LocH);
 	{breaking, _A, [MH|MT]} ->
-	    io:format("Macth ~p: ~p in ~p~n", [MH, MT, H]),
+	    %% io:format("Macth ~p: ~p in ~p~n", [MH, MT, H]),
 	    Acc = maps:put(AccKey, lists:reverse(R), R2),
-	    io:format("AddLoc ~p: ~p in ~p~n", [MH, H, LocH]),
+	    %% io:format("AddLoc ~p: ~p in ~p~n", [MH, H, LocH]),
 	    LocAcc = maps:put(MH, H, LocH),
 	    scanlist(T, MT, {MH, []}, Acc, LocAcc)
     end;
@@ -50,7 +50,7 @@ scanlist([], _K, {AccKey, R}, R2, LocH) ->
     {maps:put(AccKey, lists:reverse(R), R2), LocH}.
 scanlist(L, K) ->
     LocH = #{hd(K) => hd(L)},
-    io:format("scanlisthead ~p~n", [LocH]),
+    %% io:format("scanlisthead ~p~n", [LocH]),
     scanlist(tl(L), tl(K), {hd(K), []}, #{}, LocH).
 
 term_make_variable(Term) ->

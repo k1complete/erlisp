@@ -112,7 +112,7 @@ execute(Revert, Env) ->
     RecordDefs = get_record_defs(Env),
     case is_ddl(Revert) of
         {ok, record, {Name, _Body}} ->
-	    io:format("DEFRECORD ~p~n", [Revert]),
+	    %% io:format("DEFRECORD ~p~n", [Revert]),
 	    NewEnv = add_record_defs(Env, Revert),
             {value, [ok, record, Name], NewEnv};
         {ok, FunName, Arity} ->
@@ -185,8 +185,8 @@ repl_one(IN, _OUT, Line, Env, Acc) ->
 		       end, {value, [], add_line(Env, NextLine)}, 
 		       Forms)
 		catch 
-		    error:Reason:Stack ->
-			io:format("Catch ~p~nStack: ~p~n", [Reason, Stack]),
+		    error:Reason:_Stack ->
+			%% io:format("Catch ~p~nStack: ~p~n", [Reason, Stack]),
 			throw({error, Reason, Env});
 		    throw:Reason:_Stack ->
 			throw({error, Reason, Env})

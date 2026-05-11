@@ -347,9 +347,9 @@ form_trans([XT=#item{value=X, loc=Loc}| T], E) ->
     %%io:format("Form Trans Input-[~p]~n to Output ~p~n", [[XT|T], R]),
     R
     ;
-%form_trans([List| T], E) when is_list(List) ->
-%    io:format("nested ~p~n", [List]),
-%    form_trans([form_trans(List, E)| T], E).
+%%form_trans([List| T], E) when is_list(List) ->
+%%    io:format("nested ~p~n", [List]),
+%%    form_trans([form_trans(List, E)| T], E).
 form_trans([List| T], E) when is_list(List) ->
     %% io:format("nested ~p~n", [List]),
     Callable = form_trans(List, E),
@@ -383,22 +383,22 @@ macro_expand_(X, [L], E) ->
 
 export_(X, L, E) ->
     Loc = X#item.loc,
-    io:format("export X ~p~n", [X]),
+    %% io:format("export X ~p~n", [X]),
     Aq = lists:map(fun([Fn, Arg]) ->
                            F = els_util:term_make_atom(Fn),
                            A = sterm(Arg, Loc, E),
-                           io:format("FA Fis ~p~n Ais ~p~n", [F, A]),
+                           %% io:format("FA Fis ~p~n Ais ~p~n", [F, A]),
                            erl_syntax:arity_qualifier(F, A)
                    end, L),
     R = erl_syntax:attribute(erl_syntax:atom(export),[erl_syntax:list(Aq)]),
     erl_syntax:set_pos(R, Loc).
 macro_export_(X, L, E) ->
     Loc = X#item.loc,
-    io:format("macro_export X ~p~n", [X]),
+    %% io:format("macro_export X ~p~n", [X]),
     Aq = lists:map(fun([Fn, Arg]) ->
                            F = els_util:term_make_atom(Fn, "MACRO_"),
                            A = sterm(Arg, Loc, E),
-                           io:format("FA Fis ~p~n Ais ~p~n", [F, A]),
+                           %% io:format("FA Fis ~p~n Ais ~p~n", [F, A]),
                            erl_syntax:arity_qualifier(F, A)
                    end, L),
     R = erl_syntax:attribute(erl_syntax:atom(export),[erl_syntax:list(Aq)]),
@@ -418,7 +418,7 @@ macro_export_(X, L, E) ->
 record_field_rep(#item{type=atom, loc=Loc} = Name, _Env) ->
     NameAst = els_util:term_make_atom(Name),
     R = erl_syntax:set_pos(erl_syntax:record_field(NameAst), Loc),
-    io:format("RF ~p~n", [erl_syntax:revert(R)]),
+    %% io:format("RF ~p~n", [erl_syntax:revert(R)]),
     R;
 %% (= a expression)
 record_field_rep([#item{type=atom, value="=", loc=OpLoc}, #item{type=atom}=A, E], Env) ->
@@ -467,15 +467,15 @@ record_access_(#item{loc=Loc}, [Exp, #item{type=atom}=RecordName,RecordField], E
     Type = els_util:term_make_atom(RecordName),
     Field = els_util:term_make_atom(RecordField),
     R = erl_syntax:set_pos(erl_syntax:record_access(Argument, Type, Field), Loc),
-    io:format("record_access: ~p~n~p~n", [R, erl_syntax:revert(R)]),
+    %% io:format("record_access: ~p~n~p~n", [R, erl_syntax:revert(R)]),
     R.
 
 record_expr_do(Loc, Argument, [#item{type=atom}=RecordName |RecordFields], E) ->
     Type = els_util:term_make_atom(RecordName),
     Fields = lists:map(fun(F) -> record_field_rep(F, E) end, RecordFields),
     R = erl_syntax:set_pos(erl_syntax:record_expr(Argument, Type, Fields), Loc),
-    io:format("record_expr0: ~p~n", [R]),
-    io:format("record_expr: ~p~n~p~n", [R, erl_syntax:revert(R)]),
+    %% io:format("record_expr0: ~p~n", [R]),
+    %% io:format("record_expr: ~p~n~p~n", [R, erl_syntax:revert(R)]),
     R.
 
 record_expr_(#item{loc=Loc}, [Exp, #item{type=atom}=RecordName |RecordFields], E) ->
@@ -488,7 +488,7 @@ module_(X, L, _E) ->
     Loc = X#item.loc,
     Module = hd(L),
     M = els_util:term_make_atom(Module),
-    io:format("module_ ~p~n", [M]),
+    %% io:format("module_ ~p~n", [M]),
     E = erl_syntax:attribute(erl_syntax:atom(module), [M]),
     E1 = erl_syntax:set_pos(E, Loc),
     E2 = case tl(L) of
@@ -512,8 +512,8 @@ module_(X, L, _E) ->
 %% (-spec Funname Arg1 Result1 Args2 Result2... When)
 spec_(X, L, E) ->
     Loc = X#item.loc,
-    io:format("spec raw ~p~n", [L]),
-    io:format("spec name ~p~n arg ~p~n return ~p~n", [hd(L), hd(tl(L)), hd(tl(tl(L)))]),
+    %% io:format("spec raw ~p~n", [L]),
+    %% io:format("spec name ~p~n arg ~p~n return ~p~n", [hd(L), hd(tl(L)), hd(tl(tl(L)))]),
     FuncName = els_util:term_make_atom(hd(L)),
     
 %%    Return = type_rep(hd(tl(tl(L))), E),
@@ -528,12 +528,12 @@ spec_(X, L, E) ->
     #{funtype := FFtype, arity := ArgsLen} = els_typespec:fun_clause_arity(tl(L), E, Loc),
     FuncArity = erl_syntax:integer(ArgsLen),
     _SpecArg = erl_syntax:tuple([FuncName, FuncArity]),
-    io:format("SpecFFtype: ~p~n", [FFtype]),
+    %% io:format("SpecFFtype: ~p~n", [FFtype]),
     %%FF = erl_syntax:revert(FFtype),
 
     M = {attribute, Loc, spec, {{erl_syntax:concrete(FuncName),ArgsLen}, FFtype}},
     %%M = erl_syntax:attribute(Spec, [erl_syntax:tuple([SpecArg, Ftype])]),
-    io:format("Spec: ~p~n", [M]),
+    %% io:format("Spec: ~p~n", [M]),
     M2 = erl_syntax:revert(M),
     %% M.
     M2.
@@ -543,8 +543,8 @@ type_(X, L, E) ->
     TypeName = els_util:term_make_atom(hd(hd(L))),
     TypeArg = lists:map(fun(Elem) -> els_util:term_make_variable(Elem) end, tl(hd(L))),
     TypeDef = els_typespec:rep(hd(tl(L)),E),
-    io:format("type_ ~p~n", [TypeDef]),
-    io:format("typerevert_ ~p~n", [erl_syntax:revert(TypeDef)]),
+    %% io:format("type_ ~p~n", [TypeDef]),
+    %% io:format("typerevert_ ~p~n", [erl_syntax:revert(TypeDef)]),
     {attribute, Loc, 'type', 
      {erl_syntax:atom_value(TypeName), erl_syntax:revert(TypeDef)},
      TypeArg}.
@@ -641,7 +641,7 @@ clause_(L, Loc, E) ->
 		       _ ->
 			   {[], [WhenCandidate| BodyCandidate]}
 		   end,
-    io:format("clause_args: ~p~n", [Args]),
+    %% io:format("clause_args: ~p~n", [Args]),
     clause_arg_guard_body(Args, When, Body, Loc, E).
 
 %%
@@ -680,35 +680,36 @@ handler_(L, Loc, E) ->
 
 
 match_defun_(Name, Clauses, E) ->
-    io:format("match-defun ~p~n", [Name]),
+    %% io:format("match-defun ~p~n", [Name]),
     FuncName = erl_syntax:set_pos(erl_syntax:atom(Name#item.value), Name#item.loc),
     ClauseAst0 = lists:map(fun(A) ->
 %%				   io:format("AST ~p~n", [A]),
 				   clause_(A, Name#item.loc, E)
 			   end, Clauses),
     Md = erl_syntax:function(FuncName, ClauseAst0),
-    io:format("Md ~p~n", [Md]),
+    %% io:format("Md ~p~n", [Md]),
     {MdTree, Comment} = erl_syntax_lib:mapfold_subtrees(
 			      fun(Tree, Acc) ->
-				      io:format(standard_error, "Md SubTree ~p~n", [Tree]),
+				      %% io:format(standard_error, "Md SubTree ~p~n", [Tree]),
 				      case erl_syntax:type(Tree) of
 					  clause -> 
 					      case erl_syntax:has_comments(Tree) of
 						  true ->
 						      C = erl_syntax:get_precomments(Tree),
-						      io:format( "Md Tree ~p~n", [Tree]),
-						      io:format( "Md precomments ~p~n", [C]),
-						      NC = lists:foldl(fun(CE, A) ->
-									       io:format( "Md comment_tree ~p~n", [CE]),
-									       CT = erl_syntax:comment_text(CE),
-									       io:format( "Md comment_text ~p~n", [CT]),
-									       io:format( "Md comment_text_acc ~p~n", [A]),
-									       io:format( "Md comment_text_ct ~p~n", [A++CT]),
-									       A++CT
-								       end, [], C),
+						      %% io:format( "Md Tree ~p~n", [Tree]),
+						      %% io:format( "Md precomments ~p~n", [C]),
+						      NC = lists:foldl(
+							     fun(CE, A) ->
+								     %% io:format( "Md comment_tree ~p~n", [CE]),
+								     CT = erl_syntax:comment_text(CE),
+								     %% io:format( "Md comment_text ~p~n", [CT]),
+								     %% io:format( "Md comment_text_acc ~p~n", [A]),
+								     %% io:format( "Md comment_text_ct ~p~n", [A++CT]),
+								     A++CT
+							     end, [], C),
 						      %% NC = erl_syntax:comment_text(hd(C)),
-						      io:format( "Md acc ~p~n~p~n~p~n", [Acc, NC, Acc++NC]),
-						      io:format( "Md Tree ~p~n", [Tree]),
+						      %% io:format( "Md acc ~p~n~p~n~p~n", [Acc, NC, Acc++NC]),
+						      %% io:format( "Md Tree ~p~n", [Tree]),
 						      
 						      {erl_syntax:set_precomments(Tree, []), Acc++NC};
 						  false ->
@@ -719,18 +720,18 @@ match_defun_(Name, Clauses, E) ->
 			      end, [], Md),
     
     CommentNode = erl_syntax:comment(Comment),
-    io:format("~nmatch_defun_comment ~p~ncomment: ~p~n", [CommentNode, Comment]),
+    %% io:format("~nmatch_defun_comment ~p~ncomment: ~p~n", [CommentNode, Comment]),
     MdTreeComment = erl_syntax:set_precomments(MdTree, [CommentNode]),
     Ret=erl_syntax:copy_pos(FuncName, MdTreeComment),
     
-    io:format("~nmatch_defun_output ~p~n", [erl_syntax:get_pos(Ret)]),
-    io:format("~nmatch_defun_outputbody ~p~n", [Ret]),
+    %% io:format("~nmatch_defun_output ~p~n", [erl_syntax:get_pos(Ret)]),
+    %% io:format("~nmatch_defun_outputbody ~p~n", [Ret]),
     %%merl:print(Ret),
-    io:format("~n ", []),
+    %% io:format("~n ", []),
     Ret.
 
 match_defun_comment(Name, Com, Clauses, E) ->
-    io:format("match-defun-comment ~p~n", [Com]),
+    %% io:format("match-defun-comment ~p~n", [Com]),
     Tree = match_defun_(Name, Clauses, E),
     case Com of 
         #item{type=string, value=""} ->
@@ -739,7 +740,7 @@ match_defun_comment(Name, Com, Clauses, E) ->
             Comment = {1, 1, 
                        0, Com#item.value},
             R=erl_recomment:recomment_forms(Tree, [Comment]),
-	    io:format("reccoment ~p~n", [R]),
+	    %% io:format("reccoment ~p~n", [R]),
             R
     end.
 
@@ -747,7 +748,7 @@ match_defun_comment(Name, Com, Clauses, E) ->
 defun_comment(Name, A, [#item{type=string} = Com | Rest], E) ->
     match_defun_comment(Name, Com, [A|Rest], E);
 defun_comment(Name, A, Rest, E) ->
-    io:format("defun_comment: A ~p~n Rest: ~p~n", [A, Rest]),
+    %% io:format("defun_comment: A ~p~n Rest: ~p~n", [A, Rest]),
     match_defun_comment(Name, #item{type=string, value="", loc=Name#item.loc}, [A|Rest], E).
 make_comment({Line, Column}, Value) ->
     {Line, Column, 0, Value};
@@ -816,22 +817,22 @@ defmacro_(X, L, E) ->
     defun_(X, L2, E).
 
 
-listsmap(F, L) when is_list(L) ->
-    Fun = fun (E) when is_list(E) ->
-                  listsmap(F, E);
-              (E) ->
-                  F(E)
-          end,
-    lists:map(Fun, L);
-listsmap(F, L) ->
-    F(L).
-
-make_slist(L) ->
-    listsmap(fun(E) when is_atom(E) ->
-                     yal_util:make_symbol(E);
-                (E) ->
-                     E
-             end, L).
+%% listsmap(F, L) when is_list(L) ->
+%%    Fun = fun (E) when is_list(E) ->
+%%                  listsmap(F, E);
+%%              (E) ->
+%%                  F(E)
+%%          end,
+%%    lists:map(Fun, L);
+%% listsmap(F, L) ->
+%%     F(L).
+%%
+%% make_slist(L) ->
+%%    listsmap(fun(E) when is_atom(E) ->
+%%                     yal_util:make_symbol(E);
+%%                (E) ->
+%%                     E
+%%             end, L).
 	    
 
 	    
@@ -863,10 +864,10 @@ make_slist(L) ->
 %%%  (a (a) (b)))
 %%% 
 try_(X, L, E) ->
-    io:format("try_ : ~p~n", [[X|L]]),
+    %% io:format("try_ : ~p~n", [[X|L]]),
     Line = X#item.loc,
     {M, LocH}  = els_util:scanlist([X|L], ["try", "of", "catch", "after"]),
-    io:format("scanlist : ~p~n LockH : ~p~n", [M, LocH]),
+    %% io:format("scanlist : ~p~n LockH : ~p~n", [M, LocH]),
     case lists:any(fun("catch") -> true;
 		      ("after") -> true;
 		      (_) -> false
@@ -896,13 +897,13 @@ try_(X, L, E) ->
 			    maps:get("catch", Cls, []),
 			    maps:get("after", Cls, [])),
     R = erl_syntax:set_pos(C, erl_anno:new(Line)),
-    io:format("try : ~p~n", [R]),
+    %% io:format("try : ~p~n", [R]),
     R.
 
 maybe_match_(X, [LH, RH], E) ->
     Line = X#item.loc,
     C = erl_syntax:maybe_match_expr(sterm(LH, E), sterm(RH, E)),
-    io:format("maybe_match : ~p~n", [C]),
+    %% io:format("maybe_match : ~p~n", [C]),
     R = erl_syntax:set_pos(C, erl_anno:new(Line)),
     R.
 
@@ -919,7 +920,7 @@ maybe_match_(X, [LH, RH], E) ->
 maybe_(X, L, E) ->
     Line = X#item.loc,
     {M, LocH}  = els_util:scanlist([X|L], ["maybe", "else"]),
-    io:format("maybe_ : ~p~n", [M]),
+    %% io:format("maybe_ : ~p~n", [M]),
     Cls = maps:map(fun("maybe", V) ->
 			   lists:map(fun(S) ->
 					     sterm(S, E)
@@ -934,16 +935,16 @@ maybe_(X, L, E) ->
 		   end, M),
     C = erl_syntax:maybe_expr(maps:get("maybe", Cls), 
 			      maps:get("else", Cls, none)),
-    io:format("maybe-2_ : ~p~n", [erl_syntax:revert(C)]),
+    %% io:format("maybe-2_ : ~p~n", [erl_syntax:revert(C)]),
     R = erl_syntax:set_pos(C, erl_anno:new(Line)),
     R.
 
 
 receive_(X, L, E) ->
-    io:format("receive_ : ~p~n", [[X|L]]),
+    %% io:format("receive_ : ~p~n", [[X|L]]),
     Line = X#item.loc,
     {M, LocH}  = els_util:scanlist([X|L], ["receive", "after"]),
-    io:format("scanlist : ~p~n LockH : ~p~n", [M, LocH]),
+    %% io:format("scanlist : ~p~n LockH : ~p~n", [M, LocH]),
     Cls = maps:map(fun(K, V) when K=="after" ->
 			   [TimeoutTerm|AfterBody] = V,
 			   Timeout = sterm(TimeoutTerm, E),
@@ -958,14 +959,14 @@ receive_(X, L, E) ->
 					     clause_([[H]|T], LocK, E)
 				     end, V)
 		   end, M),
-    io:format("trycl : ~p~n", [Cls]),
+    %% io:format("trycl : ~p~n", [Cls]),
     {Timeout, After} = maps:get("after", Cls, {none, []}),
     Clauses = maps:get("receive", Cls),
-    io:format("timeout: ~p, after : ~p~n", [Timeout, After]),
+    %% io:format("timeout: ~p, after : ~p~n", [Timeout, After]),
     C = erl_syntax:receive_expr(Clauses,
 				Timeout, After),
     R = erl_syntax:set_pos(C, erl_anno:new(Line)),
-    io:format("receive : ~p~n", [R]),
+    %% io:format("receive : ~p~n", [R]),
     R.
 
 
@@ -994,7 +995,7 @@ conjunctive_form([#item{type = atom, value="when"}|Tail], Env) ->
     L = lists:map(fun(V) ->
 		      sterm(V, Env)
 		  end, Tail),
-    io:format("Conjunctive: ~p~n", [L]),
+    %% io:format("Conjunctive: ~p~n", [L]),
     L.
 %%%
 %%% (if (when (| (& (== 1 2) 
@@ -1014,19 +1015,19 @@ conjunctive_form([#item{type = atom, value="when"}|Tail], Env) ->
 %%% (if (when (== 1 2) (== 2 2) 'true) (when 'true 'ng))
 %%% (if (whend (, (== 1 2) (== 2 2)) (a ) (b)  ) 'true) (when 'true 'ng))
 disjunctive_form([#item{type = atom, value=A}|Tail], Env) when A == "whend" ->
-    io:format("Disjuncti:: ~p~n", [Tail]),
+    %% io:format("Disjuncti:: ~p~n", [Tail]),
     R0 = lists:map(fun([#item{type = atom, value = "when"}|_]=V) -> 
-			   io:format("Disjuncti:::: ~p~n", [V]),
+			   %% io:format("Disjuncti:::: ~p~n", [V]),
 			   R = conjunctive_form(V, Env),
-			   io:format("Disjuncti:::::: ~p ~n--> ~p~n", [V, R]),
+			   %% io:format("Disjuncti:::::: ~p ~n--> ~p~n", [V, R]),
 			   R;
 		      (V) ->
 			   [sterm(V, Env)]
 		   end, Tail),
-    io:format("Disjuncti:: ~p ~n ---> ~p~n", [Tail, R0]),
+    %% io:format("Disjuncti:: ~p ~n ---> ~p~n", [Tail, R0]),
     R0;
 disjunctive_form(L, Env) ->
-    io:format("Disjunction_form Other: ~p~n"< [L]),
+    %% io:format("Disjunction_form Other: ~p~n"< [L]),
     [[sterm(L, Env)]].
 
 
@@ -1047,7 +1048,7 @@ detect_guard(Test, _Body, E) ->
 	[#item{value="when"}|_] ->
 	    [conjunctive_form(Test, E)];
 	[#item{value="whend"}|_] ->
-	    io:format("detect_guard ~p~n", [Test]),
+	    %% io:format("detect_guard ~p~n", [Test]),
 	    disjunctive_form(Test, E);
 	[[#item{loc=GL}|_]|_] ->
 	    When=#item{value="when", loc=GL, type=atom},
@@ -1067,10 +1068,10 @@ clause_ast_guard_body(Pattern, Test, Body, GL, E) ->
 %%    GLine = get_leastlefthand(lists:flatten([Test|Body]), GL),
     GLine = GL,
     G = detect_guard(Test, Body, E),
-    io:format("#{clause_mono_least => ~p~nBody: ~p~nGline: ~p~n", [Test, Body,GLine]),
+    %% io:format("#{clause_mono_least => ~p~nBody: ~p~nGline: ~p~n", [Test, Body,GLine]),
     [DocItem|Body2] = getcomment(Body, GLine),
     B = lists:map(fun(V) -> 
-			  io:format("#{clause_elem => ~p~n", [V]),
+			  %% io:format("#{clause_elem => ~p~n", [V]),
 			  sterm(V, E) 
 		  end, Body2),
     S = erl_syntax:clause(Pattern, G, B),
@@ -1115,8 +1116,8 @@ if_(X, L, E) ->
 			      end, L),
     C = erl_syntax:if_expr(ClauseAstList),
     R = erl_syntax:set_pos(C, erl_anno:new(Line)),
-    io:format("if1 : ~p~n", [R]),
-    io:format("if2 : ~p~n", [erl_syntax:revert(R)]),
+    %% io:format("if1 : ~p~n", [R]),
+    %% io:format("if2 : ~p~n", [erl_syntax:revert(R)]),
     R.
 
 
@@ -1128,19 +1129,19 @@ if_(X, L, E) ->
 %%           form3))
 %%   
 case_(X, L, E) ->
-    io:format("case_ : ~p~n", [X]),
+    %% io:format("case_ : ~p~n", [X]),
     Line = X#item.loc,
     [Exp | Clauses] = L,
-    Exp2 = make_slist(Exp),
-    io:format("exp : ~p~n", [Exp2]),
-    io:format("clause : ~p~n", [Clauses]),
+    %% Exp2 = make_slist(Exp),
+    %% io:format("exp : ~p~n", [Exp2]),
+    %% io:format("clause : ~p~n", [Clauses]),
     ExpAst = form(Exp, E),
     ClauseAstList = lists:map(fun(Form) -> 
                                       [H|T] = Form,
                                       clause_([[H]|T], Line, E) end, Clauses),
     C = erl_syntax:case_expr(ExpAst, ClauseAstList),
     R = erl_syntax:set_pos(C, erl_anno:new(Line)),
-    io:format("case : ~p~n", [R]),
+    %% io:format("case : ~p~n", [R]),
     R.
 
 pattern(Term, Env) ->
@@ -1169,8 +1170,8 @@ replace_vars_do([[Pattern, Body]| Rest], Acct, Dic, Line, Env) ->
 				     end
 			     end, PatternAst),
     Ast = erl_syntax:copy_pos(PatternAst, erl_syntax:match_expr(Ret, BodyAst)),
-    io:format("replace: ~p~n~p~nTo: ~p~n", [PatternAst, BodyAst, Ast]),
-    io:format("Dict: ~p~nNewDict: ~p~n", [Dic, NewDic]),
+    %% io:format("replace: ~p~n~p~nTo: ~p~n", [PatternAst, BodyAst, Ast]),
+    %% io:format("Dict: ~p~nNewDict: ~p~n", [Dic, NewDic]),
     replace_vars_do(Rest, [Ast|Acct], NewDic, Line, Env).
 
 replace_vars(ArgList, Dic, Line, Env) ->
@@ -1184,7 +1185,7 @@ replace_vars(ArgList, Dic, Line, Env) ->
 %%   bodylist
 %% end
 letequal_(X, L, E) ->
-    io:format("let_ : ~p ~n", [X]),
+    %% io:format("let_ : ~p ~n", [X]),
     Loc = X#item.loc,
     [Args | Rest] = L,
     LocLine = lists:flatten(io_lib:format("~p_~p", [erl_anno:line(Loc),erl_anno:column(Loc)])),
@@ -1199,7 +1200,7 @@ letequal_(X, L, E) ->
 						  none ->
 						      Tree;
 						  NewValue ->
-						      io:format("ReplaceBody: ~p to ~p~n", [Tree, NewValue]),
+						      %% io:format("ReplaceBody: ~p to ~p~n", [Tree, NewValue]),
 						      erl_syntax:copy_pos(Tree, erl_syntax:variable(NewValue))
 					      end;
 					  _  ->
@@ -1224,10 +1225,10 @@ letequal_(X, L, E) ->
 %%  
     
 let_(X, L, E) ->
-    io:format("let_ : ~p~n", [X]),
+    %% io:format("let_ : ~p~n", [X]),
     Loc = X#item.loc,
     [Args | Rest] = L,
-    io:format("Args | Rest =~n  ~p~n ~p ~n", [Args, Rest]),
+    %% io:format("Args | Rest =~n  ~p~n ~p ~n", [Args, Rest]),
     {Patterns, RArgs} = lists:foldl(fun(Arg, {P, A}) ->
                                     case Arg of
                                         [[_Pattern | _] = Match, Value] ->
@@ -1239,7 +1240,7 @@ let_(X, L, E) ->
                                     end
                               end, {[], []}, Args),
     Body = lists:map(fun(A) -> form(A, E) end, Rest),
-    io:format("simpleArgs ~p ~n", [Args]),
+    %% io:format("simpleArgs ~p ~n", [Args]),
     %%  Register argument into environment.
     %%  replace body from environment(argment)
     MQ=?MQP(Loc, "fun(_@@params) -> _@@body end(_@@args)", 
@@ -1247,7 +1248,7 @@ let_(X, L, E) ->
              {'body', Body},
              {'args', RArgs}
             ]),
-    io:format("MQ2: ~p~n", [MQ]),
+    %% io:format("MQ2: ~p~n", [MQ]),
     MQ.
 %%
 parse_types(#item{loc=Loc, value=Val}) ->
@@ -1283,7 +1284,7 @@ binary_field_(#item{loc=Loc}, [Value, #item{value="/"}, Types], E) ->
     Q = erl_syntax:binary_field(Body, TypeList),
     erl_syntax:set_pos(Q, Loc);
 binary_field_(#item{loc=Loc}, [Value, SizeP, Types], E) ->
-    io:format("bf: ~p ~p ~p ~n", [Value, SizeP, Types]),
+    %% io:format("bf: ~p ~p ~p ~n", [Value, SizeP, Types]),
     Body = sterm(Value, E),
     Size = sterm(SizeP, E),
     TypeList = parse_types(Types),
@@ -1357,7 +1358,7 @@ named_fun_(#item{loc=Loc}, [#item{type=atom, value=N, loc=NLoc}|Rest]=_L, E) ->
 				clause_(LE, Loc, E)
 			end, Rest),
     NamedFun = erl_syntax:named_fun_expr(Name, Clauses),
-    io:format("NNNnamed_fun1: ~p~n~p~n", [erl_syntax:revert(NamedFun), Loc]),
+    %% io:format("NNNnamed_fun1: ~p~n~p~n", [erl_syntax:revert(NamedFun), Loc]),
     R = erl_syntax:set_pos(NamedFun, Loc),
     R.
 
@@ -1381,7 +1382,7 @@ lambda_(#item{loc=Loc} = _X, L, E) ->
                         end, L),
     Fun=erl_syntax:fun_expr(Clauses),
     R = erl_syntax:set_pos(Fun, Loc),
-    io:format("lambda-2: ~p~n", [R]),
+    %% io:format("lambda-2: ~p~n", [R]),
     R.
 
 locconv(ES) ->
@@ -1476,7 +1477,7 @@ unquote_(X, _L, _Env) ->
     X.
 
 mapp_(#item{loc=Loc}, L, Env) ->
-    io:format("mapp-- ~p~n", [L]),
+    %% io:format("mapp-- ~p~n", [L]),
     MapElem = lists:map(fun(Elem) ->
 				map_field(Elem, Env)
 			end, L),
@@ -1533,9 +1534,9 @@ getmacrotable(Env) ->
 
 getmacros_from_module(ModForm, Env) ->
     Mod = form(ModForm, Env),
-    io:format("getmacros: ~p -> ~n~p~n", [ModForm, erl_syntax:revert(Mod)]),
+    %% io:format("getmacros: ~p -> ~n~p~n", [ModForm, erl_syntax:revert(Mod)]),
     {value, ModuleAtom, Env} = erl_eval:expr(erl_syntax:revert(Mod), Env),
-    io:format("getmacro module: ~p~n", [ModuleAtom]),
+    %% io:format("getmacro module: ~p~n", [ModuleAtom]),
     yal_util:required_macros(ModuleAtom).
     
 require_(#item{loc=_Loc}, L, Env) ->
