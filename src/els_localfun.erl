@@ -32,7 +32,7 @@ create_local_func(Name, C, FunDic) ->
 	{function, Anno, _FName, Arity, Ast} ->
 	    LocalFunc = {'named_fun', Anno, Name, Ast},
 	    LocalFunAst = erl_syntax:revert(LocalFunc),
-	    %io:format("create_local_func: ~p=n", [LocalFunAst]),
+	    %% io:format("create_local_func: ~p=n", [LocalFunAst]),
 	    maps:put({Name, Arity}, {{local}, LocalFunAst}, FunDic)
     end.
 
@@ -91,7 +91,7 @@ register_local_func(Node, FunDic) ->
 	    NewFunDic = maps:put({MName, Arity}, {{local}, LocalFunAst}, FunDic),
 	    {NewFunDic, Name, Arity};
 	_ ->
-	    io:format("in register_local_funcA ~p~n", [erl_syntax:revert(Node)]),
+	    %% io:format("in register_local_funcA ~p~n", [erl_syntax:revert(Node)]),
 	    FunDic
     end.
 
@@ -99,7 +99,7 @@ register_local_func(Node, FunDic) ->
 valuefun(Name, Arg) ->
     {{local}, Func} = maps:get({Name, length(Arg)}, get_nfundic()),
     QArg = erl_syntax:revert(erl_syntax:abstract(Arg)),
-    %io:format("---Func: ~p~nArg: ~p~n", [Func, QArg]),
+    %% io:format("---Func: ~p~nArg: ~p~n", [Func, QArg]),
     Q = merl:qquote(?LINE, "apply(_@Func, _@Arg)", [{'Func', Func}, {'Arg', QArg}]),
     QQ = erl_syntax:revert(Q),
     %%io:format("Q: ~p~n", [QQ]),
